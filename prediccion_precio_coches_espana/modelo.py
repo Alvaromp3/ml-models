@@ -55,17 +55,17 @@ def entrenar_modelo(df):
     
     pipe = Pipeline([
         ('preprocessing', preprocessing),
-        ('feature_selection', SelectKBest(f_regression, k=100)),
+        ('feature_selection', SelectKBest(f_regression, k=80)),
         ('model', XGBRegressor(
-            n_estimators=600,
-            learning_rate=0.05,
-            max_depth=8,
-            min_child_weight=5,
-            subsample=0.7,
-            colsample_bytree=0.7,
-            gamma=0.2,
-            reg_alpha=0.3,
-            reg_lambda=1.5,
+            n_estimators=500,
+            learning_rate=0.03,
+            max_depth=6,
+            min_child_weight=10,
+            subsample=0.6,
+            colsample_bytree=0.6,
+            gamma=0.5,
+            reg_alpha=0.5,
+            reg_lambda=2.0,
             random_state=42,
             n_jobs=-1
         ))
