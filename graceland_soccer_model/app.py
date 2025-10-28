@@ -1666,12 +1666,43 @@ elif page == "👥 Team Lineup Calculator":
             </ul>
             
             <h5>⚠️ Critical Considerations</h5>
-            <ul>
-                <li><b>Recent Load:</b> Check injury prevention page for current load status of selected players</li>
-                <li><b>Fatigue Management:</b> High-scoring players may be fatigued - verify current status</li>
-                <li><b>Match Context:</b> Consider if {selection_method} strategy fits the opposition</li>
-                <li><b>Player Availability:</b> Confirm all {team_size} players are match-ready</li>
-            </ul>
+            <ul>""", unsafe_allow_html=True)
+            
+            # Data-driven critical considerations
+            if 'Player Name' in optimal_lineup.columns and df_clean is not None:
+                # Get injury risk data for selected players
+                selected_players = optimal_lineup['Player Name'].tolist()[:team_size]
+                player_risks = []
+                for player in selected_players:
+                    if player in df_clean['Player Name'].values:
+                        player_data = df_clean[df_clean['Player Name'] == player]
+                        if 'injury_risk' in player_data.columns:
+                            risk_level = player_data['injury_risk'].mode()[0] if len(player_data['injury_risk'].mode()) > 0 else 'medium'
+                            player_risks.append(risk_level)
+                
+                high_risk_count = player_risks.count('high')
+                if high_risk_count > 0:
+                    st.markdown(f'<li><b>⚠️ Injury Risk Alert:</b> {high_risk_count} player(s) in high-risk category - load: {", ".join([str(optimal_lineup[optimal_lineup["Player Name"] == p]["Player Load"].values[0]) if "Player Load" in optimal_lineup.columns else "N/A" for p in selected_players[:high_risk_count]])}</li>', unsafe_allow_html=True)
+                
+                # Fatigue analysis
+                if 'Player Load' in optimal_lineup.columns:
+                    avg_load = optimal_lineup['Player Load'].head(team_size).mean()
+                    high_load_players = optimal_lineup[optimal_lineup['Player Load'] > avg_load * 1.2].head(team_size)
+                    if len(high_load_players) > 0:
+                        load_list = ", ".join([f"{name} ({row['Player Load']:.0f})" for name, row in zip(high_load_players['Player Name'].head(3), high_load_players.iterrows())])
+                        st.markdown(f'<li><b>⚡ Fatigue Management:</b> {len(high_load_players)} players with elevated load - monitor: {load_list}</li>', unsafe_allow_html=True)
+                
+                st.markdown(f'<li><b>🎯 Match Context:</b> {selection_method} strategy selected - optimize for: {selection_method.replace("_", " ").title()}</li>', unsafe_allow_html=True)
+                st.markdown(f'<li><b>✅ Player Availability:</b> {team_size} players selected - composite avg: {team_composite_avg:.0f} points</li>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<li><b>Recent Load:</b> Check injury prevention page for current load status of selected players</li>', unsafe_allow_html=True)
+                st.markdown(f'<li><b>Fatigue Management:</b> High-scoring players may be fatigued - verify current status</li>', unsafe_allow_html=True)
+                st.markdown(f'<li><b>Match Context:</b> Consider if {selection_method} strategy fits the opposition</li>', unsafe_allow_html=True)
+                st.markdown(f'<li><b>Player Availability:</b> Confirm all {team_size} players are match-ready</li>', unsafe_allow_html=True)
+            
+            st.markdown("</ul>", unsafe_allow_html=True)
+            
+            st.markdown(f"""
             
             <h5>📈 Performance Projection</h5>
             """, unsafe_allow_html=True)
