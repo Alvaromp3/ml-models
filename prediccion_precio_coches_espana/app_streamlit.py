@@ -89,20 +89,38 @@ def main():
                 return
             
             with st.spinner("Training model..."):
-                r2, mae, rmse = entrenar_modelo(pd.read_csv(DATASET_PATH))
+                metrics_dict = entrenar_modelo(pd.read_csv(DATASET_PATH))
             
             st.success("Model trained successfully!")
             
+            st.subheader("Test Set Metrics (Generalization)")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("R² Score", f"{r2:.4f}")
+                st.metric("R² Score (Test)", f"{metrics_dict['test_r2']:.4f}")
             with col2:
-                st.metric("MAE", f"€{mae:.2f}")
+                st.metric("MAE (Test)", f"€{metrics_dict['test_mae']:.2f}")
             with col3:
-                st.metric("RMSE", f"€{rmse:.2f}")
+                st.metric("RMSE (Test)", f"€{metrics_dict['test_rmse']:.2f}")
+            
+            st.subheader("Train Set Metrics")
+            col4, col5, col6 = st.columns(3)
+            with col4:
+                st.metric("R² Score (Train)", f"{metrics_dict['train_r2']:.4f}")
+            with col5:
+                st.metric("MAE (Train)", f"€{metrics_dict['train_mae']:.2f}")
+            with col6:
+                st.metric("RMSE (Train)", f"€{metrics_dict['train_rmse']:.2f}")
+            
+            overfitting_diff = abs(metrics_dict['train_r2'] - metrics_dict['test_r2'])
+            if overfitting_diff > 0.15:
+                st.warning(f"⚠️ Possible overfitting: R² difference = {overfitting_diff:.3f}")
+            elif overfitting_diff > 0.05:
+                st.info(f"✓ Low overfitting: R² difference = {overfitting_diff:.3f}")
+            else:
+                st.success(f"✓ No overfitting: R² difference = {overfitting_diff:.3f}")
             
             st.session_state['model_trained'] = True
-            st.session_state['metrics'] = {'r2': r2, 'mae': mae, 'rmse': rmse}
+            st.session_state['metrics'] = metrics_dict
         
         except Exception as e:
             st.error(f"Error training model: {str(e)}")

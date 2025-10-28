@@ -57,28 +57,43 @@ def entrenar_modelo(df):
         ('preprocessing', preprocessing),
         ('feature_selection', SelectKBest(f_regression, k='all')),
         ('model', XGBRegressor(
-            n_estimators=800,
-            learning_rate=0.02,
-            max_depth=14,
-            min_child_weight=1,
-            subsample=0.9,
-            colsample_bytree=0.9,
-            gamma=0.01,
-            reg_alpha=0.01,
-            reg_lambda=0.5,
+            n_estimators=1000,
+            learning_rate=0.01,
+            max_depth=16,
+            min_child_weight=0.5,
+            subsample=0.95,
+            colsample_bytree=0.95,
+            gamma=0.0,
+            reg_alpha=0.0,
+            reg_lambda=0.3,
             random_state=42,
             n_jobs=-1
         ))
     ])
     
     pipe.fit(X_train, y_train)
-    y_pred = pipe.predict(X_test)
     
-    mae = mean_absolute_error(y_test, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-    r2 = r2_score(y_test, y_pred)
+    y_pred_train = pipe.predict(X_train)
+    y_pred_test = pipe.predict(X_test)
     
-    return r2, mae, rmse
+    train_r2 = r2_score(y_train, y_pred_train)
+    test_r2 = r2_score(y_test, y_pred_test)
+    train_mae = mean_absolute_error(y_train, y_pred_train)
+    test_mae = mean_absolute_error(y_test, y_pred_test)
+    train_rmse = np.sqrt(mean_squared_error(y_train, y_pred_train))
+    test_rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
+    
+    metrics = {
+        'train_r2': train_r2,
+        'test_r2': test_r2,
+        'train_mae': train_mae,
+        'test_mae': test_mae,
+        'train_rmse': train_rmse,
+        'test_rmse': test_rmse,
+        'overfitting': abs(train_r2 - test_r2)
+    }
+    
+    return metrics
 
 def predecir(edad, kilometraje_km, potencia_cv, consumo_l_100km, num_duenos, puertas,
             marca, modelo, combustible, transmision, estado, region, color, carroceria):

@@ -27,13 +27,17 @@ def entrenar():
         
         df = pd.read_csv(DATASET_PATH)
         
-        r2, mae, rmse = entrenar_modelo(df)
+        metrics_dict = entrenar_modelo(df)
         
         modelo_entrenado = True
         metricas = {
-            'r2': round(r2, 3),
-            'mae': round(mae, 2),
-            'rmse': round(rmse, 2)
+            'train_r2': round(metrics_dict['train_r2'], 3),
+            'test_r2': round(metrics_dict['test_r2'], 3),
+            'train_mae': round(metrics_dict['train_mae'], 2),
+            'test_mae': round(metrics_dict['test_mae'], 2),
+            'train_rmse': round(metrics_dict['train_rmse'], 2),
+            'test_rmse': round(metrics_dict['test_rmse'], 2),
+            'overfitting': round(metrics_dict['overfitting'], 3)
         }
         
         return jsonify({
