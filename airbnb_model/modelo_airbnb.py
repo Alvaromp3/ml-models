@@ -15,6 +15,7 @@ class ModeloAirbnb:
     def __init__(self):
         self.pipeline = None
         self.label_encoders = {}
+        self.metrics = {}
         
     def limpiar_datos(self, df):
         df_clean = df.copy()
@@ -77,9 +78,18 @@ class ModeloAirbnb:
         self.pipeline.fit(X_train, y_train)
         
         y_pred = self.pipeline.predict(X_test)
-        r2 = r2_score(y_test, y_pred)
         
-        return r2
+        r2 = r2_score(y_test, y_pred)
+        mae = mean_absolute_error(y_test, y_pred)
+        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+        
+        self.metrics = {
+            'r2': r2,
+            'mae': mae,
+            'rmse': rmse
+        }
+        
+        return self.metrics
     
     def predecir(self, datos):
         # Codificar variables categóricas usando los encoders entrenados
