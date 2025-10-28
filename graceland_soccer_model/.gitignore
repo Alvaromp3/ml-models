@@ -46,4 +46,30 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Environment variables
+.env
+.env.local
+
+# Model artifacts
+models/*.pkl
+models/*.joblib
+
+# Reports
+reports/*.xlsx
+reports/*.pdf
+reports/*.csv
+
+# Logs
+logs/
+*.log.*
+
+# Jupyter
+.ipynb_checkpoints
+
+# Test
+.pytest_cache/
+.coverage
 

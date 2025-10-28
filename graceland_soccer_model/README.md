@@ -1,10 +1,17 @@
 # ⚽ Elite Sports Performance Analytics
 
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
+[![Streamlit](https://img.shields.io/badge/streamlit-1.28+-red.svg)](https://streamlit.io)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-production-brightgreen.svg)](https://github.com/Alvaromp3/ml-models)
+
 Advanced machine learning platform for analyzing soccer player performance, preventing injuries, and optimizing team lineups.
 
-## Author
+## 👤 Author
 
-**Developed by Alvaro Martin-Pena** | Machine Learning Engineer
+**Alvaro Martin-Pena** | Machine Learning Engineer
+
+- GitHub: [@Alvaromp3](https://github.com/Alvaromp3)
 
 ## 🎯 Features
 
