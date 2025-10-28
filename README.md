@@ -11,7 +11,6 @@ A curated collection of machine learning demo applications and models.
 - **flight_price_predictor/** — Streamlit app for Iberia flight price prediction and route visualization (CatBoost)
 - **graceland_soccer_model/** — Sports performance analytics platform (regression + classification)
 
-
 ## Usage
 
 Each project folder contains its own README with setup and usage instructions.
