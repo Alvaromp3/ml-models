@@ -65,19 +65,21 @@ class ModeloAirbnb:
         
         from catboost import CatBoostRegressor
         
-        # CatBoost handles categorical features automatically
-        cat_indices = [X_train.columns.get_loc(col) for col in cat_features if col in X_train.columns]
-        
+        # Train CatBoost without specifying categorical features (let it auto-detect)
+        # Since we already encoded categoricals, CatBoost will treat them as numeric
+        # For better performance, let's use more iterations and deeper trees
         self.pipeline = Pipeline([
             ('preprocessing', preprocessing),
             ('model', CatBoostRegressor(
-                iterations=300,
-                learning_rate=0.1,
-                depth=8,
+                iterations=600,
+                learning_rate=0.03,
+                depth=12,
+                l2_leaf_reg=5,
                 loss_function='RMSE',
+                eval_metric='RMSE',
                 verbose=False,
                 random_state=42,
-                cat_features=cat_indices
+                task_type='CPU'
             ))
         ])
         
