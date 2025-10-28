@@ -18,6 +18,7 @@ Advanced machine learning platform for analyzing soccer player performance, prev
 ## 📸 Live Demo
 
 **🎯 Try the application online now:**
+
 - **Dashboard**: KPIs overview with real-time player risk alerts
 - **Model Training**: Train and evaluate regression + classification models
 - **Injury Prevention**: Automated risk assessment with personalized recommendations

@@ -53,6 +53,23 @@ from xgboost import XGBClassifier, XGBRegressor
 from lightgbm import LGBMClassifier, LGBMRegressor
 from catboost import CatBoostClassifier, CatBoostRegressor
 
+# Advanced ML extensions
+try:
+    from advanced_ml_extensions import (
+        compute_cross_validation_metrics,
+        generate_shap_analysis,
+        plot_shap_summary,
+        log_to_mlflow,
+        display_cv_metrics,
+        create_cv_box_plot,
+        SHAP_AVAILABLE,
+        MLFLOW_AVAILABLE
+    )
+except ImportError:
+    SHAP_AVAILABLE = False
+    MLFLOW_AVAILABLE = False
+    logging.warning("Advanced ML extensions not available")
+
 # Set page config
 st.set_page_config(
     page_title="Elite Sports Performance Analytics | Alvaro Martin-Pena",
@@ -651,6 +668,27 @@ def train_regression_model_fast(df, use_early_stopping=True, use_saved_model=Tru
     # Log training results
     log_training_results('regression', metrics, {'use_early_stopping': use_early_stopping})
     
+    # Compute cross-validation metrics
+    cv_metrics = None
+    if 'compute_cross_validation_metrics' in globals():
+        try:
+            cv_metrics = compute_cross_validation_metrics(pipe, X, y, cv_folds=5, model_type='regression')
+            metrics['cv'] = cv_metrics
+        except Exception as e:
+            logging.warning(f"Cross-validation failed: {e}")
+    
+    # Log to MLflow if available
+    if MLFLOW_AVAILABLE and 'log_to_mlflow' in globals():
+        try:
+            log_to_mlflow(
+                pipe, 
+                'regression_model',
+                metrics,
+                params={'use_early_stopping': use_early_stopping}
+            )
+        except Exception as e:
+            logging.warning(f"MLflow logging failed: {e}")
+    
     # Save model
     save_model(pipe, 'regression', metrics, features)
     
@@ -732,6 +770,25 @@ def train_classification_model_fast(df, use_saved_model=True):
     
     # Log training results
     log_training_results('classification', metrics)
+    
+    # Compute cross-validation metrics
+    if 'compute_cross_validation_metrics' in globals():
+        try:
+            cv_metrics = compute_cross_validation_metrics(pipe, X, y, cv_folds=5, model_type='classification')
+            metrics['cv'] = cv_metrics
+        except Exception as e:
+            logging.warning(f"Cross-validation failed: {e}")
+    
+    # Log to MLflow if available
+    if MLFLOW_AVAILABLE and 'log_to_mlflow' in globals():
+        try:
+            log_to_mlflow(
+                pipe,
+                'classification_model',
+                metrics
+            )
+        except Exception as e:
+            logging.warning(f"MLflow logging failed: {e}")
     
     # Save model
     save_model(pipe, 'classification', metrics, features)
@@ -1041,6 +1098,29 @@ elif page == "🤖 Model Training":
                     if fig_overfitting:
                         st.plotly_chart(fig_overfitting, use_container_width=True)
                     
+                    # Cross-validation metrics
+                    if 'cv' in metrics and display_cv_metrics in globals():
+                        st.markdown("---")
+                        display_cv_metrics(metrics['cv'], model_type='regression')
+                        
+                        # Box plot for CV
+                        cv_box = create_cv_box_plot(metrics['cv'], model_type='regression')
+                        if cv_box:
+                            st.plotly_chart(cv_box, use_container_width=True)
+                    
+                    # SHAP feature importance
+                    if SHAP_AVAILABLE and 'generate_shap_analysis' in globals():
+                        with st.expander("🔬 SHAP Analysis (Advanced Explainability)", expanded=False):
+                            st.info("SHAP values explain individual predictions by showing feature contributions")
+                            try:
+                                shap_values, X_transformed = generate_shap_analysis(model, st.session_state.df[features].head(100), features)
+                                if shap_values is not None:
+                                    fig_shap = plot_shap_summary(shap_values, X_transformed, features)
+                                    if fig_shap:
+                                        st.plotly_chart(fig_shap, use_container_width=True)
+                            except Exception as e:
+                                st.warning(f"SHAP analysis failed: {e}")
+                    
                     # Feature importance visualization
                     st.markdown("### 🔍 Feature Importance")
                     importance_df = plot_feature_importance(model, features)
@@ -1064,6 +1144,10 @@ elif page == "🤖 Model Training":
                         st.plotly_chart(fig_importance, use_container_width=True)
                     else:
                         st.info("Feature importance not available for this model type.")
+                    
+                    # MLflow tracking status
+                    if MLFLOW_AVAILABLE:
+                        st.success("✅ Model logged to MLflow for versioning and tracking")
                     
                     st.markdown(f"**Features used:** {len(features)}")
                     with st.expander("View all features"):
