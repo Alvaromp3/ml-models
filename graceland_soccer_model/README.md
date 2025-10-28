@@ -15,34 +15,18 @@ Advanced machine learning platform for analyzing soccer player performance, prev
 
 **🎯 Try it now:** [https://ml-models-afmi4erd2llrbwjbxwc5qr.streamlit.app/](https://ml-models-afmi4erd2llrbwjbxwc5qr.streamlit.app/)
 
-## 📸 Screenshots
+## 📸 Live Demo
 
-### Dashboard Overview
+**🎯 Try the application online now:**
+- **Dashboard**: KPIs overview with real-time player risk alerts
+- **Model Training**: Train and evaluate regression + classification models
+- **Injury Prevention**: Automated risk assessment with personalized recommendations
+- **Player Load Analysis**: Individual player performance tracking and insights
+- **Team Lineup Calculator**: Optimize team formations with multiple strategies
 
-![Dashboard](screenshots/dashboard.png)
-_Quick overview of KPIs and player risk alerts_
+👉 **[Open Live Demo](https://ml-models-afmi4erd2llrbwjbxwc5qr.streamlit.app/)**
 
-### Model Training Interface
-
-![Model Training](screenshots/model_training.png)
-_Train regression and classification models with performance metrics_
-
-### Injury Risk Prevention
-
-![Injury Prevention](screenshots/injury_prevention.png)
-_Automated risk assessment and personalized recommendations_
-
-### Player Load Analysis
-
-![Player Load Analysis](screenshots/player_load.png)
-_Individual player performance tracking and insights_
-
-### Team Lineup Calculator
-
-![Lineup Calculator](screenshots/lineup_calculator.png)
-_Optimize team formations with multiple strategies_
-
-> **Note**: Screenshots will be added in the first release. The application runs locally at `http://localhost:8501`
+> **Note**: The demo is fully functional with sample Catapult data included. No installation required!
 
 ## 👤 Author
 
