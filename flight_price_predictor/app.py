@@ -1,25 +1,22 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import os
 import plotly.express as px
 import plotly.graph_objects as go
-from sklearn.model_selection import train_test_split, GridSearchCV, KFold, cross_val_score
+from sklearn.model_selection import train_test_split, GridSearchCV, KFold
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, make_scorer
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from xgboost import XGBRegressor
-from lightgbm import LGBMRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from catboost import CatBoostRegressor
-from sklearn.linear_model import LinearRegression, Lasso
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, StackingRegressor
 import warnings
 warnings.filterwarnings("ignore")
 
+DATASET_PATH = os.getenv('FLIGHT_DATASET_PATH', 'iberia_flight_prices_2025.csv')
+
 st.set_page_config(
-    page_title="✈️ Iberia Flight Price Predictor",
+    page_title="Iberia Flight Price Predictor | Alvaro Martin-Pena",
     page_icon="✈️",
     layout="wide"
 )
@@ -207,19 +204,16 @@ def entrenar_mejor_modelo(df, target_col):
         'model__l2_leaf_reg': [3, 5]
     }
     
-    # crear GridSearch para encontrar los mejores parametros
     grid = GridSearchCV(
         estimator=pipe,
         param_grid=param_grid,
         cv=kf,
         scoring='r2',
-        n_jobs=-1,  # para usar todos los nucleos de nuestra CPU
+        n_jobs=-1
     )
 
-    # entrenar grid
     grid.fit(X, y)
     
-    # imprimir best_parametrers 
     print(f"\nBest Parameters:\n{grid.best_params_}")
     print(f"\nBest R² Score: {grid.best_score_:.4f}")
 
@@ -227,11 +221,15 @@ def entrenar_mejor_modelo(df, target_col):
 
 @st.cache_resource
 def train_model():
-    df = pd.read_csv('/Users/alvaromartin-pena/anaconda_projects/4e1a8735-845d-491d-84cd-848cf9c616ea/iberia_flight_prices_2025.csv')
+    if not os.path.exists(DATASET_PATH):
+        st.error(f"Dataset not found: {DATASET_PATH}")
+        st.info("Please place 'iberia_flight_prices_2025.csv' in the project directory or set FLIGHT_DATASET_PATH environment variable")
+        st.stop()
+    
+    df = pd.read_csv(DATASET_PATH)
     
     best_model, best_params = entrenar_mejor_modelo(df, 'price_eur')
     
-    # Calculate metrics on test set
     df_clean = limpiar_datos(df)
     X = df_clean.drop(columns=['price_eur'])
     y = df_clean['price_eur']
@@ -358,15 +356,13 @@ def create_flight_path_animation(origin, destination):
     return fig
 
 def main():
-    st.markdown('<h1 class="main-header">✈️ Predictor de Precios Iberia</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">Predice precios de vuelos y visualiza tu viaje</p>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">✈️ Iberia Flight Price Predictor</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle">Developed by Alvaro Martin-Pena | Machine Learning Engineer</p>', unsafe_allow_html=True)
     
-    # Load model
-    with st.spinner('Cargando modelo de predicción...'):
+    with st.spinner('Loading prediction model...'):
         model, r2_score_val, mae_val, feature_cols = train_model()
     
-    # Get available origins and destinations from the data
-    df_sample = pd.read_csv('/Users/alvaromartin-pena/anaconda_projects/4e1a8735-845d-491d-84cd-848cf9c616ea/iberia_flight_prices_2025.csv')
+    df_sample = pd.read_csv(DATASET_PATH)
     available_origins = sorted(df_sample['origin'].unique())
     available_destinations = sorted(df_sample['destination'].unique())
     
