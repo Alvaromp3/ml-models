@@ -1805,18 +1805,60 @@ elif page == "📉 Performance Analytics":
                     """, unsafe_allow_html=True)
                     
                 elif analysis_to_explain == "📈 Performance Distribution":
-                    st.markdown("""
-                    <div class="info-box">
-                    <h4>📈 What Distribution Plots Show</h4>
-                    <p><b>This is like a report card for your entire team.</b></p>
-                    <ul>
-                        <li><b>Normal bell curve:</b> Most players cluster around average - healthy team consistency</li>
-                        <li><b>Peaks (tails):</b> Some players far above or below average - mix of high performers and development players</li>
-                        <li><b>Mean vs Median:</b> If mean (red line) is much higher than median (green), you have a few superstars pulling the average up</li>
-                    </ul>
-                    <p><b>What to look for:</b> Watch for players way off to the right (overperforming - good!) or way off to the left (underperforming - needs attention).</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    if selected_player_for_explain:
+                        # Get player-specific data
+                        player_data_explain = df_clean[df_clean['Player Name'] == selected_player_for_explain]
+                        
+                        if len(player_data_explain) > 0:
+                            # Calculate player's position in distribution
+                            if 'Player Load' in df_clean.columns and 'Player Load' in player_data_explain.columns:
+                                player_load = player_data_explain['Player Load'].mean()
+                                team_mean = df_clean['Player Load'].mean()
+                                team_std = df_clean['Player Load'].std()
+                                
+                                if player_load > team_mean + team_std:
+                                    position = f"far ABOVE average (Load: {player_load:.0f} vs Team Avg: {team_mean:.0f})"
+                                    insight = f"{selected_player_for_explain} is a high performer - elite level load. Monitor for overtraining."
+                                elif player_load > team_mean:
+                                    position = f"ABOVE average (Load: {player_load:.0f} vs Team Avg: {team_mean:.0f})"
+                                    insight = f"{selected_player_for_explain} is performing well - maintaining good intensity."
+                                elif player_load < team_mean - team_std:
+                                    position = f"far BELOW average (Load: {player_load:.0f} vs Team Avg: {team_mean:.0f})"
+                                    insight = f"{selected_player_for_explain} may need higher training intensity or recovery period."
+                                else:
+                                    position = f"AVERAGE (Load: {player_load:.0f} vs Team Avg: {team_mean:.0f})"
+                                    insight = f"{selected_player_for_explain} is at team baseline - may need targeted improvement."
+                                
+                                st.markdown(f"""
+                                <div class="info-box">
+                                <h4>📈 {selected_player_for_explain}'s Position in Team Distribution</h4>
+                                <p><b>{selected_player_for_explain} is {position}</b></p>
+                                <p><b>Your analysis:</b> {insight}</p>
+                                <p><b>Team distribution shows:</b> Bell curve = consistency | Peaks = star players | Tails = outliers</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            else:
+                                st.markdown("""
+                                <div class="info-box">
+                                <h4>📈 What Distribution Plots Show</h4>
+                                <p><b>This is like a report card for your entire team.</b></p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        else:
+                            st.warning(f"No data available for {selected_player_for_explain}")
+                    else:
+                        st.markdown("""
+                        <div class="info-box">
+                        <h4>📈 What Distribution Plots Show</h4>
+                        <p><b>This is like a report card for your entire team.</b></p>
+                        <ul>
+                            <li><b>Normal bell curve:</b> Most players cluster around average - healthy team consistency</li>
+                            <li><b>Peaks (tails):</b> Some players far above or below average - mix of high performers and development players</li>
+                            <li><b>Mean vs Median:</b> If mean (red line) is much higher than median (green), you have a few superstars pulling the average up</li>
+                        </ul>
+                        <p><b>What to look for:</b> Watch for players way off to the right (overperforming - good!) or way off to the left (underperforming - needs attention).</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                     
                 elif analysis_to_explain == "📅 Temporal Performance Trends":
                     if selected_player_for_explain:
