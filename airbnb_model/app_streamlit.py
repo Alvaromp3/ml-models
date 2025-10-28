@@ -100,7 +100,7 @@ def main():
         """, unsafe_allow_html=True)
         
         st.markdown("---")
-        st.info("**Model**: CatBoost Regressor (300 iterations)")
+        st.info("**Model**: XGBoost Regressor (500 estimators)")
         st.info("**Training Data**: Synthetic Airbnb dataset")
         st.success("**Expected R²**: > 0.90 (Excellent performance)")
     
@@ -155,30 +155,26 @@ def main():
             # Feature importance
             st.subheader("Feature Importance")
             try:
-                if hasattr(modelo.pipeline.named_steps['model'], 'get_feature_importance'):
-                    # CatBoost
+                model = modelo.pipeline.named_steps['model']
+                
+                if hasattr(model, 'feature_importances_'):
                     feature_names = ['latitude', 'longitude', 'bedrooms', 'bathrooms', 
                                    'number_of_reviews', 'availability_365', 'property_type', 'room_type']
-                    importances = modelo.pipeline.named_steps['model'].get_feature_importance()
-                elif hasattr(modelo.pipeline.named_steps['model'], 'feature_importances_'):
-                    # Random Forest
-                    feature_names = ['latitude', 'longitude', 'bedrooms', 'bathrooms', 
-                                   'number_of_reviews', 'availability_365', 'property_type', 'room_type']
-                    importances = modelo.pipeline.named_steps['model'].feature_importances_
+                    importances = model.feature_importances_
+                    
+                    # Ensure same length
+                    min_len = min(len(feature_names), len(importances))
+                    feature_names = feature_names[:min_len]
+                    importances = importances[:min_len]
+                    
+                    importance_df = pd.DataFrame({
+                        'Feature': feature_names,
+                        'Importance': importances
+                    }).sort_values('Importance', ascending=False)
+                    
+                    st.bar_chart(importance_df.set_index('Feature'))
                 else:
-                    raise AttributeError("No feature importance method found")
-                
-                # Ensure same length
-                min_len = min(len(feature_names), len(importances))
-                feature_names = feature_names[:min_len]
-                importances = importances[:min_len]
-                
-                importance_df = pd.DataFrame({
-                    'Feature': feature_names,
-                    'Importance': importances
-                }).sort_values('Importance', ascending=False)
-                
-                st.bar_chart(importance_df.set_index('Feature'))
+                    st.info("Feature importance not available for this model")
             except Exception as e:
                 st.warning(f"Could not display feature importance: {str(e)}")
         
