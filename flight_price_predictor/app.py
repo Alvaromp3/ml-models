@@ -636,6 +636,16 @@ def main():
         <p style="font-size: 1.5rem; font-weight: 700; color: #f87171;">€{mae_val:.2f}</p>
         </div>
         ''', unsafe_allow_html=True)
+    
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; color: #666; padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 15px; margin-top: 3rem;">
+        <p style="font-size: 1.5rem; font-weight: 600; color: white; margin-bottom: 0.5rem;">✈️ Iberia Flight Price Predictor</p>
+        <p><strong>Developed by Alvaro Martin-Pena</strong></p>
+        <p>Machine Learning Engineer | Data Scientist</p>
+        <p style="font-size: 0.9rem; margin-top: 1rem; opacity: 0.8;">© 2024 Alvaro Martin-Pena - All rights reserved</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
