@@ -6,7 +6,8 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from xgboost import XGBClassifier
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from xgboost import XGBClassifier, XGBRegressor
 
 pipe = None
 
@@ -59,12 +60,14 @@ def entrenar_modelo():
         ('preprocessing', preprocessing),
         ('model', XGBClassifier(
             n_estimators=400,
-            learning_rate=0.05,
-            max_depth=6,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            reg_alpha=0.0,
-            reg_lambda=1.0,
+            learning_rate=0.08,
+            max_depth=5,
+            min_child_weight=6,
+            subsample=0.75,
+            colsample_bytree=0.75,
+            gamma=0.3,
+            reg_alpha=0.3,
+            reg_lambda=2.0,
             random_state=42,
             n_jobs=-1,
             eval_metric='logloss'
@@ -105,5 +108,73 @@ def predecir(data):
         confidence = max(probability) * 100
         
         return quality, f"Confianza: {confidence:.1f}%"
+    except Exception as e:
+        return None, f"Error en predicción: {str(e)}"
+
+# ======================
+# REGRESIÓN (R² / MAE / RMSE)
+# ======================
+def entrenar_modelo_regresion():
+    dataset_path = os.getenv('WINE_DATASET_PATH', 'winequalityN.csv')
+    df = pd.read_csv(dataset_path)
+    df_clean = limpiar_datos(df)
+    
+    X = df_clean.drop(columns=['quality'])
+    y = df_clean['quality'].astype(float)
+    
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+    
+    numeric_features = ['fixed acidity', 'volatile acidity', 'citric acid', 'residual sugar', 'chlorides', 
+                       'free sulfur dioxide', 'total sulfur dioxide', 'density', 'pH', 'sulphates', 'alcohol']
+    cat_features = ['type']
+    
+    preprocessing = ColumnTransformer(
+        transformers=[
+            ('num', StandardScaler(), numeric_features),
+            ('cat', OneHotEncoder(handle_unknown='ignore'), cat_features)
+        ]
+    )
+    
+    model = XGBRegressor(
+        n_estimators=300,
+        learning_rate=0.05,
+        max_depth=3,
+        min_child_weight=8,
+        subsample=0.6,
+        colsample_bytree=0.6,
+        gamma=0.5,
+        reg_alpha=0.5,
+        reg_lambda=3.0,
+        random_state=42,
+        n_jobs=-1
+    )
+    
+    pipe_reg = Pipeline([
+        ('preprocessing', preprocessing),
+        ('model', model)
+    ])
+    
+    pipe_reg.fit(X_train, y_train)
+    y_pred_train = pipe_reg.predict(X_train)
+    y_pred_test = pipe_reg.predict(X_test)
+    
+    metrics = {
+        'train_r2': float(r2_score(y_train, y_pred_train)),
+        'test_r2': float(r2_score(y_test, y_pred_test)),
+        'train_mae': float(mean_absolute_error(y_train, y_pred_train)),
+        'test_mae': float(mean_absolute_error(y_test, y_pred_test)),
+        'train_rmse': float(mean_squared_error(y_train, y_pred_train, squared=False)),
+        'test_rmse': float(mean_squared_error(y_test, y_pred_test, squared=False)),
+    }
+    
+    return metrics, pipe_reg
+
+def predecir_regresion(pipe_reg, data):
+    try:
+        df_input = pd.DataFrame([data])
+        pred = float(pipe_reg.predict(df_input)[0])
+        return pred, None
     except Exception as e:
         return None, f"Error en predicción: {str(e)}"
