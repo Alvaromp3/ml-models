@@ -14,9 +14,11 @@ A curated collection of machine learning demo applications and models.
 - **vinos_modelo/** — Flask app to classify wine quality
 
 ## Usage
+
 Each project folder contains its own README with setup and usage instructions.
 
 ## Author
+
 **Alvaro Martin-Pena**
 
 - Machine Learning Engineer
