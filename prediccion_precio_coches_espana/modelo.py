@@ -4,7 +4,6 @@ import os
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.decomposition import PCA
 from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn.pipeline import Pipeline
 from xgboost import XGBRegressor
@@ -56,18 +55,17 @@ def entrenar_modelo(df):
     
     pipe = Pipeline([
         ('preprocessing', preprocessing),
-        ('feature_selection', SelectKBest(f_regression, k=30)),
-        ('pca', PCA(n_components=15)),
+        ('feature_selection', SelectKBest(f_regression, k='all')),
         ('model', XGBRegressor(
-            n_estimators=600,
-            learning_rate=0.03,
-            max_depth=12,
-            min_child_weight=2,
-            subsample=0.85,
-            colsample_bytree=0.85,
-            gamma=0.05,
-            reg_alpha=0.05,
-            reg_lambda=0.8,
+            n_estimators=800,
+            learning_rate=0.02,
+            max_depth=14,
+            min_child_weight=1,
+            subsample=0.9,
+            colsample_bytree=0.9,
+            gamma=0.01,
+            reg_alpha=0.01,
+            reg_lambda=0.5,
             random_state=42,
             n_jobs=-1
         ))
