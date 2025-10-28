@@ -63,15 +63,21 @@ class ModeloAirbnb:
             ]
         )
         
+        from catboost import CatBoostRegressor
+        
+        # CatBoost handles categorical features automatically
+        cat_indices = [X_train.columns.get_loc(col) for col in cat_features if col in X_train.columns]
+        
         self.pipeline = Pipeline([
             ('preprocessing', preprocessing),
-            ('model', RandomForestRegressor(
-                n_estimators=150,
-                max_depth=15,
-                min_samples_split=5,
-                min_samples_leaf=2,
+            ('model', CatBoostRegressor(
+                iterations=300,
+                learning_rate=0.1,
+                depth=8,
+                loss_function='RMSE',
+                verbose=False,
                 random_state=42,
-                n_jobs=-1
+                cat_features=cat_indices
             ))
         ])
         
