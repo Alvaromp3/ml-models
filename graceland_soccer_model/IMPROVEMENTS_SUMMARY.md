@@ -5,20 +5,24 @@
 ### 1. ✅ Cross-Validation Metrics (K-Fold)
 
 **What it does:**
+
 - Implements 5-fold cross-validation to provide robust performance estimates
 - Calculates mean, std, min, and max for each metric
 - Shows performance ranges to assess model stability
 
 **Where to use:**
+
 - Automatically calculated after training regression or classification models
 - Results displayed in the "Model Training" section
 
 **Benefits:**
+
 - More reliable performance estimates than single train/test split
 - Helps identify overfitting across different data splits
 - Professional-grade evaluation standard
 
 **Implementation:**
+
 ```python
 cv_metrics = compute_cross_validation_metrics(pipe, X, y, cv_folds=5, model_type='regression')
 ```
@@ -28,20 +32,24 @@ cv_metrics = compute_cross_validation_metrics(pipe, X, y, cv_folds=5, model_type
 ### 2. ✅ SHAP Values for Explainability
 
 **What it does:**
+
 - Explains individual predictions by showing feature contributions
 - Visualizes feature importance with SHAP values
 - Provides transparent, interpretable machine learning
 
 **Where to use:**
+
 - Available in "Model Training" section under "🔬 SHAP Analysis"
 - Expander section with summary plot
 
 **Benefits:**
+
 - Understand why a model makes specific predictions
 - Identify which features drive player load or injury risk
 - Build trust with coaches through transparency
 
 **Implementation:**
+
 ```python
 shap_values, X_transformed = generate_shap_analysis(pipeline, X_sample, features)
 fig_shap = plot_shap_summary(shap_values, X_transformed, features)
@@ -52,21 +60,25 @@ fig_shap = plot_shap_summary(shap_values, X_transformed, features)
 ### 3. ✅ MLflow Integration for Model Versioning
 
 **What it does:**
+
 - Automatically logs trained models to MLflow
 - Tracks hyperparameters and metrics
 - Enables model comparison and rollback
 
 **Where to use:**
+
 - Automatically executed after training any model
 - Displays "✅ Model logged to MLflow" message when successful
 
 **Benefits:**
+
 - Version control for ML models
 - Track experiments and compare model performance
 - Reproducible machine learning workflow
 - Professional MLOps standard
 
 **Implementation:**
+
 ```python
 log_to_mlflow(pipeline, 'regression_model', metrics, params)
 ```
@@ -102,10 +114,12 @@ Since you'll use real Catapult data:
 ## Technical Details
 
 ### Files Added:
+
 - `advanced_ml_extensions.py` - Contains all advanced ML functions
 - Updated `app.py` - Integrated extensions into training workflow
 
 ### Dependencies Added:
+
 ```txt
 shap>=0.42.0           # For explainability
 mlflow>=2.8.0          # For model versioning
@@ -115,11 +129,13 @@ protobuf>=3.20,<5      # Compatibility constraint
 ### How It Works:
 
 1. **During Training:**
+
    - Models are trained as before
    - Cross-validation runs automatically
    - Results logged to MLflow
 
 2. **After Training:**
+
    - CV metrics displayed with ranges
    - SHAP analysis available on demand
    - Status messages confirm MLflow logging
@@ -135,12 +151,14 @@ protobuf>=3.20,<5      # Compatibility constraint
 
 ### Why These Features Matter:
 
-1. **Cross-Validation**: 
+1. **Cross-Validation**:
+
    - Shows you understand robust evaluation
    - Industry standard for ML projects
    - Demonstrates statistical rigor
 
 2. **SHAP Explainability**:
+
    - Addresses "black box" criticism
    - Shows you care about interpretability
    - Coaches can trust the recommendations
@@ -171,4 +189,3 @@ protobuf>=3.20,<5      # Compatibility constraint
 ---
 
 **Status**: ✅ All features implemented and ready for your dataset!
-
