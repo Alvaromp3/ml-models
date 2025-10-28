@@ -1,0 +1,41 @@
+# CatBoost training artifacts
+catboost_info/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Model files
+*.pkl
+*.joblib
+*.h5
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Data files
+*.csv
+!sample_*.csv
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+
