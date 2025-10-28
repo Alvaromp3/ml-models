@@ -1689,7 +1689,7 @@ elif page == "👥 Team Lineup Calculator":
                     avg_load = optimal_lineup['Player Load'].head(team_size).mean()
                     high_load_players = optimal_lineup[optimal_lineup['Player Load'] > avg_load * 1.2].head(team_size)
                     if len(high_load_players) > 0:
-                        load_list = ", ".join([f"{name} ({row['Player Load']:.0f})" for name, row in zip(high_load_players['Player Name'].head(3), high_load_players.iterrows())])
+                        load_list = ", ".join([f"{name} ({load:.0f})" for name, load in zip(high_load_players['Player Name'].head(3), high_load_players['Player Load'].head(3))])
                         st.markdown(f'<li><b>⚡ Fatigue Management:</b> {len(high_load_players)} players with elevated load - monitor: {load_list}</li>', unsafe_allow_html=True)
                 
                 st.markdown(f'<li><b>🎯 Match Context:</b> {selection_method} strategy selected - optimize for: {selection_method.replace("_", " ").title()}</li>', unsafe_allow_html=True)
