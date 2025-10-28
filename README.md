@@ -149,6 +149,32 @@ The application will open automatically in your browser at `http://localhost:850
 
 > **Note**: On macOS, you may need to use `python3` instead of `python`
 
+### 🌐 Deploy to Streamlit Cloud
+
+**Option 1: Deploy via GitHub**
+1. Go to [https://streamlit.io/cloud](https://streamlit.io/cloud)
+2. Sign in with GitHub
+3. Click "New app"
+4. Select repository: `Alvaromp3/ml-models`
+5. Set Main file path: `graceland_soccer_model/app.py`
+6. Click "Deploy!"
+7. Your app will be live at: `https://your-app-name.streamlit.app`
+
+**Option 2: Deploy from this directory**
+```bash
+# Install Streamlit CLI (if not already installed)
+pip install streamlit
+
+# Deploy using Streamlit Cloud CLI
+streamlit deploy
+```
+
+### 🐳 Deploy with Docker
+```bash
+docker build -t graceland-soccer .
+docker run -p 8501:8501 graceland-soccer
+```
+
 ## 📊 Dataset Requirements
 
 **⚠️ IMPORTANT**: This application requires data exported from **Catapult Sports GPS tracking systems**. The CSV file must contain the following columns (or similar):
