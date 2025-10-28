@@ -419,11 +419,13 @@ def train_regression_model_fast(df):
     preprocessor = ColumnTransformer([('num', StandardScaler(), features)])
     
     model = GradientBoostingRegressor(
-        n_estimators=200,
-        learning_rate=0.1,
-        max_depth=4,
-        subsample=1.0,
-        min_samples_split=2,
+        n_estimators=150,
+        learning_rate=0.08,
+        max_depth=3,
+        subsample=0.75,
+        min_samples_split=10,
+        min_samples_leaf=4,
+        max_features='sqrt',
         random_state=42
     )
     
