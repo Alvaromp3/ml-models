@@ -6,7 +6,7 @@ A curated collection of machine learning demo applications and models.
 
 ## 🌐 Live Demos
 
-- **Elite Sports Performance Analytics** ⚽ [View Demo](https://graceland-soccer-model.streamlit.app)
+- **Elite Sports Performance Analytics** ⚽ [🚀 Live Demo](https://ml-models-afmi4erd2llrbwjbxwc5qr.streamlit.app/)
 
 ## Projects
 
