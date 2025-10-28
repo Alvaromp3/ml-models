@@ -91,3 +91,6 @@ htmlcov/
 *.bak
 *.tmp
 
+# MLflow
+mlruns/
+

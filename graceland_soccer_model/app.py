@@ -668,9 +668,9 @@ def train_regression_model_fast(df, use_early_stopping=True, use_saved_model=Tru
     # Log training results
     log_training_results('regression', metrics, {'use_early_stopping': use_early_stopping})
     
-    # Compute cross-validation metrics
+    # Compute cross-validation metrics (skip if data is too large for performance)
     cv_metrics = None
-    if 'compute_cross_validation_metrics' in globals():
+    if len(X) < 500 and 'compute_cross_validation_metrics' in globals():
         try:
             cv_metrics = compute_cross_validation_metrics(pipe, X, y, cv_folds=5, model_type='regression')
             metrics['cv'] = cv_metrics
@@ -771,8 +771,8 @@ def train_classification_model_fast(df, use_saved_model=True):
     # Log training results
     log_training_results('classification', metrics)
     
-    # Compute cross-validation metrics
-    if 'compute_cross_validation_metrics' in globals():
+    # Compute cross-validation metrics (skip if data is too large for performance)
+    if len(X) < 500 and 'compute_cross_validation_metrics' in globals():
         try:
             cv_metrics = compute_cross_validation_metrics(pipe, X, y, cv_folds=5, model_type='classification')
             metrics['cv'] = cv_metrics
