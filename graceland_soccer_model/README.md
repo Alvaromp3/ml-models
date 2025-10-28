@@ -2,6 +2,10 @@
 
 Advanced machine learning platform for analyzing soccer player performance, preventing injuries, and optimizing team lineups.
 
+## Author
+
+**Developed by Alvaro Martin-Pena** | Machine Learning Engineer
+
 ## 🎯 Features
 
 ### 1. **Data Audit & Quality Control**

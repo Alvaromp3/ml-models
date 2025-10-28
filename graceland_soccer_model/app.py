@@ -35,9 +35,8 @@ from xgboost import XGBClassifier, XGBRegressor
 from lightgbm import LGBMClassifier, LGBMRegressor
 from catboost import CatBoostClassifier, CatBoostRegressor
 
-# Set page config
 st.set_page_config(
-    page_title="Elite Sports Performance Analytics",
+    page_title="Elite Sports Performance Analytics | Alvaro Martin-Pena",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
