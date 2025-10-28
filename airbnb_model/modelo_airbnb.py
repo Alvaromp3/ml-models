@@ -1,12 +1,15 @@
 import pandas as pd
 import numpy as np
+import os
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import pickle
+
+DATASET_PATH = os.getenv('AIRBNB_DATASET_PATH', 'airbnb_synthetic.csv')
 
 class ModeloAirbnb:
     def __init__(self):
@@ -32,7 +35,10 @@ class ModeloAirbnb:
         return df_clean
     
     def entrenar_modelo(self):
-        df = pd.read_csv('airbnb_synthetic.csv')
+        if not os.path.exists(DATASET_PATH):
+            raise FileNotFoundError(f"Dataset not found: {DATASET_PATH}")
+        
+        df = pd.read_csv(DATASET_PATH)
         df_clean = self.limpiar_datos(df)
         
         # Codificar variables categóricas
@@ -58,7 +64,14 @@ class ModeloAirbnb:
         
         self.pipeline = Pipeline([
             ('preprocessing', preprocessing),
-            ('model', KNeighborsClassifier(n_neighbors=5, weights='distance', metric='euclidean'))
+            ('model', RandomForestRegressor(
+                n_estimators=150,
+                max_depth=15,
+                min_samples_split=5,
+                min_samples_leaf=2,
+                random_state=42,
+                n_jobs=-1
+            ))
         ])
         
         self.pipeline.fit(X_train, y_train)
