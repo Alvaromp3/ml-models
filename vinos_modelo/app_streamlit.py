@@ -3,10 +3,23 @@ import streamlit as st
 from modelo import entrenar_modelo, predecir
 
 def get_explanation(data, quality):
+    alcohol = data.get('alcohol', 0)
+    volatile_acidity = data.get('volatile acidity', 0)
+    
     if "Alta" in quality or "High" in quality:
-        return "✅ High quality wines (≥6) typically have balanced acidity, moderate alcohol content, and good structure."
+        msg = f"✅ High quality wines (≥6) - This wine shows good balance:"
+        if alcohol > 11:
+            msg += f" Alcohol content ({alcohol:.1f}%) adds body."
+        if volatile_acidity < 0.6:
+            msg += f" Low volatile acidity ({volatile_acidity:.2f}) indicates freshness."
+        return msg
     else:
-        return "⚠️ Low quality wines (<6) often have imbalanced characteristics, such as high volatile acidity or low alcohol content."
+        msg = f"⚠️ Low quality wines (<6) - This wine shows concerning characteristics:"
+        if alcohol < 10:
+            msg += f" Low alcohol content ({alcohol:.1f}%) reduces body."
+        if volatile_acidity > 0.7:
+            msg += f" High volatile acidity ({volatile_acidity:.2f}) indicates possible defects."
+        return msg
 
 st.set_page_config(
     page_title="Wine Quality Predictor | Developed by Alvaro Martin-Pena",
