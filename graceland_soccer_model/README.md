@@ -11,6 +11,10 @@ Advanced machine learning platform for analyzing soccer player performance, prev
 
 **🚀 Upcoming**: Professional mobile application for sports coaches with advanced analytics, real-time updates, and intuitive interface.
 
+## 🌐 Live Demo
+
+**🎯 Try it now:** [https://ml-models-afmi4erd2llrbwjbxwc5qr.streamlit.app/](https://ml-models-afmi4erd2llrbwjbxwc5qr.streamlit.app/)
+
 ## 📸 Screenshots
 
 ### Dashboard Overview
