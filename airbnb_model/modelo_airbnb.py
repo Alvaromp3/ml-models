@@ -4,7 +4,9 @@ import os
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import SelectKBest, f_regression
+from xgboost import XGBRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import pickle
@@ -42,7 +44,6 @@ class ModeloAirbnb:
         df = pd.read_csv(DATASET_PATH)
         df_clean = self.limpiar_datos(df)
         
-        # Codificar variables categóricas
         for col in ['property_type', 'room_type']:
             le = LabelEncoder()
             df_clean[col] = le.fit_transform(df_clean[col])
@@ -63,22 +64,20 @@ class ModeloAirbnb:
             ]
         )
         
-        from xgboost import XGBRegressor
-        
-        # Use XGBoost for reliable high R² performance
-        # Optimized hyperparameters for R² > 0.90
         self.pipeline = Pipeline([
             ('preprocessing', preprocessing),
+            ('feature_selection', SelectKBest(f_regression, k=6)),
+            ('pca', PCA(n_components=5)),
             ('model', XGBRegressor(
-                n_estimators=500,
-                learning_rate=0.05,
-                max_depth=10,
-                min_child_weight=3,
-                subsample=0.8,
-                colsample_bytree=0.8,
-                gamma=0.1,
-                reg_alpha=0.1,
-                reg_lambda=1,
+                n_estimators=600,
+                learning_rate=0.03,
+                max_depth=12,
+                min_child_weight=2,
+                subsample=0.85,
+                colsample_bytree=0.85,
+                gamma=0.05,
+                reg_alpha=0.05,
+                reg_lambda=0.8,
                 random_state=42,
                 n_jobs=-1
             ))
@@ -101,13 +100,11 @@ class ModeloAirbnb:
         return self.metrics
     
     def predecir(self, datos):
-        # Codificar variables categóricas usando los encoders entrenados
         datos_encoded = datos.copy()
         for col in ['property_type', 'room_type']:
             if col in datos_encoded:
                 datos_encoded[col] = self.label_encoders[col].transform([datos_encoded[col]])[0]
         
-        # Crear DataFrame con el orden correcto de columnas
         df_pred = pd.DataFrame([datos_encoded])
         prediccion = self.pipeline.predict(df_pred)
         return prediccion[0]
