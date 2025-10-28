@@ -5,7 +5,8 @@ import os
 
 app = Flask(__name__)
 
-# Variables globales
+DATASET_PATH = os.getenv('CARS_DATASET_PATH', 'coches_espana_usados_1500_edad.csv')
+
 modelo_entrenado = False
 metricas = {}
 
@@ -18,10 +19,14 @@ def entrenar():
     global modelo_entrenado, metricas
     
     try:
-        # Cargar dataset
-        df = pd.read_csv('coches_espana_usados_1500_edad.csv')
+        if not os.path.exists(DATASET_PATH):
+            return jsonify({
+                'success': False,
+                'message': f'Dataset not found: {DATASET_PATH}'
+            })
         
-        # Entrenar modelo
+        df = pd.read_csv(DATASET_PATH)
+        
         r2, mae, rmse = entrenar_modelo(df)
         
         modelo_entrenado = True

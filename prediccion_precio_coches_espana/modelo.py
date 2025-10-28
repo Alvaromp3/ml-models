@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
@@ -7,7 +8,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-# Variable global para el pipeline
 pipe = None
 
 def limpiar_datos(df):
@@ -27,7 +27,7 @@ def limpiar_datos(df):
         df_clean = df_clean[(df_clean[col] >= limite_inferior) & 
                            (df_clean[col] <= limite_superior)]
     
-    print(f"Dataset limpio: {df_clean.shape[0]} filas y {df_clean.shape[1]} columnas")
+    print(f"Clean dataset: {df_clean.shape[0]} rows and {df_clean.shape[1]} columns")
     return df_clean
 
 def entrenar_modelo(df):
@@ -70,9 +70,8 @@ def predecir(edad, kilometraje_km, potencia_cv, consumo_l_100km, num_duenos, pue
             marca, modelo, combustible, transmision, estado, region, color, carroceria):
     
     if pipe is None:
-        return "Error: Debe entrenar el modelo primero"
+        return "Error: Model must be trained first"
     
-    # Crear DataFrame con los datos de entrada
     datos_entrada = pd.DataFrame({
         'edad': [edad],
         'kilometraje_km': [kilometraje_km],
@@ -94,4 +93,4 @@ def predecir(edad, kilometraje_km, potencia_cv, consumo_l_100km, num_duenos, pue
         prediccion = pipe.predict(datos_entrada)
         return round(prediccion[0], 2)
     except Exception as e:
-        return f"Error en la predicción: {str(e)}"
+        return f"Prediction error: {str(e)}"

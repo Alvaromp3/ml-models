@@ -1,143 +1,119 @@
-# 🚗 Predicción de Precios de Coches Usados en España
+# Used Car Price Predictor - Spain
 
-Este proyecto utiliza machine learning para predecir el precio de coches usados en España basándose en diversas características del vehículo.
+## Description
+Flask and Streamlit web applications to predict used car prices in Spain using Random Forest Regressor trained on vehicle characteristics.
 
-## 📋 Descripción
+**Developed by:** Alvaro Martin-Pena
 
-El modelo utiliza un algoritmo Random Forest Regressor para predecir precios de coches usados considerando factores como:
+## Motivation
+Help buyers and sellers estimate fair market prices for used cars in Spain based on technical, physical, and commercial features.
 
-- **Características técnicas**: Edad, kilometraje, potencia, consumo
-- **Características físicas**: Número de puertas, color, carrocería
-- **Información comercial**: Marca, modelo, número de dueños, estado
-- **Ubicación**: Región de venta
+## Features
+- **Advanced model**: Random Forest Regressor (300 trees)
+- **Dual interfaces**: Flask and Streamlit web apps
+- **Real-time prediction**: Instant price estimates
+- **Multiple features**: 14 input variables
+- **Dataset included**: Spanish used car dataset
 
-## 🚀 Instalación y Uso
+## Installation
 
-### Prerrequisitos
-
-- Python 3.8 o superior
-- pip (gestor de paquetes de Python)
-
-### Instalación
-
-1. **Clonar o descargar el proyecto**
-```bash
-cd prediccion_precio_coches_espana
-```
-
-2. **Instalar dependencias**
+1. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **Ejecutar la aplicación web**
+2. Run the application:
+
+**Streamlit (Recommended):**
+```bash
+streamlit run app_streamlit.py
+```
+
+**Flask:**
 ```bash
 python app.py
 ```
 
-4. **Abrir en el navegador**
-Ve a `http://localhost:5000`
+3. Open your browser:
+   - Streamlit: `http://localhost:8501`
+   - Flask: `http://localhost:5000`
 
-## 📊 Uso de la Aplicación
+## Usage
 
-### 1. Entrenar Modelo
-- Haz clic en "🎯 Entrenar Modelo" para entrenar con el dataset incluido
-- El sistema mostrará las métricas de rendimiento del modelo
+### Streamlit
+1. Click "Train Model" to train with the included dataset
+2. Fill in car characteristics
+3. Click "Predict Price" to get the estimate
 
-### 2. Realizar Predicciones
-- Completa el formulario con las características del coche
-- Haz clic en "🔮 Predecir Precio" para obtener la estimación
+### Flask
+1. Click "Train Model" button
+2. Fill in the form with car characteristics
+3. Click "Predict Price" to get the estimate
 
-## 📁 Estructura del Proyecto
+## Model Features
 
+### Algorithm
+- **Model**: Random Forest Regressor
+- **Trees**: 300
+- **Max Depth**: 20
+- **Min Samples Leaf**: 2
+
+### Input Features
+
+**Numeric:**
+- Age (years)
+- Mileage (km)
+- Horsepower (CV)
+- Consumption (L/100km)
+- Number of owners
+- Number of doors
+
+**Categorical:**
+- Brand
+- Model
+- Fuel type
+- Transmission
+- Condition
+- Region
+- Color
+- Body type
+
+### Preprocessing
+- StandardScaler for numerical variables
+- OneHotEncoder for categorical variables
+- Outlier removal using IQR method
+- Duplicate removal
+
+## Expected Performance
+- **R² Score**: Displayed after training
+- **MAE**: Shown in interface
+- **RMSE**: Calculated on test set
+
+## Project Structure
 ```
 prediccion_precio_coches_espana/
-│
-├── app.py                 # Aplicación web con Flask
+├── app.py                    # Flask application
+├── app_streamlit.py          # Streamlit application
+├── modelo.py                 # ML model functions
 ├── templates/
-│   └── index.html        # Interfaz web HTML
-├── modelo.py             # Funciones de ML (limpieza, entrenamiento, predicción)
-├── requirements.txt      # Dependencias del proyecto
-├── README.md            # Documentación
-└── coches_espana_usados_1500_edad.csv  # Dataset (a añadir)
+│   └── index.html           # Flask interface
+├── coches_espana_usados_1500_edad.csv  # Dataset
+├── requirements.txt          # Dependencies
+├── .gitignore               # Git ignore rules
+└── README.md                # Documentation
 ```
 
-## 🔧 Características del Modelo
+## Technologies
+- Python 3.8+
+- Flask / Streamlit
+- Scikit-learn
+- Pandas / NumPy
+- Random Forest Regressor
 
-### Variables de Entrada
+## Author
+**Alvaro Martin-Pena**
+- Machine Learning Engineer
+- Data Scientist
 
-**Numéricas:**
-- Edad (años)
-- Kilometraje (km)
-- Potencia (CV)
-- Consumo (L/100km)
-- Número de dueños
-- Número de puertas
-
-**Categóricas:**
-- Marca
-- Modelo
-- Combustible
-- Transmisión
-- Estado
-- Región
-- Color
-- Carrocería
-
-### Algoritmo Utilizado
-
-- **Random Forest Regressor**
-  - 300 estimadores
-  - Profundidad máxima: 20
-  - Mínimo de muestras por hoja: 2
-
-### Preprocesamiento
-
-- **Limpieza de datos**: Eliminación de duplicados y outliers
-- **Escalado**: StandardScaler para variables numéricas
-- **Codificación**: OneHotEncoder para variables categóricas
-
-## 📈 Métricas de Rendimiento
-
-El modelo proporciona las siguientes métricas:
-
-- **R² Score**: Coeficiente de determinación (precisión del modelo)
-- **MAE**: Error Medio Absoluto en euros
-- **RMSE**: Error Cuadrático Medio en euros
-
-## 🛠️ Tecnologías Utilizadas
-
-- **Python**: Lenguaje de programación principal
-- **Flask**: Framework web ligero
-- **Scikit-learn**: Biblioteca de machine learning
-- **Pandas**: Manipulación de datos
-- **NumPy**: Operaciones numéricas
-- **HTML/CSS/JavaScript**: Interfaz web responsiva
-
-## 📝 Notas Importantes
-
-1. **Dataset incluido**: El archivo CSV con datos de coches ya está incluido en el proyecto
-2. **Calidad de datos**: El rendimiento del modelo depende de la calidad y cantidad de datos de entrenamiento
-3. **Actualización**: Se recomienda reentrenar el modelo periódicamente con datos actualizados
-
-## 🤝 Contribuciones
-
-Las contribuciones son bienvenidas. Para cambios importantes:
-
-1. Abre un issue para discutir los cambios propuestos
-2. Realiza un fork del proyecto
-3. Crea una rama para tu feature
-4. Realiza tus cambios y pruebas
-5. Envía un pull request
-
-## 📄 Licencia
-
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
-
-## 📞 Contacto
-
-Para preguntas o sugerencias sobre el proyecto, puedes abrir un issue en el repositorio.
-
----
-
-**¡Disfruta prediciendo precios de coches! 🚗💰**
+## License
+For educational and personal use.
