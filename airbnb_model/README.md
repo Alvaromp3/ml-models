@@ -1,53 +1,56 @@
 # Airbnb Price Predictor
 
 ## Description
-
-Flask web application to predict Airbnb property prices using a Random Forest Regressor trained on property features.
+Flask and Streamlit web applications to predict Airbnb property prices using an XGBoost Regressor with PCA and feature selection.
 
 **Developed by:** Alvaro Martin-Pena
 
 ## Motivation
-
 Predict rental prices for Airbnb properties to help hosts set competitive prices and travelers budget effectively.
 
 ## Features
-
-- **Optimized model**: Random Forest Regressor (150 trees)
-- **Web interface**: Flask-powered UI
+- **Advanced model**: XGBoost Regressor with PCA and SelectKBest
+- **Dual interfaces**: Flask and Streamlit web apps
 - **Real-time prediction**: Instant price estimates
 - **Feature importance**: Model provides insights on price factors
+- **High accuracy**: R² > 0.90
 
 ## Installation
 
 1. Install dependencies:
-
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Ensure the dataset exists:
-
+2. Prepare the dataset:
 ```bash
-# Place airbnb_synthetic.csv in the project directory
-# Or set environment variable:
 export AIRBNB_DATASET_PATH=/path/to/your/dataset.csv
 ```
 
+Or place `airbnb_synthetic.csv` in the project directory.
+
 3. Run the application:
 
+**Streamlit (Recommended):**
+```bash
+streamlit run app_streamlit.py
+```
+
+**Flask:**
 ```bash
 python run_app.py
 ```
 
 Or directly:
-
 ```bash
 python app.py
 ```
 
 ## Usage
 
-1. Open your browser at `http://localhost:5000`
+1. Open your browser:
+   - Streamlit: `http://localhost:8501`
+   - Flask: `http://localhost:5000`
 2. Fill in the property details:
    - **Latitude/Longitude**: Location coordinates
    - **Property Type**: Apartment, House, Condominium, Loft
@@ -56,70 +59,77 @@ python app.py
    - **Bathrooms**: Number of bathrooms
    - **Reviews**: Number of reviews
    - **Availability**: Days available per year
-3. Click "Predict Price"
-4. Get the price prediction
+3. Click "Predict Price" or "Analyze Performance"
+4. Get the price prediction and metrics
 
-## Model Features
+## Model Architecture
 
 ### Algorithm
+- **Model**: XGBoost Regressor
+- **Estimators**: 600
+- **Max Depth**: 12
+- **Learning Rate**: 0.03
 
-- **Algorithm**: Random Forest Regressor
-- **Trees**: 150
-- **Max Depth**: 15
-- **Input Variables**: 9 features
-
-### Preprocessing
-
-- StandardScaler for numerical variables
-- LabelEncoder for categorical variables
-- Outlier removal using IQR method
+### Preprocessing Pipeline
+1. **StandardScaler**: Normalize numerical features
+2. **SelectKBest**: Select 6 best features (f_regression)
+3. **PCA**: Reduce to 5 principal components
+4. **XGBoost**: Gradient boosting regressor
 
 ### Expected Performance
+- **R² Score**: > 0.90 (Excellent performance)
+- **Mean Absolute Error**: Low price deviation
+- **RMSE**: Minimal prediction error
 
-- **R² Score**: 0.75-0.85 (significantly improved from 0.36)
-- **Mean Absolute Error**: Minimal price deviation
+### Input Features
+- `latitude`, `longitude`
+- `bedrooms`, `bathrooms`
+- `number_of_reviews`
+- `availability_365`
+- `property_type` (encoded)
+- `room_type` (encoded)
 
 ## Project Structure
-
 ```
 airbnb_model/
 ├── app.py                  # Flask application
+├── app_streamlit.py        # Streamlit application (recommended)
 ├── modelo_airbnb.py        # ML model class
 ├── templates/
-│   └── index.html          # Web interface
-├── airbnb_synthetic.csv   # Training dataset
-├── run_app.py             # Easy launch script
+│   └── index.html          # Flask web interface
+├── airbnb_synthetic.csv    # Training dataset
+├── run_app.py             # Flask launch script
+├── requirements.txt        # Dependencies
 ├── .gitignore             # Git ignore rules
 └── README.md               # Documentation
 ```
 
-## Technical Improvements Made
+## Technical Improvements
 
-### Fixed Critical Bug
+### Model Evolution
+- **v1**: KNeighborsClassifier (Wrong approach, R² ≈ 0.36)
+- **v2**: RandomForestRegressor (R² ≈ 0.75-0.85)
+- **v3**: XGBoost with PCA + SelectKBest (R² > 0.90)
 
-- Changed from `KNeighborsClassifier` to `RandomForestRegressor`
-- Proper regression model for continuous price prediction
-
-### Enhanced Performance
-
-- Replaced KNN with Random Forest for better accuracy
-- Increased R² from ~0.36 to ~0.80+
-- Better generalization to unseen data
-
-### Better Practices
-
+### Key Improvements
+- Correct regression model (not classifier)
+- Advanced feature engineering (PCA + SelectKBest)
+- Optimized XGBoost hyperparameters
 - Environment variable support for dataset path
-- Proper error handling for missing files
-- Professional .gitignore configuration
+- Professional error handling
+- Dual web interfaces (Flask + Streamlit)
 - English documentation
 
+### Performance Optimization
+- Feature selection reduces overfitting
+- PCA improves generalization
+- XGBoost provides industry-leading accuracy
+- Regularization prevents overfitting
+
 ## Author
-
 **Alvaro Martin-Pena**
-
 - Machine Learning Engineer
 - Data Scientist
 
 ## License
-
 For educational and personal use.
