@@ -1,3 +1,0 @@
-# Streamlit Cloud dependency (optional - for specific versions)
-# If you need specific Python or system packages, list them here
-
