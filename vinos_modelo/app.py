@@ -17,12 +17,9 @@ def index():
 @app.route('/entrenar', methods=['POST'])
 def entrenar():
     try:
-        # Llama a la función que entrena el modelo y devuelve la precisión
-        accuracy = entrenar_modelo()
-        # Devuelve respuesta JSON con éxito y precisión del modelo
-        return jsonify({'success': True, 'accuracy': f'{accuracy:.3f}'})
+        metrics = entrenar_modelo()
+        return jsonify({'success': True, 'metrics': metrics})
     except Exception as e:
-        # Si hay error, devuelve respuesta JSON con el mensaje de error
         return jsonify({'success': False, 'error': str(e)})
 
 # Ruta para hacer predicciones - solo acepta peticiones POST

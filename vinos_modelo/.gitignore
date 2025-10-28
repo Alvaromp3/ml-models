@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pkl
+*.log
+.DS_Store
+.env
+venv/
+catboost_info/
+*.csv
+!winequalityN.csv
+

@@ -91,8 +91,12 @@
                     const resultDiv = document.getElementById('training-result');
                     // Si el entrenamiento fue exitoso
                     if (data.success) {
-                        // Muestra mensaje verde con la precisión del modelo
-                        resultDiv.innerHTML = `<div class="result success">Modelo entrenado exitosamente. Accuracy: ${data.accuracy}</div>`;
+                        const m = data.metrics;
+                        resultDiv.innerHTML = `<div class="result success">
+                            Modelo entrenado exitosamente.<br>
+                            <strong>Train</strong> — Acc: ${m.train_accuracy.toFixed(3)}, Prec: ${m.train_precision.toFixed(3)}, Rec: ${m.train_recall.toFixed(3)}, F1: ${m.train_f1.toFixed(3)}<br>
+                            <strong>Test</strong> — Acc: ${m.test_accuracy.toFixed(3)}, Prec: ${m.test_precision.toFixed(3)}, Rec: ${m.test_recall.toFixed(3)}, F1: ${m.test_f1.toFixed(3)}
+                        </div>`;
                     } else {
                         // Si hubo error, muestra mensaje rojo con el error
                         resultDiv.innerHTML = `<div class="result error">Error: ${data.error}</div>`;

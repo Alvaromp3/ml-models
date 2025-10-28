@@ -1,11 +1,12 @@
+import os
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from xgboost import XGBClassifier
 
 pipe = None
 
@@ -34,13 +35,14 @@ def limpiar_datos(df):
 def entrenar_modelo():
     global pipe
     
-    df = pd.read_csv('winequalityN.csv')
+    dataset_path = os.getenv('WINE_DATASET_PATH', 'winequalityN.csv')
+    df = pd.read_csv(dataset_path)
     df_clean = limpiar_datos(df)
     
     X = df_clean.drop(columns=['quality'])
     y = (df_clean['quality'] >= 6).astype(int)
     
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     
     numeric_features = ['fixed acidity', 'volatile acidity', 'citric acid', 'residual sugar', 'chlorides', 
                        'free sulfur dioxide', 'total sulfur dioxide', 'density', 'pH', 'sulphates', 'alcohol']
@@ -55,14 +57,39 @@ def entrenar_modelo():
     
     pipe = Pipeline([
         ('preprocessing', preprocessing),
-        ('model', DecisionTreeClassifier(criterion="gini", max_depth=10, min_samples_split=10, min_samples_leaf=5))
+        ('model', XGBClassifier(
+            n_estimators=400,
+            learning_rate=0.05,
+            max_depth=6,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            reg_alpha=0.0,
+            reg_lambda=1.0,
+            random_state=42,
+            n_jobs=-1,
+            eval_metric='logloss'
+        ))
     ])
     
     pipe.fit(X_train, y_train)
-    y_pred = pipe.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
     
-    return accuracy
+    # Predictions
+    y_pred_train = pipe.predict(X_train)
+    y_pred_test = pipe.predict(X_test)
+    
+    # Metrics
+    metrics = {
+        'train_accuracy': float(accuracy_score(y_train, y_pred_train)),
+        'test_accuracy': float(accuracy_score(y_test, y_pred_test)),
+        'train_precision': float(precision_score(y_train, y_pred_train, zero_division=0)),
+        'test_precision': float(precision_score(y_test, y_pred_test, zero_division=0)),
+        'train_recall': float(recall_score(y_train, y_pred_train, zero_division=0)),
+        'test_recall': float(recall_score(y_test, y_pred_test, zero_division=0)),
+        'train_f1': float(f1_score(y_train, y_pred_train, zero_division=0)),
+        'test_f1': float(f1_score(y_test, y_pred_test, zero_division=0))
+    }
+    
+    return metrics
 
 def predecir(data):
     global pipe

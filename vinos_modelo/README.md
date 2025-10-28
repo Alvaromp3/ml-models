@@ -1,38 +1,42 @@
-# Predictor de Calidad de Vino
+## Wine Quality Predictor (Flask)
 
-Aplicación Flask para predecir la calidad del vino usando machine learning.
+Flask application to predict wine quality using machine learning.
 
-## Instalación
+### Features
+- Gradient boosting classifier (XGBoost)
+- Robust preprocessing: StandardScaler + OneHotEncoder, IQR outlier removal
+- Binary target: High quality (≥6) vs Low (<6)
+- Train/test metrics: Accuracy, Precision, Recall, F1
+- Portable dataset path via environment variable
 
-1. Instalar dependencias:
+### Installation
 ```bash
 pip install -r requirements.txt
 ```
 
-## Uso
+### Dataset
+- Default file: `winequalityN.csv` in this folder
+- Or set env var to a custom path:
+```bash
+export WINE_DATASET_PATH=/absolute/path/to/winequalityN.csv
+```
 
-1. Ejecutar la aplicación:
+### Run
 ```bash
 python app.py
 ```
+Then open `http://localhost:5000`
 
-2. Abrir navegador en: http://localhost:5000
+### Usage
+1) Click “Entrenar Modelo” to train and view train/test metrics
+2) Fill the form and submit to get prediction + confidence
 
-3. Entrenar el modelo haciendo clic en "Entrenar Modelo"
+### Project Structure
+- `app.py` — Flask app
+- `modelo.py` — ML logic (training, prediction)
+- `templates/index.html` — UI
+- `winequalityN.csv` — dataset
+- `requirements.txt` — dependencies
 
-4. Introducir características del vino y predecir su calidad
-
-## Características del modelo
-
-- **Algoritmo**: Decision Tree Classifier
-- **Preprocesamiento**: StandardScaler para variables numéricas, OneHotEncoder para categóricas
-- **Limpieza**: Eliminación de duplicados, imputación de NaN con media, eliminación de outliers con IQR
-- **Target**: Calidad Alta (≥6) vs Baja (<6)
-
-## Archivos
-
-- `app.py`: Aplicación Flask principal
-- `modelo.py`: Lógica del modelo de ML
-- `templates/index.html`: Interfaz web
-- `winequalityN.csv`: Dataset de vinos
-- `requirements.txt`: Dependencias
+### Author
+Developed by: Alvaro Martin-Pena
