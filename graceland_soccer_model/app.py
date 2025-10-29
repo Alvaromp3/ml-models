@@ -906,12 +906,15 @@ if page == "🏠 Dashboard":
                                 
                                 # Group by player (using mean and max)
                                 player_risk = recent_data.groupby('Player Name')['Predicted_Risk'].agg(['mean', 'max']).reset_index()
-                                # New logic: if mean risk <= 0.40, classify as Low Risk
+                                # New logic: if mean risk <= 0.40, classify as Low Risk (regardless of max)
                                 risk_mapping = {0: 'Low', 1: 'Medium', 2: 'High'}
-                                player_risk['Risk_Category'] = player_risk.apply(
-                                    lambda row: 'Low' if row['mean'] <= 0.40 else risk_mapping.get(int(row['max']), 'Medium'),
-                                    axis=1
-                                )
+                                def classify_risk(row):
+                                    mean_val = float(row['mean'])
+                                    if mean_val <= 0.40:
+                                        return 'Low'
+                                    else:
+                                        return risk_mapping.get(int(row['max']), 'Medium')
+                                player_risk['Risk_Category'] = player_risk.apply(classify_risk, axis=1)
                                 
                                 high_risk_count = len(player_risk[player_risk['Risk_Category'] == 'High'])
                                 medium_risk_count = len(player_risk[player_risk['Risk_Category'] == 'Medium'])
@@ -1497,12 +1500,15 @@ elif page == "🛡️ Injury Prevention":
         
         if 'Player Name' in recent_data.columns:
             player_risk = recent_data.groupby('Player Name')['Predicted_Risk'].agg(['mean', 'max']).reset_index()
-            # New logic: if mean risk <= 0.40, classify as Low Risk
+            # New logic: if mean risk <= 0.40, classify as Low Risk (regardless of max)
             risk_mapping = {0: 'Low', 1: 'Medium', 2: 'High'}
-            player_risk['Risk_Category'] = player_risk.apply(
-                lambda row: 'Low' if row['mean'] <= 0.40 else risk_mapping.get(int(row['max']), 'Medium'),
-                axis=1
-            )
+            def classify_risk(row):
+                mean_val = float(row['mean'])
+                if mean_val <= 0.40:
+                    return 'Low'
+                else:
+                    return risk_mapping.get(int(row['max']), 'Medium')
+            player_risk['Risk_Category'] = player_risk.apply(classify_risk, axis=1)
             player_risk = player_risk.sort_values('mean', ascending=False)
             
             st.markdown("### 🚨 Current Injury Risk Status")
