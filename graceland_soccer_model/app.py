@@ -630,15 +630,15 @@ def train_regression_model_fast(df, use_early_stopping=True, use_saved_model=Tru
             random_state=42
         )
     else:
-        model = GradientBoostingRegressor(
-            n_estimators=200,
-            learning_rate=0.1,
-            max_depth=4,
+    model = GradientBoostingRegressor(
+        n_estimators=200,
+        learning_rate=0.1,
+        max_depth=4,
             subsample=0.8,
             min_samples_split=10,
             min_samples_leaf=4,
-            random_state=42
-        )
+        random_state=42
+    )
     
     pipe = Pipeline([
         ('preprocessor', preprocessor),
@@ -1492,7 +1492,12 @@ elif page == "🛡️ Injury Prevention":
         
         if 'Player Name' in recent_data.columns:
             player_risk = recent_data.groupby('Player Name')['Predicted_Risk'].agg(['mean', 'max']).reset_index()
-            player_risk['Risk_Category'] = player_risk['max'].map({0: 'Low', 1: 'Medium', 2: 'High'})
+            # New logic: if mean risk <= 0.40, classify as Low Risk
+            risk_mapping = {0: 'Low', 1: 'Medium', 2: 'High'}
+            player_risk['Risk_Category'] = player_risk.apply(
+                lambda row: 'Low' if row['mean'] <= 0.40 else risk_mapping.get(int(row['max']), 'Medium'),
+                axis=1
+            )
             player_risk = player_risk.sort_values('mean', ascending=False)
             
             st.markdown("### 🚨 Current Injury Risk Status")
