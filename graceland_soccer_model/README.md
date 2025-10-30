@@ -91,6 +91,27 @@ Advanced machine learning platform for analyzing soccer player performance, prev
 - Player comparison matrix
 - Comprehensive coaching recommendations
 
+### 7. **AI Coach Assistant (Ollama Integration)**
+
+- Local LLM assistant powered by **Ollama**
+- Ask in English about players, metrics, comparisons, greetings
+- Always includes team context ("All Players") + specific player(s) if detected
+- Gracefully handles non-existent players by listing available ones
+- Faster responses with optimized prompts; supports long answers (>2000 chars)
+
+Setup:
+
+```bash
+pip install ollama
+ollama serve  # ensure it's running on 127.0.0.1:11434
+```
+
+Models: defaults to `llama3.2`.
+
+Notes:
+- The UI shows a subtle status “Ollama connected”.
+- Player names are matched robustly (case-insensitive, partial/fuzzy).
+
 ## 🚀 Getting Started
 
 ### Installation
@@ -246,7 +267,11 @@ The application works best with the following Catapult metrics included in your 
 
 ### Data Preprocessing
 
-- **Outlier Handling**: IQR method (1.5 \* IQR)
+- **Outlier Handling**: Conservative cleaning
+  - Removes only very extreme outliers (Z > 4.5 or beyond 4.5×IQR)
+  - Drops rows only if flagged in multiple critical metrics
+  - Also filters rows with many zeros across critical metrics (thresholded)
+  - Safety guard prevents removal of >20% of data in one action
 - **Missing Values**: Imputed using mode (categorical) and median (numeric)
 - **Feature Scaling**: StandardScaler for normalization
 - **Feature Selection**: SelectKBest / SelectFromModel
