@@ -7,12 +7,8 @@ import warnings
 import pickle
 import os
 import json
-import requests
-import re
-import concurrent.futures
 import logging
 import plotly.graph_objects as go
-import plotly.express as px
 from datetime import datetime, timedelta
 warnings.filterwarnings('ignore')
 
@@ -74,14 +70,6 @@ except ImportError:
     MLFLOW_AVAILABLE = False
     logging.warning("Advanced ML extensions not available")
 
-# Ollama integration for AI Coach Assistant
-try:
-    import ollama
-    OLLAMA_AVAILABLE = True
-except ImportError:
-    OLLAMA_AVAILABLE = False
-    logging.warning("Ollama not available. Install with: pip install ollama")
-
 # Set page config
 st.set_page_config(
     page_title="Elite Sports Performance Analytics | Alvaro Martin-Pena",
@@ -90,375 +78,53 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Enhanced Custom CSS - Modern UI Design System
+# Custom CSS
 st.markdown("""
 <style>
-    /* ===== Color Palette & Variables ===== */
-    :root {
-        --primary-blue: #1E88E5;
-        --primary-green: #43A047;
-        --accent-purple: #667eea;
-        --accent-purple-dark: #764ba2;
-        --success-green: #28A745;
-        --warning-yellow: #FFC107;
-        --danger-red: #DC3545;
-        --info-blue: #2196F3;
-        --bg-light: #F8F9FA;
-        --bg-card: #FFFFFF;
-        --text-primary: #212529;
-        --text-secondary: #6C757D;
-        --border-light: #E9ECEF;
-        --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
-        --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
-        --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
-        --gradient-primary: linear-gradient(135deg, #1E88E5 0%, #43A047 100%);
-        --gradient-card: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    
-    /* ===== Main Header ===== */
     .main-header {
         font-size: 2.5rem;
-        font-weight: 700;
+        font-weight: bold;
+        color: #1E88E5;
         text-align: center;
-        padding: 1.5rem 1rem;
-        margin-bottom: 2rem;
-        background: var(--gradient-primary);
+        padding: 1rem;
+        background: linear-gradient(90deg, #1E88E5 0%, #43A047 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        background-clip: text;
-        animation: fadeInDown 0.6s ease-out;
     }
-    
-    /* ===== Metric Cards ===== */
     .metric-card {
-        background: var(--gradient-card);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 1.5rem;
-        border-radius: 12px;
+        border-radius: 10px;
         color: white;
         text-align: center;
-        box-shadow: var(--shadow-md);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        animation: fadeInUp 0.5s ease-out;
     }
-    
-    .metric-card:hover {
-        transform: translateY(-4px);
-        box-shadow: var(--shadow-lg);
-    }
-    
-    .metric-card-enhanced {
-        background: var(--bg-card);
-        border: 2px solid var(--border-light);
-        border-radius: 12px;
-        padding: 1.5rem;
-        box-shadow: var(--shadow-sm);
-        transition: all 0.3s ease;
-    }
-    
-    .metric-card-enhanced:hover {
-        border-color: var(--primary-blue);
-        box-shadow: var(--shadow-md);
-        transform: translateY(-2px);
-    }
-    
-    /* ===== Alert Boxes ===== */
     .warning-box {
-        background: linear-gradient(135deg, #FFF3CD 0%, #FFE69C 100%);
-        border-left: 5px solid var(--warning-yellow);
-        padding: 1.2rem;
-        border-radius: 8px;
+        background-color: #FFF3CD;
+        border-left: 5px solid #FFC107;
+        padding: 1rem;
+        border-radius: 5px;
         margin: 1rem 0;
-        box-shadow: var(--shadow-sm);
-        animation: slideInLeft 0.4s ease-out;
     }
-    
     .success-box {
-        background: linear-gradient(135deg, #D4EDDA 0%, #C3E6CB 100%);
-        border-left: 5px solid var(--success-green);
-        padding: 1.2rem;
-        border-radius: 8px;
+        background-color: #D4EDDA;
+        border-left: 5px solid #28A745;
+        padding: 1rem;
+        border-radius: 5px;
         margin: 1rem 0;
-        box-shadow: var(--shadow-sm);
-        animation: slideInLeft 0.4s ease-out;
     }
-    
     .danger-box {
-        background: linear-gradient(135deg, #F8D7DA 0%, #F5C6CB 100%);
-        border-left: 5px solid var(--danger-red);
-        padding: 1.2rem;
-        border-radius: 8px;
+        background-color: #F8D7DA;
+        border-left: 5px solid #DC3545;
+        padding: 1rem;
+        border-radius: 5px;
         margin: 1rem 0;
-        box-shadow: var(--shadow-sm);
-        animation: slideInLeft 0.4s ease-out;
     }
-    
     .info-box {
-        background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
-        border-left: 5px solid var(--info-blue);
-        padding: 1.2rem;
-        border-radius: 8px;
+        background-color: #E3F2FD;
+        border-left: 5px solid #2196F3;
+        padding: 1rem;
+        border-radius: 5px;
         margin: 1rem 0;
-        box-shadow: var(--shadow-sm);
-        animation: slideInLeft 0.4s ease-out;
-    }
-    
-    /* ===== Chat Bubbles ===== */
-    .chat-bubble-user {
-        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--info-blue) 100%);
-        color: white;
-        padding: 1rem 1.25rem;
-        border-radius: 18px 18px 4px 18px;
-        margin: 0.5rem 0;
-        max-width: 85%;
-        margin-left: auto;
-        box-shadow: var(--shadow-md);
-        animation: slideInRight 0.3s ease-out;
-    }
-    
-    .chat-bubble-assistant {
-        background: var(--bg-card);
-        color: var(--text-primary);
-        padding: 1rem 1.25rem;
-        border-radius: 18px 18px 18px 4px;
-        margin: 0.5rem 0;
-        max-width: 85%;
-        border: 1px solid var(--border-light);
-        box-shadow: var(--shadow-sm);
-        animation: slideInLeft 0.3s ease-out;
-    }
-    
-    /* ===== Sidebar Enhancements ===== */
-    .sidebar .stRadio > div {
-        gap: 0.5rem;
-    }
-    
-    .sidebar [data-testid="stRadio"] > div > label {
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
-        transition: all 0.2s ease;
-        margin-bottom: 0.5rem;
-    }
-    
-    .sidebar [data-testid="stRadio"] > div > label:hover {
-        background-color: var(--bg-light);
-    }
-    
-    .sidebar [data-testid="stRadio"] > div > label > div:first-child {
-        border: 2px solid var(--primary-blue);
-    }
-    
-    /* ===== Buttons ===== */
-    .stButton > button {
-        border-radius: 8px;
-        padding: 0.5rem 1.5rem;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        border: none;
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
-    }
-    
-    /* ===== Tables ===== */
-    .dataframe {
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: var(--shadow-sm);
-    }
-    
-    .dataframe thead {
-        background: var(--gradient-primary);
-        color: white;
-    }
-    
-    .dataframe tbody tr:hover {
-        background-color: var(--bg-light);
-        transition: background-color 0.2s ease;
-    }
-    
-    /* ===== Cards & Containers ===== */
-    .section-card {
-        background: var(--bg-card);
-        border-radius: 12px;
-        padding: 2rem;
-        margin: 1.5rem 0;
-        box-shadow: var(--shadow-md);
-        border: 1px solid var(--border-light);
-        animation: fadeIn 0.5s ease-out;
-    }
-    
-    .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1.5rem;
-        margin: 2rem 0;
-    }
-    
-    /* ===== Animations ===== */
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-    
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    @keyframes fadeInDown {
-        from {
-            opacity: 0;
-            transform: translateY(-20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    @keyframes slideInLeft {
-        from {
-            opacity: 0;
-            transform: translateX(-30px);
-        }
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-    
-    @keyframes slideInRight {
-        from {
-            opacity: 0;
-            transform: translateX(30px);
-        }
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-    
-    @keyframes pulse {
-        0%, 100% {
-            opacity: 1;
-        }
-        50% {
-            opacity: 0.7;
-        }
-    }
-    
-    /* ===== Loading States ===== */
-    .loading-skeleton {
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        animation: loading 1.5s ease-in-out infinite;
-        border-radius: 8px;
-        height: 20px;
-        margin: 0.5rem 0;
-    }
-    
-    @keyframes loading {
-        0% { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
-    }
-    
-    /* ===== Badges ===== */
-    .badge {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 12px;
-        font-size: 0.875rem;
-        font-weight: 600;
-    }
-    
-    .badge-success {
-        background-color: var(--success-green);
-        color: white;
-    }
-    
-    .badge-warning {
-        background-color: var(--warning-yellow);
-        color: #212529;
-    }
-    
-    .badge-danger {
-        background-color: var(--danger-red);
-        color: white;
-    }
-    
-    .badge-info {
-        background-color: var(--info-blue);
-        color: white;
-    }
-    
-    /* ===== Scrollbar Styling ===== */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    
-    ::-webkit-scrollbar-track {
-        background: var(--bg-light);
-        border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-        background: var(--primary-blue);
-        border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-        background: var(--primary-green);
-    }
-    
-    /* ===== Typography ===== */
-    h1, h2, h3, h4, h5, h6 {
-        color: var(--text-primary);
-        font-weight: 600;
-    }
-    
-    /* ===== Spacing Improvements ===== */
-    .main .block-container {
-        padding-top: 3rem;
-        padding-bottom: 3rem;
-    }
-    
-    /* ===== Risk Cards ===== */
-    .risk-card {
-        border-radius: 12px;
-        padding: 1.5rem;
-        text-align: center;
-        box-shadow: var(--shadow-md);
-        transition: all 0.3s ease;
-        animation: fadeInUp 0.5s ease-out;
-    }
-    
-    .risk-card:hover {
-        transform: translateY(-4px);
-        box-shadow: var(--shadow-lg);
-    }
-    
-    .risk-card-high {
-        background: linear-gradient(135deg, #F8D7DA 0%, #F5C6CB 100%);
-        border: 2px solid var(--danger-red);
-    }
-    
-    .risk-card-medium {
-        background: linear-gradient(135deg, #FFF3CD 0%, #FFE69C 100%);
-        border: 2px solid var(--warning-yellow);
-    }
-    
-    .risk-card-low {
-        background: linear-gradient(135deg, #D4EDDA 0%, #C3E6CB 100%);
-        border: 2px solid var(--success-green);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -480,10 +146,6 @@ if 'regression_features' not in st.session_state:
     st.session_state.regression_features = None
 if 'classification_features' not in st.session_state:
     st.session_state.classification_features = None
-if 'chat_history' not in st.session_state:
-    st.session_state.chat_history = []
-if 'selected_chat_player' not in st.session_state:
-    st.session_state.selected_chat_player = None
 
 # Setup logging and directories
 os.makedirs('logs', exist_ok=True)
@@ -934,11 +596,7 @@ def train_regression_model_fast(df, use_early_stopping=True, use_saved_model=Tru
         'Top Speed (mph)', 'Max Acceleration (yd/s/s)', 'Max Deceleration (yd/s/s)',
         'Distance Per Min (yd/min)', 'Hr Load', 'Hr Max (bpm)', 'Time In Red Zone (min)',
         'Impacts', 'Impact Zones: > 20 G (Impacts)', 'Impact Zones: 15 - 20 G (Impacts)',
-        'Power Plays', 'Power Score (w/kg)',
-        # Additional recommended metrics if present can improve regression performance
-        'Distance in Speed Zone 4 (miles)',
-        'Distance in Speed Zone 5 (miles)',
-        'Time in HR Load Zone 85% - 96% Max HR (secs)'
+        'Power Plays', 'Power Score (w/kg)'
     ]
     
     features = [c for c in features if c in df_clean.columns]
@@ -960,25 +618,25 @@ def train_regression_model_fast(df, use_early_stopping=True, use_saved_model=Tru
     # Use early stopping if requested
     if use_early_stopping:
         model = GradientBoostingRegressor(
-            n_estimators=1500,  # allow more boosting iterations
+            n_estimators=1000,  # Large number for early stopping
             learning_rate=0.05,
-            max_depth=5,
-            subsample=0.9,
-            min_samples_split=6,
-            min_samples_leaf=2,
-            validation_fraction=0.15,
-            n_iter_no_change=20,  # allow longer patience
+            max_depth=4,
+            subsample=0.8,
+            min_samples_split=10,
+            min_samples_leaf=4,
+            validation_fraction=0.1,
+            n_iter_no_change=10,  # Stop if no improvement for 10 iterations
             tol=1e-4,
             random_state=42
         )
     else:
         model = GradientBoostingRegressor(
-            n_estimators=400,
-            learning_rate=0.07,
-            max_depth=5,
-            subsample=0.9,
-            min_samples_split=6,
-            min_samples_leaf=2,
+            n_estimators=200,
+            learning_rate=0.1,
+            max_depth=4,
+            subsample=0.8,
+            min_samples_split=10,
+            min_samples_leaf=4,
             random_state=42
         )
     
@@ -1141,497 +799,77 @@ def train_classification_model_fast(df, use_saved_model=True):
     
     return pipe, metrics, features
 
-# Ollama AI Coach Assistant Functions
-def find_player_in_dataframe(df_clean, player_name):
-    """Find player in dataframe with flexible matching (case-insensitive, trimmed, fuzzy)"""
-    if not player_name or 'Player Name' not in df_clean.columns:
-        return None
-    
-    # Clean input name
-    search_name = str(player_name).strip()
-    
-    # Get all unique player names from dataframe
-    available_players = df_clean['Player Name'].unique()
-    
-    # Try exact match (case-insensitive)
-    for name in available_players:
-        if str(name).strip().lower() == search_name.lower():
-            return str(name).strip()
-    
-    # Try contains match (case-insensitive)
-    for name in available_players:
-        if search_name.lower() in str(name).strip().lower() or str(name).strip().lower() in search_name.lower():
-            return str(name).strip()
-    
-    # Try fuzzy match - check if all words in search name are in player name
-    search_words = search_name.lower().split()
-    for name in available_players:
-        name_str = str(name).strip().lower()
-        # Check if all words from search are in the player name
-        if all(word in name_str for word in search_words if len(word) > 2):
-            return str(name).strip()
-    
-    # Try reverse - all words from player name are in search
-    for name in available_players:
-        name_str = str(name).strip().lower()
-        name_words = name_str.split()
-        if all(word in search_name.lower() for word in name_words if len(word) > 2):
-            return str(name).strip()
-    
-    return None
-
-def extract_player_names_from_text(text, available_players):
-    """Extract player names mentioned in user text with improved matching"""
-    if not text or not available_players:
-        return []
-    
-    text_lower = text.lower()
-    found_players = []
-    
-    # Check for each available player name with multiple matching strategies
-    for player in available_players:
-        player_str = str(player).strip()
-        player_lower = player_str.lower()
-        
-        # Strategy 1: Exact match (case-insensitive)
-        if player_lower in text_lower:
-            found_players.append(player_str)
-            continue
-        
-        # Strategy 2: Match if all significant words from player name appear in text
-        player_words = [w for w in player_lower.split() if len(w) > 2]  # Words longer than 2 chars
-        if len(player_words) >= 2:
-            # For multi-word names, check if all significant words appear close together
-            words_found = sum(1 for word in player_words if word in text_lower)
-            # If most words match (at least 2 out of 3, or all if 2 words)
-            if words_found >= min(2, len(player_words)):
-                found_players.append(player_str)
-                continue
-        
-        # Strategy 3: For single-word or short names, check if it appears as a whole word
-        if len(player_words) == 1 and len(player_words[0]) > 4:
-            # Check if it appears as a standalone word (with word boundaries)
-            if re.search(r'\b' + re.escape(player_words[0]) + r'\b', text_lower):
-                found_players.append(player_str)
-                continue
-    
-    # Remove duplicates while preserving order
-    seen = set()
-    unique_players = []
-    for player in found_players:
-        if player.lower() not in seen:
-            seen.add(player.lower())
-            unique_players.append(player)
-    
-    return unique_players
-
-def format_player_data_for_context(df_clean, player_name=None):
-    """Format player data as context string for Ollama"""
-    try:
-        available_players = []
-        if 'Player Name' in df_clean.columns:
-            available_players = sorted(list(df_clean['Player Name'].unique()))
-        
-        if player_name and 'Player Name' in df_clean.columns:
-            # Use flexible player search
-            matched_player_name = find_player_in_dataframe(df_clean, player_name)
-            if matched_player_name:
-                player_data = df_clean[df_clean['Player Name'] == matched_player_name].copy()
-            else:
-                # Player not found - return info about available players
-                return f"AVAILABLE_PLAYERS: {', '.join(available_players[:20])}{' (and more)' if len(available_players) > 20 else ''}\nREQUESTED_PLAYER: {player_name} NOT FOUND in dataset."
-        else:
-            player_data = df_clean.copy()
-        
-        # Key metrics to include
-        key_metrics = [
-            'Player Load', 'Energy (kcal)', 'Distance (miles)', 
-            'Top Speed (mph)', 'Hr Load', 'Sprint Distance (yards)',
-            'Power Score (w/kg)', 'Impacts', 'Work Ratio'
-        ]
-        
-        available_metrics = [m for m in key_metrics if m in player_data.columns]
-        
-        # Calculate statistics
-        stats_summary = []
-        stats_summary.append(f"Number of sessions: {len(player_data)}")
-        
-        for metric in available_metrics:
-            try:
-                mean_val = player_data[metric].mean()
-                max_val = player_data[metric].max()
-                min_val = player_data[metric].min()
-                stats_summary.append(f"{metric}: Average={mean_val:.2f}, Max={max_val:.2f}, Min={min_val:.2f}")
-            except:
-                continue
-        
-        # Add speed zones if available
-        speed_zone_cols = [col for col in player_data.columns if 'Speed Zone' in col and 'Distance' in col]
-        if speed_zone_cols:
-            stats_summary.append(f"\nSpeed Zone Distribution:")
-            for zone_col in speed_zone_cols[:5]:  # First 5 zones
-                try:
-                    total_distance = player_data[zone_col].sum()
-                    avg_distance = player_data[zone_col].mean()
-                    stats_summary.append(f"  {zone_col}: Total={total_distance:.2f} miles, Avg={avg_distance:.2f} miles")
-                except:
-                    continue
-        
-        # Limit context size to avoid long prompts
-        context_lines = []
-        for line in stats_summary:
-            context_lines.append(line)
-            if len("\n".join(context_lines)) > 2000:
-                break
-        context = "\n".join(context_lines)
-        
-        if player_name:
-            # Use the matched name if available
-            matched_name = find_player_in_dataframe(df_clean, player_name)
-            display_name = matched_name if matched_name else player_name
-            context = f"Player: {display_name}\n{context}"
-        else:
-            context = f"Team Overall Data:\n{context}\nAvailable Players: {', '.join(available_players[:15])}{' (and more)' if len(available_players) > 15 else ''}"
-            
-        return context
-    except Exception as e:
-        logging.error(f"Error formatting player data: {str(e)}")
-        return None
-
-def get_ollama_response(user_message, player_context=None, chat_history=None, model="llama3.2"):
-    """Get response from Ollama with player context, using timeouts to prevent blocking"""
-    try:
-        if not OLLAMA_AVAILABLE:
-            return "Ollama is not available. Please install it with: pip install ollama. Also make sure Ollama is running locally (ollama serve)."
-
-        # Quick health check to ensure Ollama server is responsive
-        try:
-            requests.get("http://127.0.0.1:11434/api/tags", timeout=2)
-        except Exception:
-            return "Cannot connect to Ollama at http://127.0.0.1:11434. Please make sure the server is running (ollama serve)."
-
-        # Build system prompt
-        system_prompt = (
-            "You are an expert football (soccer) performance analytics assistant. "
-            "Your job is to explain performance metrics, analyze player data, and provide useful coaching insights. "
-            "Always answer in clear, professional, and concise English. "
-            "When player data is provided, ground your explanations and recommendations in that data. "
-            "Be friendly and conversational for casual questions like greetings. "
-            "IMPORTANT: If the context mentions 'NOT FOUND' or 'AVAILABLE_PLAYERS', that means the requested player doesn't exist in the dataset. "
-            "In that case, politely inform the user that the player is not in the dataset and mention some available players from the list provided. "
-            "Never make up data for players that don't exist. "
-            "When multiple players are mentioned (e.g., 'compare X and Y'), analyze ALL players mentioned using their provided data sections. "
-            "If you see multiple '---PLAYER: [Name]---' sections, each contains data for a different player - use ALL of them in your response."
-        )
-
-        # Prepare messages (include system)
-        messages = [{"role": "system", "content": system_prompt}]
-
-        # Limit chat history to last 4 messages to keep prompt small
-        if chat_history and len(chat_history) > 0:
-            recent_history = chat_history[-4:] if len(chat_history) > 4 else chat_history
-            messages.extend(recent_history)
-
-        # Build user message with compact context (always include team data if available)
-        context_prefix = ""
-        if player_context:
-            # Truncate context to ~1000 chars max for speed
-            trimmed_context = player_context[:1000]
-            context_prefix = f"DATA:\n{trimmed_context}\n\n"
-
-        user_prompt = f"{context_prefix}Q: {user_message}\nA:"
-        messages.append({"role": "user", "content": user_prompt})
-
-        # Optimized direct call - allow longer responses (2000+ characters)
-        try:
-            # Use llama3.2 with increased token limit for detailed responses
-            resp = ollama.chat(
-                model="llama3.2",
-                messages=messages,
-                options={
-                    'temperature': 0.7, 
-                    'num_predict': 1024,  # Increased to allow 2000+ character responses
-                    'top_k': 40,
-                    'top_p': 0.9,
-                    'repeat_penalty': 1.1
-                }
-            )
-            if resp and 'message' in resp and 'content' in resp['message']:
-                content = resp['message']['content'].strip()
-                return content if content else "I'm ready to help! Please ask your question."
-        except Exception as e1:
-            logging.warning(f"Error with llama3.2: {str(e1)}")
-            # Quick fallback
-            try:
-                resp = ollama.chat(
-                    model="llama3.2",
-                    messages=[messages[-1]],  # Just last message, no history for speed
-                    options={'num_predict': 1024}  # Also increased for fallback
-                )
-                if resp and 'message' in resp and 'content' in resp['message']:
-                    return resp['message']['content'].strip()
-            except Exception as e2:
-                logging.warning(f"Error with fallback: {str(e2)}")
-
-        return "Could not get a response. Please try again or check if Ollama is running."
-    except Exception as e:
-        logging.error(f"Error getting Ollama response: {str(e)}")
-        return f"An error occurred while generating the response: {str(e)}. Please try again."
-
-# Enhanced Sidebar Navigation
-st.sidebar.markdown("""
-<div style="text-align: center; padding: 1.5rem 0;">
-    <h1 style="font-size: 1.5rem; font-weight: 700; color: #1E88E5; margin: 0;">Elite Sports Analytics</h1>
-    <p style="font-size: 0.85rem; color: #6C757D; margin-top: 0.5rem;">Performance Intelligence Platform</p>
-    <hr style="margin: 1rem 0; border: none; border-top: 1px solid #E9ECEF;">
-    <p style="font-size: 0.75rem; color: #6C757D; margin-top: 0.5rem; font-style: italic;">Developed by <strong>Alvaro Martin-Pena</strong></p>
-</div>
-""", unsafe_allow_html=True)
+# Sidebar Navigation
+st.sidebar.markdown("# ⚽ Elite Sports Analytics")
 st.sidebar.markdown("---")
 
-# Group navigation items
-st.sidebar.markdown("**Main Sections**")
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Data Audit", "Model Training", "Player Load Analysis", 
-     "Injury Prevention", "Team Lineup Calculator", "Performance Analytics", "Load Prediction"],
-    label_visibility="collapsed"
+    ["🏠 Dashboard", "📊 Data Audit", "🤖 Model Training", "📈 Player Load Analysis", 
+     "🛡️ Injury Prevention", "👥 Team Lineup Calculator", "📉 Performance Analytics", "🎯 Load Prediction"]
 )
 
-# Add status indicators and interactive filters in sidebar if data is loaded
-if st.session_state.df is not None:
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**Data Status**")
-    df_status = st.session_state.df
-    total_players = df_status['Player Name'].nunique() if 'Player Name' in df_status.columns else 0
-    st.sidebar.markdown(f"""
-    <div style="background: #E3F2FD; padding: 0.75rem; border-radius: 8px; margin: 0.5rem 0;">
-        <div style="font-size: 0.85rem; color: #2196F3; font-weight: 600;">Data Loaded</div>
-        <div style="font-size: 0.75rem; color: #6C757D; margin-top: 0.25rem;">{total_players} players • {df_status.shape[0]:,} sessions</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if st.session_state.regression_model and st.session_state.classification_model:
-        st.sidebar.markdown(f"""
-        <div style="background: #D4EDDA; padding: 0.75rem; border-radius: 8px; margin: 0.5rem 0;">
-            <div style="font-size: 0.85rem; color: #28A745; font-weight: 600;">Models Ready</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-
-
 # Main Content
-if page == "Dashboard":
-    st.markdown('<h1 class="main-header">Dashboard - Quick Overview</h1>', unsafe_allow_html=True)
+if page == "🏠 Dashboard":
+    st.markdown('<h1 class="main-header">🏠 Dashboard - Quick Overview</h1>', unsafe_allow_html=True)
     st.markdown("**Welcome to Elite Sports Performance Analytics | Developed by Alvaro Martin-Pena**")
     st.markdown("---")
     
     if st.session_state.df is None:
-        st.info("Please upload your dataset in the Data Audit section to begin.")
+        st.info("📋 Please upload your dataset in the Data Audit section to begin.")
         
-        st.markdown("### Quick Start Guide")
+        st.markdown("### 🚀 Quick Start Guide")
         col1, col2, col3 = st.columns(3)
         
         with col1:
             st.markdown("""
-            #### 1. Upload Data
-            Go to **Data Audit** section and upload your CSV file with player performance data.
+            #### 1️⃣ Upload Data
+            Go to **📊 Data Audit** section and upload your CSV file with player performance data.
             """)
         
         with col2:
             st.markdown("""
-            #### 2. Train Models
-            Train the regression and classification models in **Model Training** section.
+            #### 2️⃣ Train Models
+            Train the regression and classification models in **🤖 Model Training** section.
             """)
         
         with col3:
             st.markdown("""
-            #### 3. Analyze
+            #### 3️⃣ Analyze
             Explore player loads, injury risks, and performance analytics!
             """)
     else:
         df = st.session_state.df
-        df_filtered = df.copy()
         
-        # Interactive Filter Section
-        with st.expander("Advanced Filters & Settings", expanded=False):
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                # Player search
-                if 'Player Name' in df_filtered.columns:
-                    all_player_names = ['All Players'] + sorted(list(df_filtered['Player Name'].unique()))
-                    search_term = st.text_input("Search Player", value="", key="player_search", placeholder="Type player name...")
-                    if search_term:
-                        all_player_names = [p for p in all_player_names if search_term.lower() in p.lower()]
-                    selected_player_filter = st.selectbox("Filter by Player", all_player_names, key="dashboard_player_filter")
-                    if selected_player_filter != "All Players":
-                        df_filtered = df_filtered[df_filtered['Player Name'] == selected_player_filter]
-                else:
-                    selected_player_filter = "All Players"
-            
-            with col2:
-                # Metric selection for visualization
-                if 'Player Load' in df_filtered.columns:
-                    metric_options = ['Player Load', 'Energy (kcal)', 'Distance (miles)', 
-                                     'Top Speed (mph)', 'Hr Load'] if all(m in df_filtered.columns for m in ['Energy (kcal)', 'Distance (miles)', 'Top Speed (mph)', 'Hr Load']) else ['Player Load']
-                    primary_metric = st.selectbox("Primary Metric", metric_options, key="dashboard_primary_metric")
-                else:
-                    primary_metric = None
-            
-            with col3:
-                # Show comparison
-                show_comparison = st.checkbox("Show Team Comparison", value=False, key="dashboard_show_comparison")
-            
-            with col4:
-                # Time period
-                time_period = st.selectbox("Time Period", ["All Time", "Last 7 Days", "Last 30 Days", "Last 90 Days"], key="dashboard_time_period")
-                
-                # Export data button
-                if st.button("Export Filtered Data", key="export_dashboard"):
-                    csv = df_filtered.to_csv(index=False)
-                    st.download_button(
-                        label="Download CSV",
-                        data=csv,
-                        file_name=f"dashboard_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                        mime="text/csv"
-                    )
-        
-        # Apply time period filter
-        if time_period != "All Time" and 'Date' in df_filtered.columns:
-            try:
-                df_filtered['Date'] = pd.to_datetime(df_filtered['Date'], errors='coerce')
-                days = {"Last 7 Days": 7, "Last 30 Days": 30, "Last 90 Days": 90}[time_period]
-                cutoff_date = datetime.now() - timedelta(days=days)
-                df_filtered = df_filtered[df_filtered['Date'] >= cutoff_date]
-            except:
-                pass
-        
-        # Key Metrics Dashboard - Enhanced with cards
-        st.markdown("### Key Performance Indicators")
+        # Key Metrics Dashboard
+        st.markdown("### 📊 Key Performance Indicators")
         
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            total_players = df_filtered['Player Name'].nunique() if 'Player Name' in df_filtered.columns else 0
-            st.markdown(f"""
-            <div class="metric-card-enhanced" style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: 700; color: #1E88E5; margin-bottom: 0.25rem;">{total_players}</div>
-                <div style="font-size: 0.9rem; color: #6C757D;">Total Players</div>
-            </div>
-            """, unsafe_allow_html=True)
+            total_players = df['Player Name'].nunique() if 'Player Name' in df.columns else 0
+            st.metric("Total Players", total_players)
         
         with col2:
-            total_sessions = df_filtered.shape[0]
-            st.markdown(f"""
-            <div class="metric-card-enhanced" style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: 700; color: #43A047; margin-bottom: 0.25rem;">{total_sessions:,}</div>
-                <div style="font-size: 0.9rem; color: #6C757D;">Total Sessions</div>
-                {f'<div style="font-size: 0.75rem; color: #6C757D; margin-top: 0.25rem;">From {df.shape[0]:,} total</div>' if df_filtered.shape[0] < df.shape[0] else ''}
-            </div>
-            """, unsafe_allow_html=True)
+            total_sessions = df.shape[0]
+            st.metric("Total Sessions", total_sessions)
         
         with col3:
-            if primary_metric and primary_metric in df_filtered.columns:
-                avg_metric = df_filtered[primary_metric].mean()
-                max_metric = df_filtered[primary_metric].max()
-                st.markdown(f"""
-                <div class="metric-card-enhanced" style="text-align: center;">
-                    <div style="font-size: 1.5rem; font-weight: 700; color: #667eea; margin-bottom: 0.25rem;">{avg_metric:.1f}</div>
-                    <div style="font-size: 0.9rem; color: #6C757D;">Avg {primary_metric}</div>
-                    <div style="font-size: 0.75rem; color: #6C757D; margin-top: 0.25rem;">Max: {max_metric:.1f}</div>
-                </div>
-                """, unsafe_allow_html=True)
+            if 'Date' in df.columns:
+                try:
+                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                    recent_sessions = df[df['Date'] >= (datetime.now() - timedelta(days=7))].shape[0]
+                    st.metric("Sessions (7 days)", recent_sessions)
+                except:
+                    st.metric("Sessions (7 days)", "N/A")
             else:
-                if 'Date' in df_filtered.columns:
-                    try:
-                        df_filtered['Date'] = pd.to_datetime(df_filtered['Date'], errors='coerce')
-                        recent_sessions = df_filtered[df_filtered['Date'] >= (datetime.now() - timedelta(days=7))].shape[0]
-                        st.markdown(f"""
-                        <div class="metric-card-enhanced" style="text-align: center;">
-                            <div style="font-size: 2rem; font-weight: 700; color: #212529; margin-bottom: 0.25rem;">{recent_sessions}</div>
-                            <div style="font-size: 0.9rem; color: #6C757D;">Sessions (7 days)</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    except:
-                        st.markdown(f"""
-                        <div class="metric-card-enhanced" style="text-align: center;">
-                            <div style="font-size: 1.2rem; font-weight: 700; color: #212529; margin-bottom: 0.25rem;">N/A</div>
-                            <div style="font-size: 0.9rem; color: #6C757D;">Sessions (7 days)</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div class="metric-card-enhanced" style="text-align: center;">
-                        <div style="font-size: 1.2rem; font-weight: 700; color: #212529; margin-bottom: 0.25rem;">N/A</div>
-                        <div style="font-size: 0.9rem; color: #6C757D;">Sessions (7 days)</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                st.metric("Sessions (7 days)", "N/A")
         
         with col4:
             if st.session_state.regression_model is not None and st.session_state.classification_model is not None:
-                st.markdown(f"""
-                <div class="metric-card-enhanced" style="text-align: center; border-color: #28A745;">
-                    <div style="font-size: 1.2rem; font-weight: 700; color: #212529; margin-bottom: 0.25rem;">Ready</div>
-                    <div style="font-size: 0.9rem; color: #6C757D;">Models Status</div>
-                    <span class="badge badge-success" style="margin-top: 0.5rem; display: inline-block;">Trained</span>
-                </div>
-                """, unsafe_allow_html=True)
+                st.metric("Models Status", "✅ Ready", delta="Trained")
             else:
-                st.markdown(f"""
-                <div class="metric-card-enhanced" style="text-align: center; border-color: #FFC107;">
-                    <div style="font-size: 1.2rem; font-weight: 700; color: #212529; margin-bottom: 0.25rem;">Not Trained</div>
-                    <div style="font-size: 0.9rem; color: #6C757D;">Models Status</div>
-                    <span class="badge badge-warning" style="margin-top: 0.5rem; display: inline-block;">Action Needed</span>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Interactive Visualizations
-        if primary_metric and primary_metric in df_filtered.columns:
-            st.markdown("---")
-            st.markdown("### Interactive Performance Analysis")
-            
-            col_viz1, col_viz2 = st.columns(2)
-            
-            with col_viz1:
-                # Metric distribution - Interactive Plotly
-                fig_dist = px.histogram(
-                    df_filtered, 
-                    x=primary_metric, 
-                    nbins=30,
-                    title=f'{primary_metric} Distribution',
-                    labels={primary_metric: primary_metric, 'count': 'Frequency'},
-                    color_discrete_sequence=['#1E88E5']
-                )
-                fig_dist.update_layout(
-                    hovermode='x unified',
-                    showlegend=False,
-                    height=400
-                )
-                st.plotly_chart(fig_dist, use_container_width=True)
-            
-            with col_viz2:
-                # Player comparison if selected - Interactive Plotly
-                if show_comparison and 'Player Name' in df_filtered.columns and df_filtered['Player Name'].nunique() > 1:
-                    player_avg = df_filtered.groupby('Player Name')[primary_metric].mean().sort_values(ascending=False).head(10)
-                    player_avg_df = player_avg.reset_index()
-                    
-                    fig_comp = px.bar(
-                        player_avg_df,
-                        x=primary_metric,
-                        y='Player Name',
-                        orientation='h',
-                        title=f'Top Players - Avg {primary_metric}',
-                        labels={primary_metric: primary_metric},
-                        color=primary_metric,
-                        color_continuous_scale='Greens'
-                    )
-                    fig_comp.update_layout(
-                        yaxis={'categoryorder': 'total ascending'},
-                        height=400,
-                        hovermode='y unified'
-                    )
-                    st.plotly_chart(fig_comp, use_container_width=True)
+                st.metric("Models Status", "⚠️ Not Trained", delta="Please train models")
         
         st.markdown("---")
         
@@ -1668,21 +906,14 @@ if page == "Dashboard":
                                 
                                 # Group by player (using mean and max)
                                 player_risk = recent_data.groupby('Player Name')['Predicted_Risk'].agg(['mean', 'max']).reset_index()
-                                # Risk classification: Low if avg_risk <= 0.40
+                                # New logic: if mean risk <= 0.40, classify as Low Risk (regardless of max)
                                 risk_mapping = {0: 'Low', 1: 'Medium', 2: 'High'}
                                 def classify_risk(row):
                                     mean_val = float(row['mean'])
-                                    max_val = float(row['max'])
-                                    # Low Risk: Average risk <= 0.40
                                     if mean_val <= 0.40:
                                         return 'Low'
-                                    # Otherwise, use maximum risk to classify
-                                    elif max_val >= 2.0:  # High risk class
-                                        return 'High'
-                                    elif max_val >= 1.0:  # Medium risk class
-                                        return 'Medium'
                                     else:
-                                        return 'Low'
+                                        return risk_mapping.get(int(row['max']), 'Medium')
                                 player_risk['Risk_Category'] = player_risk.apply(classify_risk, axis=1)
                                 
                                 high_risk_count = len(player_risk[player_risk['Risk_Category'] == 'High'])
@@ -1693,31 +924,25 @@ if page == "Dashboard":
                                 
                                 with col1:
                                     st.markdown(f"""
-                                    <div class="risk-card risk-card-high">
-                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🚨</div>
-                                        <h3 style='color:#DC3545; margin:0; font-size: 2.5rem; font-weight: 700;'>{high_risk_count}</h3>
-                                        <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>High Risk Players</p>
-                                        <span class="badge badge-danger">Attention Required</span>
+                                    <div style='background-color:#F8D7DA; padding:15px; border-radius:10px; text-align:center;'>
+                                        <h3 style='color:#DC3545; margin:0;'>{high_risk_count}</h3>
+                                        <p style='margin:5px 0;'><b>High Risk Players</b></p>
                                     </div>
                                     """, unsafe_allow_html=True)
                                 
                                 with col2:
                                     st.markdown(f"""
-                                    <div class="risk-card risk-card-medium">
-                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">⚡</div>
-                                        <h3 style='color:#FFC107; margin:0; font-size: 2.5rem; font-weight: 700;'>{medium_risk_count}</h3>
-                                        <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>Medium Risk</p>
-                                        <span class="badge badge-warning">Monitor</span>
+                                    <div style='background-color:#FFF3CD; padding:15px; border-radius:10px; text-align:center;'>
+                                        <h3 style='color:#FFC107; margin:0;'>{medium_risk_count}</h3>
+                                        <p style='margin:5px 0;'><b>Medium Risk</b></p>
                                     </div>
                                     """, unsafe_allow_html=True)
                                 
                                 with col3:
                                     st.markdown(f"""
-                                    <div class="risk-card risk-card-low">
-                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">✅</div>
-                                        <h3 style='color:#28A745; margin:0; font-size: 2.5rem; font-weight: 700;'>{low_risk_count}</h3>
-                                        <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>Low Risk</p>
-                                        <span class="badge badge-success">Healthy</span>
+                                    <div style='background-color:#D4EDDA; padding:15px; border-radius:10px; text-align:center;'>
+                                        <h3 style='color:#28A745; margin:0;'>{low_risk_count}</h3>
+                                        <p style='margin:5px 0;'><b>Low Risk</b></p>
                                     </div>
                                     """, unsafe_allow_html=True)
                                 
@@ -1732,7 +957,7 @@ if page == "Dashboard":
                                     """, unsafe_allow_html=True)
                                     
                                     if st.button("🔍 View Detailed Analysis", type="primary"):
-                                        st.session_state.page_from_dashboard = "Injury Prevention"
+                                        st.session_state.page_from_dashboard = "🛡️ Injury Prevention"
                                         st.rerun()
                                 
                             except Exception as e:
@@ -1741,29 +966,29 @@ if page == "Dashboard":
             except Exception as e:
                 st.warning(f"Could not load injury risk data: {str(e)}")
         
-        # Quick Actions - Enhanced
+        # Quick Actions
         st.markdown("---")
-        st.markdown("### Quick Actions")
+        st.markdown("### 🎯 Quick Actions")
         
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            if st.button("View Player Loads", use_container_width=True, type="primary"):
-                st.session_state.page_from_dashboard = "Player Load Analysis"
+            if st.button("📊 View Player Loads", use_container_width=True):
+                st.session_state.page_from_dashboard = "📈 Player Load Analysis"
                 st.rerun()
         
         with col2:
-            if st.button("Team Lineup", use_container_width=True, type="primary"):
-                st.session_state.page_from_dashboard = "Team Lineup Calculator"
+            if st.button("👥 Team Lineup", use_container_width=True):
+                st.session_state.page_from_dashboard = "👥 Team Lineup Calculator"
                 st.rerun()
         
         with col3:
-            if st.button("Analytics", use_container_width=True, type="primary"):
-                st.session_state.page_from_dashboard = "Performance Analytics"
+            if st.button("📉 Analytics", use_container_width=True):
+                st.session_state.page_from_dashboard = "📉 Performance Analytics"
                 st.rerun()
 
-elif page == "Data Audit":
-    st.markdown('<h1 class="main-header">Data Audit & Quality Control</h1>', unsafe_allow_html=True)
+elif page == "📊 Data Audit":
+    st.markdown('<h1 class="main-header">📊 Data Audit & Quality Control</h1>', unsafe_allow_html=True)
     
     uploaded_file = st.file_uploader("Upload your CSV file", type=['csv'])
     
@@ -1771,66 +996,18 @@ elif page == "Data Audit":
         df = pd.read_csv(uploaded_file)
         st.session_state.df = df
         
-        st.markdown(f"""
-        <div class="success-box">
-            <h4 style="margin: 0 0 0.5rem 0;">✅ Dataset Successfully Loaded</h4>
-            <p style="margin: 0;"><strong>{df.shape[0]:,}</strong> rows • <strong>{df.shape[1]}</strong> columns</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Validate required columns for Injury Risk calculations
-        required_columns = {
-            'Time in HR Load Zone 85% - 96% Max HR (secs)',
-            'Hr Max (bpm)',
-            'Impact Zones: 15 - 20 G (Impacts)',
-            'Max Acceleration (yd/s/s)',
-            'Power Plays',
-            'Max Deceleration (yd/s/s)',
-            'Impact Zones: > 20 G (Impacts)',
-            'Power Score (w/kg)',
-            'Distance Per Min (yd/min)',
-            'Time In Red Zone (min)'
-        }
-        df_columns_set = set(df.columns)
-        missing_required = sorted(list(required_columns - df_columns_set))
-        if missing_required:
-            st.error(
-                "Missing required columns for Injury Risk calculations: " + ", ".join(missing_required)
-            )
-            st.info(
-                "Please upload a CSV that includes these fields. The current file will still load, but Injury Risk cannot be computed until the missing columns are provided."
-            )
+        st.success(f"✅ Dataset loaded: {df.shape[0]} rows and {df.shape[1]} columns")
         
         col1, col2, col3 = st.columns(3)
-        total_players = df['Player Name'].nunique() if 'Player Name' in df.columns else 0
-        
         with col1:
-            st.markdown(f"""
-            <div class="metric-card-enhanced" style="text-align: center;">
-                <div style="font-size: 2rem; color: #1E88E5; margin-bottom: 0.5rem;">👥</div>
-                <div style="font-size: 1.75rem; font-weight: 700; color: #212529;">{total_players}</div>
-                <div style="font-size: 0.85rem; color: #6C757D;">Total Players</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric("Total Players", df['Player Name'].nunique() if 'Player Name' in df.columns else 'N/A')
         with col2:
-            st.markdown(f"""
-            <div class="metric-card-enhanced" style="text-align: center;">
-                <div style="font-size: 2rem; color: #43A047; margin-bottom: 0.5rem;">📊</div>
-                <div style="font-size: 1.75rem; font-weight: 700; color: #212529;">{df.shape[0]:,}</div>
-                <div style="font-size: 0.85rem; color: #6C757D;">Total Sessions</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric("Total Sessions", df.shape[0])
         with col3:
-            st.markdown(f"""
-            <div class="metric-card-enhanced" style="text-align: center;">
-                <div style="font-size: 2rem; color: #667eea; margin-bottom: 0.5rem;">📈</div>
-                <div style="font-size: 1.75rem; font-weight: 700; color: #212529;">{df.shape[1]}</div>
-                <div style="font-size: 0.85rem; color: #6C757D;">Features</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric("Features", df.shape[1])
         
         st.markdown("### 📋 Dataset Preview")
-        st.dataframe(df.head(10), use_container_width=True, height=400)
+        st.dataframe(df.head(10), use_container_width=True)
         
         st.markdown("### 📊 Data Quality Report")
         
@@ -1839,29 +1016,15 @@ elif page == "Data Audit":
         
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown(f"""
-            <div class="info-box">
-                <strong>📊 Numeric Variables:</strong> <span class="badge badge-info">{len(numeric_cols)}</span>
-            </div>
-            <div class="info-box">
-                <strong>📝 Categorical Variables:</strong> <span class="badge badge-info">{len(cat_cols)}</span>
-            </div>
-            """, unsafe_allow_html=True)
+            st.info(f"**Numeric Variables:** {len(numeric_cols)}")
+            st.info(f"**Categorical Variables:** {len(cat_cols)}")
         
         with col2:
             nulls = df.isnull().sum()
             if nulls.sum() > 0:
-                st.markdown(f"""
-                <div class="warning-box">
-                    <strong>⚠️ Missing Values:</strong> <span class="badge badge-warning">{nulls.sum():,} total</span>
-                </div>
-                """, unsafe_allow_html=True)
+                st.warning(f"**Missing Values:** {nulls.sum()} total")
             else:
-                st.markdown("""
-                <div class="success-box">
-                    <strong>✅ No Missing Values</strong> <span class="badge badge-success">Perfect</span>
-                </div>
-                """, unsafe_allow_html=True)
+                st.success("**No Missing Values** ✓")
         
         if 'Player Load' in df.columns:
             st.markdown("### 📈 Player Load Distribution")
@@ -1870,98 +1033,23 @@ elif page == "Data Audit":
             ax.set_title('Player Load Distribution', fontsize=14, fontweight='bold')
             st.pyplot(fig)
         
-        st.markdown("### Outlier Detection & Cleaning")
+        st.markdown("### 🔧 Outlier Detection & Cleaning")
         
-        col_info_outlier, col_btn_outlier = st.columns([3, 1])
-        with col_info_outlier:
-            st.markdown("""
-            **Outlier Removal Strategy:**
-            - Removes rows with MANY zeros across critical metrics (data-quality cleanup)
-            - Removes **very extreme outliers** (beyond 4.5 standard deviations or 4.5×IQR)
-            - A row is removed only if flagged as outlier in **multiple critical metrics** (conservative approach)
-            - Preserves most data while removing only the most exaggerated values
-            """)
-        with col_btn_outlier:
-            if st.button("Remove Extreme Outliers", type="primary", use_container_width=True):
-                with st.spinner("Detecting and removing extreme outliers..."):
-                    # Detect outliers using z-score method (only very extreme values) and drop zeros in critical metrics
-                    df_clean = df.copy()
-                    original_rows = len(df_clean)
-                    
-                    numeric_cols = df_clean.select_dtypes(include=['float64', 'int64']).columns.tolist()
-                    # Focus only on critical performance metrics for outlier detection
-                    critical_metrics = ['Player Load', 'Energy (kcal)', 'Distance (miles)', 
-                                      'Top Speed (mph)', 'Hr Load', 'Sprint Distance (yards)',
-                                      'Power Score (w/kg)', 'Impacts']
-                    critical_cols = [col for col in numeric_cols if any(metric in col for metric in critical_metrics)]
-                    
-                    if not critical_cols:
-                        critical_cols = numeric_cols[:5]  # Use first 5 if no critical metrics found
-                    
-                    outlier_scores = pd.Series([0] * len(df_clean))  # Track how many columns flag a row as outlier
-                    zero_counts = pd.Series([0] * len(df_clean))     # Track how many critical metrics are zero per row
-                    
-                    for col in critical_cols:
-                        if col in df_clean.columns:
-                            try:
-                                # Count zeros per row across critical metrics (we'll threshold later)
-                                zero_counts += (df_clean[col].fillna(0) == 0.0).astype(int)
-                                
-                                # Method 1: Z-score - only VERY extreme outliers (beyond 4 standard deviations)
-                                col_data = df_clean[col].fillna(df_clean[col].median())
-                                if col_data.std() > 0:  # Avoid division by zero
-                                    z_scores = np.abs(stats.zscore(col_data))
-                                    extreme_outliers = z_scores > 4.5  # Very conservative - only extreme outliers
-                                    outlier_scores += extreme_outliers.astype(int)
-                                
-                                # Method 2: IQR - only remove if beyond 4.5 * IQR (very conservative)
-                                Q1 = df_clean[col].quantile(0.25)
-                                Q3 = df_clean[col].quantile(0.75)
-                                IQR = Q3 - Q1
-                                if IQR > 0:  # Avoid division by zero
-                                    lower_bound = Q1 - 4.5 * IQR  # Very conservative
-                                    upper_bound = Q3 + 4.5 * IQR
-                                    iqr_extreme = ((df_clean[col] < lower_bound) | (df_clean[col] > upper_bound)).astype(int)
-                                    outlier_scores += iqr_extreme
-                            except:
-                                continue
-                    
-                    # Only remove rows that are outliers in MULTIPLE critical metrics (at least 2)
-                    # And optionally rows with MANY zeros across critical metrics
-                    base_outlier_mask = (outlier_scores >= 2)
-                    # Threshold: many zeros if at least half of the critical metrics are zero (min 3)
-                    zero_threshold = max(3, int(np.ceil(len(critical_cols) * 0.5))) if len(critical_cols) > 0 else 3
-                    many_zeros_mask = zero_counts >= zero_threshold
-                    proposed_mask = base_outlier_mask | many_zeros_mask
-                    
-                    # Safety guard: if proposed removal would drop too many rows (>20%), fall back to base outliers only
-                    removal_ratio = proposed_mask.mean() if len(df_clean) > 0 else 0
-                    outlier_mask = base_outlier_mask if removal_ratio > 0.20 else proposed_mask
-                    
-                    # Remove only extreme outliers
-                    rows_before = len(df_clean)
-                    df_clean = df_clean[~outlier_mask].copy()
-                    rows_removed = rows_before - len(df_clean)
-                    
-                    if rows_removed > 0:
-                        st.session_state.df = df_clean  # Update main dataframe
-                        st.session_state.df_clean = df_clean
-                        
-                        st.success(f"Data cleaned successfully! Removed {rows_removed} extreme outlier rows ({rows_removed/rows_before*100:.1f}% of data).")
-                        
-                        st.markdown("#### Before vs After")
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("Original Rows", rows_before)
-                        with col2:
-                            st.metric("Cleaned Rows", len(df_clean))
-                        with col3:
-                            st.metric("Rows Removed", rows_removed, delta=f"-{rows_removed/rows_before*100:.1f}%")
-                    else:
-                        st.info("No extreme outliers detected. Data is clean!")
+        if st.button("🧹 Clean Data & Remove Outliers", type="primary"):
+            with st.spinner("Cleaning data..."):
+                df_clean = limpiar_datos_regression(df)
+                st.session_state.df_clean = df_clean
+                st.success("✅ Data cleaned successfully!")
+                
+                st.markdown("#### Before vs After")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Original Rows", df.shape[0])
+                with col2:
+                    st.metric("Cleaned Rows", df_clean.shape[0])
 
-elif page == "Model Training":
-    st.markdown('<h1 class="main-header">Advanced Model Training</h1>', unsafe_allow_html=True)
+elif page == "🤖 Model Training":
+    st.markdown('<h1 class="main-header">🤖 Advanced Model Training</h1>', unsafe_allow_html=True)
     
     if st.session_state.df is None:
         st.warning("⚠️ Please upload data in the Data Audit section first.")
@@ -1974,7 +1062,7 @@ elif page == "Model Training":
             st.markdown("### Train Player Load Prediction Model")
             st.info("This model predicts Player Load based on performance metrics")
             
-            if st.button("Train Regression Model", type="primary", key="train_reg"):
+            if st.button("🚀 Train Regression Model", type="primary", key="train_reg"):
                 with st.spinner("Training model... This may take a moment"):
                     model, metrics, features = train_regression_model_fast(df)
                     st.session_state.regression_model = model
@@ -1984,66 +1072,23 @@ elif page == "Model Training":
                     st.markdown("### 📊 Train vs Test Performance")
                     
                     col1, col2 = st.columns(2)
-                    train_r2 = metrics['train']['R2']
-                    test_r2 = metrics['test']['R2']
                     
                     with col1:
-                        st.markdown("""
-                        <div style="background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); padding: 1.5rem; border-radius: 12px; border-left: 5px solid #2196F3;">
-                            <h4 style="color: #2196F3; margin: 0 0 1rem 0;">🟢 Training Set</h4>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.markdown(f"""
-                        <div class="metric-card-enhanced" style="text-align: center; margin-top: 0.5rem;">
-                            <div style="font-size: 2rem; font-weight: 700; color: #1E88E5;">{train_r2:.4f}</div>
-                            <div style="font-size: 0.85rem; color: #6C757D; margin-top: 0.25rem;">R² Score</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        # Visual progress for R²
-                        st.progress(min(max(train_r2, 0.0), 1.0))
-                        st.markdown(f"""
-                        <div class="metric-card-enhanced" style="text-align: center; margin-top: 0.5rem;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #212529;">{metrics['train']['MAE']:.2f}</div>
-                            <div style="font-size: 0.85rem; color: #6C757D; margin-top: 0.25rem;">MAE</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.markdown(f"""
-                        <div class="metric-card-enhanced" style="text-align: center; margin-top: 0.5rem;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #212529;">{metrics['train']['RMSE']:.2f}</div>
-                            <div style="font-size: 0.85rem; color: #6C757D; margin-top: 0.25rem;">RMSE</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.markdown("#### 🟢 Training Set")
+                        train_r2 = metrics['train']['R2']
+                        st.metric("R² Score", f"{train_r2:.4f}")
+                        st.metric("MAE", f"{metrics['train']['MAE']:.2f}")
+                        st.metric("RMSE", f"{metrics['train']['RMSE']:.2f}")
                     
                     with col2:
-                        st.markdown("""
-                        <div style="background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); padding: 1.5rem; border-radius: 12px; border-left: 5px solid #43A047;">
-                            <h4 style="color: #43A047; margin: 0 0 1rem 0;">🔵 Test Set</h4>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.markdown(f"""
-                        <div class="metric-card-enhanced" style="text-align: center; margin-top: 0.5rem;">
-                            <div style="font-size: 2rem; font-weight: 700; color: #43A047;">{test_r2:.4f}</div>
-                            <div style="font-size: 0.85rem; color: #6C757D; margin-top: 0.25rem;">R² Score</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        # Visual progress for R²
-                        st.progress(min(max(test_r2, 0.0), 1.0))
-                        st.markdown(f"""
-                        <div class="metric-card-enhanced" style="text-align: center; margin-top: 0.5rem;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #212529;">{metrics['test']['MAE']:.2f}</div>
-                            <div style="font-size: 0.85rem; color: #6C757D; margin-top: 0.25rem;">MAE</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.markdown(f"""
-                        <div class="metric-card-enhanced" style="text-align: center; margin-top: 0.5rem;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #212529;">{metrics['test']['RMSE']:.2f}</div>
-                            <div style="font-size: 0.85rem; color: #6C757D; margin-top: 0.25rem;">RMSE</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.markdown("#### 🔵 Test Set")
+                        test_r2 = metrics['test']['R2']
+                        st.metric("R² Score", f"{test_r2:.4f}")
+                        st.metric("MAE", f"{metrics['test']['MAE']:.2f}")
+                        st.metric("RMSE", f"{metrics['test']['RMSE']:.2f}")
                     
                     # Check for overfitting
                     diff = abs(train_r2 - test_r2)
-                    st.metric("Generalization gap (|Train-Test|)", f"{diff:.4f}", delta=f"{(test_r2-train_r2):+.4f}")
                     if diff > 0.15:
                         st.warning(f"⚠️ **Warning:** Potential overfitting! Train R² ({train_r2:.4f}) vs Test R² ({test_r2:.4f}) gap: {diff:.4f}")
                     elif diff > 0.10:
@@ -2051,10 +1096,9 @@ elif page == "Model Training":
                     else:
                         st.success(f"✅ **No overfitting!** Gap: {diff:.4f}")
                     
-                    # Balloons: celebrate either excellent test R² or very small gap with solid performance
-                    if (metrics['test']['R2'] >= 0.90) or (diff <= 0.05 and metrics['test']['R2'] >= 0.80):
+                    if metrics['test']['R2'] >= 0.90:
                         st.balloons()
-                        st.markdown('<div class="success-box">🎯 <b>Great Performance!</b> Strong generalization and high R²</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="success-box">🎯 <b>Excellent Performance!</b> R² score exceeds 0.90 threshold</div>', unsafe_allow_html=True)
                     
                     # Visualize overfitting with Plotly
                     st.markdown("### 📊 Overfitting Visualization")
@@ -2121,14 +1165,11 @@ elif page == "Model Training":
             st.markdown("### Train Injury Risk Classification Model")
             st.info("This model classifies players into low/medium/high injury risk categories")
             
-            st.markdown("""
-            **Risk Classification Rules:**
-            - **Low Risk:** Average predicted risk ≤ 0.40
-            - **Medium Risk:** Average risk > 0.40 and maximum risk indicates medium
-            - **High Risk:** Maximum risk indicates high
-            """)
+            # Add warning about retraining needed
+            if st.session_state.classification_model is not None:
+                st.warning("⚠️ **Important:** Please retrain the classification model to apply the updated risk thresholds (60th percentile for Low/Medium, 95th for High).")
             
-            if st.button("Train Classification Model", type="primary", key="train_class"):
+            if st.button("🚀 Train Classification Model", type="primary", key="train_class"):
                 with st.spinner("Training model... This may take a moment"):
                     model, metrics, features = train_classification_model_fast(df)
                     st.session_state.classification_model = model
@@ -2177,8 +1218,8 @@ elif page == "Model Training":
                     with st.expander("View all features"):
                         st.write(features)
 
-elif page == "Player Load Analysis":
-    st.markdown('<h1 class="main-header">Player Load Analysis</h1>', unsafe_allow_html=True)
+elif page == "📈 Player Load Analysis":
+    st.markdown('<h1 class="main-header">📈 Player Load Analysis</h1>', unsafe_allow_html=True)
     
     if st.session_state.df is None:
         st.warning("⚠️ Please upload data in the Data Audit section first.")
@@ -2322,8 +1363,8 @@ elif page == "Player Load Analysis":
             </div>
             """, unsafe_allow_html=True)
 
-elif page == "Injury Prevention":
-    st.markdown('<h1 class="main-header">Injury Risk Prevention System</h1>', unsafe_allow_html=True)
+elif page == "🛡️ Injury Prevention":
+    st.markdown('<h1 class="main-header">🛡️ Injury Risk Prevention System</h1>', unsafe_allow_html=True)
     
     if st.session_state.df is None:
         st.warning("⚠️ Please upload data in the Data Audit section first.")
@@ -2459,25 +1500,18 @@ elif page == "Injury Prevention":
         
         if 'Player Name' in recent_data.columns:
             player_risk = recent_data.groupby('Player Name')['Predicted_Risk'].agg(['mean', 'max']).reset_index()
-            # Risk classification: Low if avg_risk <= 0.40
+            # New logic: if mean risk <= 0.40, classify as Low Risk (regardless of max)
             risk_mapping = {0: 'Low', 1: 'Medium', 2: 'High'}
             def classify_risk(row):
                 mean_val = float(row['mean'])
-                max_val = float(row['max'])
-                # Low Risk: Average risk <= 0.40
                 if mean_val <= 0.40:
                     return 'Low'
-                # Otherwise, use maximum risk to classify
-                elif max_val >= 2.0:  # High risk class
-                    return 'High'
-                elif max_val >= 1.0:  # Medium risk class
-                    return 'Medium'
                 else:
-                    return 'Low'
+                    return risk_mapping.get(int(row['max']), 'Medium')
             player_risk['Risk_Category'] = player_risk.apply(classify_risk, axis=1)
             player_risk = player_risk.sort_values('mean', ascending=False)
             
-            st.markdown("### Current Injury Risk Status")
+            st.markdown("### 🚨 Current Injury Risk Status")
             
             col1, col2, col3 = st.columns(3)
             high_risk = len(player_risk[player_risk['Risk_Category'] == 'High'])
@@ -2820,8 +1854,12 @@ elif page == "Injury Prevention":
                                 for item in intel_recs['personalized_plan']:
                                     st.markdown(f"- {item}")
 
-elif page == "Team Lineup Calculator":
-    st.markdown('<h1 class="main-header">Optimal Team Lineup Calculator</h1>', unsafe_allow_html=True)
+elif page == "👥 Team Lineup Calculator":
+    st.markdown("""
+    <h1 style='color:#1E88E5; font-size:2.5rem; font-weight:bold; text-align:center; padding:1rem;'>
+        👥 Optimal Team Lineup Calculator
+    </h1>
+    """, unsafe_allow_html=True)
     
     if st.session_state.df is None:
         st.warning("⚠️ Please upload data in the Data Audit section first.")
@@ -3201,8 +2239,8 @@ elif page == "Team Lineup Calculator":
             st.markdown(f"<p>Based on historical data, this lineup is expected to deliver {team_composite_avg:.0f} composite performance. {performance_msg}</p>", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-elif page == "Performance Analytics":
-    st.markdown('<h1 class="main-header">Advanced Performance Analytics</h1>', unsafe_allow_html=True)
+elif page == "📉 Performance Analytics":
+    st.markdown('<h1 class="main-header">📉 Advanced Performance Analytics</h1>', unsafe_allow_html=True)
     
     if st.session_state.df is None:
         st.warning("⚠️ Please upload data in the Data Audit section first.")
@@ -3210,212 +2248,227 @@ elif page == "Performance Analytics":
         df = st.session_state.df
         df_clean = limpiar_datos_regression(df)
         
-        # AI Coach Assistant - Interactive Chat with Ollama
-        with st.expander("AI Coach Assistant - Understand Your Analytics", expanded=True):
-            st.markdown("### Ask Your AI Assistant About Performance Analytics")
+        # AI Coach Assistant - Explain Analytics
+        with st.expander("🤖 AI Coach Assistant - Understand Your Analytics", expanded=True):
+            st.markdown("### 💬 Your AI Assistant Explains Each Analysis")
             
-            # Player selection for context with search
-            col_player, col_info = st.columns([2, 3])
+            col1, col2 = st.columns([3, 1])
             
-            with col_player:
-                if 'Player Name' in df_clean.columns:
-                    # Always default to "All Players" to have team data available
-                    if st.session_state.selected_chat_player is None:
-                        st.session_state.selected_chat_player = None  # Force to All Players
-                    
-                    chat_player = st.selectbox(
-                        "Select a Player (Optional)",
-                        ["All Players"] + sorted(list(df_clean['Player Name'].unique())),
-                        key="chat_player_selector",
-                        index=0,  # Always default to "All Players"
-                        help="Select a specific player to get personalized insights. 'All Players' provides team-wide context."
+            # Player selection for personalized explanations
+            selected_player_for_explain = None
+            if 'Player Name' in df_clean.columns:
+                col_select_player, col_select_analysis = st.columns([1, 2])
+                
+                with col_select_player:
+                    explain_player = st.selectbox(
+                        "👤 Select Player (Optional)",
+                        ["All Players"] + list(df_clean['Player Name'].unique()),
+                        key="explain_player_selector"
                     )
                     
-                    if chat_player != "All Players":
-                        st.session_state.selected_chat_player = chat_player
-                    else:
-                        st.session_state.selected_chat_player = None
-                else:
-                    st.session_state.selected_chat_player = None
+                    if explain_player != "All Players":
+                        selected_player_for_explain = explain_player
+                        st.info(f"📊 Explaining for: **{explain_player}**")
+                
+                with col_select_analysis:
+                    analysis_to_explain = st.selectbox(
+                        "🎯 What do you want to understand?",
+                        [
+                            "Select an analysis...",
+                            "📊 Key Performance Indicators (KPIs)",
+                            "🔗 Correlation Analysis",
+                            "📈 Performance Distribution",
+                            "📅 Temporal Performance Trends",
+                            "⚡ Speed Zone Distribution",
+                            "🏃 Player Comparison Matrix",
+                            "👥 All Analytics Overview"
+                        ],
+                        key="analysis_selector"
+                    )
+            else:
+                analysis_to_explain = st.selectbox(
+                    "🎯 What do you want to understand?",
+                    [
+                        "Select an analysis...",
+                        "📊 Key Performance Indicators (KPIs)",
+                        "🔗 Correlation Analysis",
+                        "📈 Performance Distribution",
+                        "📅 Temporal Performance Trends",
+                        "⚡ Speed Zone Distribution",
+                        "🏃 Player Comparison Matrix",
+                        "👥 All Analytics Overview"
+                    ]
+                )
             
-            with col_info:
-                if not OLLAMA_AVAILABLE:
-                    st.warning("Ollama is not installed. Install it with: `pip install ollama`")
-                    st.info("You also need to have Ollama running locally. Run `ollama serve` in your terminal.")
-                else:
+            # AI Explanations
+            if analysis_to_explain != "Select an analysis...":
+                if analysis_to_explain == "📊 Key Performance Indicators (KPIs)":
                     st.markdown("""
-                    <div style="font-size: 0.75rem; color: #6C757D; padding: 0.5rem; background: #F8F9FA; border-radius: 4px;">
-                        Status: Ollama connected
+                    <div class="info-box">
+                    <h4>📊 What Are KPIs?</h4>
+                    <p><b>Think of KPIs as your team's vital signs.</b></p>
+                    <ul>
+                        <li><b>Player Load:</b> Total training stress per session. High scores (350+) mean high intensity work.</li>
+                        <li><b>Distance:</b> How many miles covered. Shows overall work capacity.</li>
+                        <li><b>Top Speed:</b> Maximum sprint speed. Elite players hit 18-20 mph.</li>
+                        <li><b>Energy:</b> Calories burned. Indicates metabolic workload.</li>
+                    </ul>
+                    <p><b>Why it matters:</b> These numbers tell you who's working hardest, who needs more intensity, and who might be overtraining.</p>
                     </div>
                     """, unsafe_allow_html=True)
-            
-            # Chat interface
-            st.markdown("---")
-            st.markdown("#### Conversation")
-            
-            # Initialize chat history if needed
-            if 'chat_history' not in st.session_state:
-                st.session_state.chat_history = []
-            
-            # Display chat history with enhanced bubbles
-            chat_container = st.container()
-            with chat_container:
-                if len(st.session_state.chat_history) == 0:
-                    st.markdown("""
-                    <div class="info-box" style="text-align: center; padding: 2rem;">
-                        <h4 style="color: #2196F3; margin-bottom: 1rem;">Hi! I'm your sports analytics assistant</h4>
-                        <p style="color: #6C757D; margin-bottom: 1.5rem;">You can ask me about:</p>
-                        <div style="text-align: left; max-width: 500px; margin: 0 auto;">
-                            <p style="margin: 0.5rem 0;"><b>Specific player performance</b> - Analyze individual player metrics and trends</p>
-                            <p style="margin: 0.5rem 0;"><b>Metric explanations</b> - Learn about Player Load, Energy, Speed Zones, etc.</p>
-                            <p style="margin: 0.5rem 0;"><b>Player comparisons</b> - Compare performance across different players</p>
-                            <p style="margin: 0.5rem 0;"><b>Trends and data analysis</b> - Understand patterns and performance trajectories</p>
-                            <p style="margin: 0.5rem 0;"><b>Training recommendations</b> - Get personalized coaching insights</p>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    for i, msg in enumerate(st.session_state.chat_history):
-                        if msg['role'] == 'user':
-                            st.markdown(f"""
-                            <div class="chat-bubble-user">
-                                <strong>You:</strong><br>{msg['content']}
-                            </div>
-                            """, unsafe_allow_html=True)
-                        elif msg['role'] == 'assistant':
-                            st.markdown(f"""
-                            <div class="chat-bubble-assistant">
-                                <strong>Assistant:</strong><br>{msg['content']}
-                            </div>
-                            """, unsafe_allow_html=True)
-            
-            # Chat input
-            user_input = st.chat_input("Ask your question here...")
-            
-            if user_input:
-                # Add user message to history
-                st.session_state.chat_history.append({"role": "user", "content": user_input})
-                
-                # Always get team context first (All Players), then add specific player if selected
-                player_context = format_player_data_for_context(df_clean, None)  # Team data
-                
-                # Auto-detect player names mentioned in the user input
-                detected_players = []
-                if 'Player Name' in df_clean.columns:
-                    available_players = sorted(list(df_clean['Player Name'].unique()))
-                    detected_players = extract_player_names_from_text(user_input, available_players)
-                
-                # Build context with detected players and selected player
-                players_to_include = []
-                if st.session_state.selected_chat_player:
-                    matched_name = find_player_in_dataframe(df_clean, st.session_state.selected_chat_player)
-                    if matched_name:
-                        players_to_include.append(matched_name)
-                
-                # Add detected players from text
-                for detected_player in detected_players:
-                    matched_name = find_player_in_dataframe(df_clean, detected_player)
-                    if matched_name and matched_name not in players_to_include:
-                        players_to_include.append(matched_name)
-                
-                # Add player contexts
-                if players_to_include:
-                    player_contexts_parts = []
-                    for player_name in players_to_include[:5]:  # Limit to 5 players to avoid too much context
-                        specific_player_context = format_player_data_for_context(df_clean, player_name)
-                        if specific_player_context and "NOT FOUND" not in specific_player_context:
-                            player_contexts_parts.append(f"\n\n---PLAYER: {player_name}---\n{specific_player_context[:800]}")
                     
-                    if player_contexts_parts:
-                        player_context = f"{player_context}\n\n{' '.join(player_contexts_parts)}"
-                elif st.session_state.selected_chat_player:
-                    # Fallback to selected player if no auto-detection worked
-                    specific_player_context = format_player_data_for_context(df_clean, st.session_state.selected_chat_player)
-                    if specific_player_context:
-                        # Check if player was not found
-                        if "NOT FOUND" in specific_player_context:
-                            player_context = specific_player_context  # Use the "not found" message
+                elif analysis_to_explain == "🔗 Correlation Analysis":
+                    st.markdown("""
+                    <div class="info-box">
+                    <h4>🔗 Understanding Correlations</h4>
+                    <p><b>This shows which metrics move together.</b></p>
+                    <ul>
+                        <li><b>Red/Hot areas (+0.7 to +1.0):</b> Strong positive relationship - when one goes up, the other does too (e.g., Distance and Energy burn together)</li>
+                        <li><b>Blue areas (-0.7 to -1.0):</b> Strong negative - they move opposite (rare in performance data)</li>
+                        <li><b>Yellow areas (+0.3 to -0.3):</b> Weak relationship - they're independent</li>
+                    </ul>
+                    <p><b>Practical use:</b> If Player Load and Distance are highly correlated (red), then increasing running volume automatically increases load. This helps you predict training responses.</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                elif analysis_to_explain == "📈 Performance Distribution":
+                    st.markdown("""
+                    <div class="info-box">
+                    <h4>📈 What Distribution Plots Show</h4>
+                    <p><b>This is like a report card for your entire team.</b></p>
+                    <ul>
+                        <li><b>Normal bell curve:</b> Most players cluster around average - healthy team consistency</li>
+                        <li><b>Peaks (tails):</b> Some players far above or below average - mix of high performers and development players</li>
+                        <li><b>Mean vs Median:</b> If mean (red line) is much higher than median (green), you have a few superstars pulling the average up</li>
+                    </ul>
+                    <p><b>What to look for:</b> Watch for players way off to the right (overperforming - good!) or way off to the left (underperforming - needs attention).</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                elif analysis_to_explain == "📅 Temporal Performance Trends":
+                    if selected_player_for_explain:
+                        # Get player-specific data
+                        player_data_explain = df_clean[df_clean['Player Name'] == selected_player_for_explain]
+                        
+                        if len(player_data_explain) > 0:
+                            avg_load_player = player_data_explain['Player Load'].mean() if 'Player Load' in player_data_explain.columns else 0
+                            avg_energy_player = player_data_explain['Energy (kcal)'].mean() if 'Energy (kcal)' in player_data_explain.columns else 0
+                            avg_speed_player = player_data_explain['Top Speed (mph)'].mean() if 'Top Speed (mph)' in player_data_explain.columns else 0
+                            
+                            st.markdown(f"""
+                            <div class="info-box">
+                            <h4>📅 Reading {selected_player_for_explain}'s Trends Over Time</h4>
+                            <p><b>This is your crystal ball for fatigue and fitness.</b></p>
+                            
+                            <h5>📊 {selected_player_for_explain}'s Average Metrics:</h5>
+                            <ul>
+                                <li><b>Player Load:</b> {avg_load_player:.1f} ({"High intensity" if avg_load_player > 250 else "Moderate"})</li>
+                                <li><b>Energy:</b> {avg_energy_player:.0f} kcal per session</li>
+                                <li><b>Top Speed:</b> {avg_speed_player:.1f} mph</li>
+                            </ul>
+                            
+                            <ul>
+                                <li><b>Upward trend in Load:</b> {selected_player_for_explain} is working harder - either getting fitter OR heading toward injury</li>
+                                <li><b>Downward trend:</b> Either recovering well or undertraining</li>
+                                <li><b>Spikes (sudden peaks):</b> Heavy sessions or matches - needs recovery days after</li>
+                                <li><b>Stable line:</b> Consistent training - good for maintaining fitness</li>
+                            </ul>
+                            <p><b>Key insight:</b> If Load is rising but Energy is falling, that's fatigue - {selected_player_for_explain} can't sustain intensity. Warning sign!</p>
+                            <p><b>Action items:</b> Rising trends need monitoring, falling Energy suggests recovery needed.</p>
+                            </div>
+                            """, unsafe_allow_html=True)
                         else:
-                            player_context = f"{player_context}\n\n---SPECIFIC PLAYER---\n{specific_player_context[:500]}"
+                            st.warning(f"No data available for {selected_player_for_explain}")
                     else:
-                        # If no context returned, player doesn't exist
-                        available_players = sorted(list(df_clean['Player Name'].unique())) if 'Player Name' in df_clean.columns else []
-                        player_context = f"REQUESTED_PLAYER: {st.session_state.selected_chat_player} NOT FOUND in dataset.\nAVAILABLE_PLAYERS: {', '.join(available_players[:20])}{' (and more)' if len(available_players) > 20 else ''}"
-                
-                # Show loading
-                with st.spinner("🤔 Thinking..."):
-                    # Get response from Ollama
-                    response = get_ollama_response(
-                        user_input, 
-                        player_context=player_context,
-                        chat_history=st.session_state.chat_history[:-1]  # Exclude the just-added user message
-                    )
+                        st.markdown("""
+                        <div class="info-box">
+                        <h4>📅 Reading Player Trends Over Time</h4>
+                        <p><b>This is your crystal ball for fatigue and fitness.</b></p>
+                        <ul>
+                            <li><b>Upward trend in Load:</b> Player is working harder - either getting fitter OR heading toward injury</li>
+                            <li><b>Downward trend:</b> Either recovering well or undertraining</li>
+                            <li><b>Spikes (sudden peaks):</b> Heavy sessions or matches - needs recovery days after</li>
+                            <li><b>Stable line:</b> Consistent training - good for maintaining fitness</li>
+                        </ul>
+                        <p><b>Key insight:</b> If Load is rising but Energy is falling, that's fatigue - player can't sustain intensity. Warning sign!</p>
+                        <p><b>Action items:</b> Rising trends need monitoring, falling Energy suggests recovery needed.</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                     
-                    # Add assistant response to history
-                    st.session_state.chat_history.append({"role": "assistant", "content": response})
+                elif analysis_to_explain == "⚡ Speed Zone Distribution":
+                    st.markdown("""
+                    <div class="info-box">
+                    <h4>⚡ Speed Zones Explained</h4>
+                    <p><b>Think of this as your training intensity recipe.</b></p>
+                    <ul>
+                        <li><b>Zone 1 (Green):</b> Walking/recovery. High = low-intensity recovery work</li>
+                        <li><b>Zone 2 (Light green):</b> Jogging. Building endurance</li>
+                        <li><b>Zone 3 (Yellow):</b> Running. Threshold work - builds aerobic capacity</li>
+                        <li><b>Zone 4 (Orange):</b> Fast running. High-intensity runs</li>
+                        <li><b>Zone 5 (Red):</b> Sprinting. Max speed/power work - anaerobic zone</li>
+                    </ul>
+                    <p><b>Elite standards:</b> 5-15% should be Zone 5 (sprints) for match-ready fitness. Less than 5% = need more high-intensity work.</p>
+                    <p><b>Too much Zone 5 (>15%):</b> Risk of fatigue and injury. Too little = not ready for match intensity.</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
-                    # Rerun to show new messages
-                    st.rerun()
-            
-            # Chat actions with suggestions
-            if len(st.session_state.chat_history) == 0:
-                st.markdown("**Quick Questions:**")
-                col_q1, col_q2, col_q3 = st.columns(3)
-                with col_q1:
-                    if st.button("What is Player Load?", key="q1"):
-                        user_input = "What is Player Load?"
-                        st.session_state.chat_history.append({"role": "user", "content": user_input})
-                        player_context = format_player_data_for_context(df_clean, None)
-                        if st.session_state.selected_chat_player:
-                            specific_player_context = format_player_data_for_context(df_clean, st.session_state.selected_chat_player)
-                            if specific_player_context:
-                                player_context = f"{player_context}\n\n---SPECIFIC PLAYER---\n{specific_player_context[:500]}"
-                        with st.spinner("Thinking..."):
-                            response = get_ollama_response(user_input, player_context=player_context, chat_history=[])
-                            st.session_state.chat_history.append({"role": "assistant", "content": response})
-                        st.rerun()
-                with col_q2:
-                    if st.button("Compare top players", key="q2"):
-                        user_input = "Compare the top performing players"
-                        st.session_state.chat_history.append({"role": "user", "content": user_input})
-                        player_context = format_player_data_for_context(df_clean, None)
-                        with st.spinner("Thinking..."):
-                            response = get_ollama_response(user_input, player_context=player_context, chat_history=[])
-                            st.session_state.chat_history.append({"role": "assistant", "content": response})
-                        st.rerun()
-                with col_q3:
-                    if st.button("Training recommendations", key="q3"):
-                        user_input = "What are some training recommendations based on the data?"
-                        st.session_state.chat_history.append({"role": "user", "content": user_input})
-                        player_context = format_player_data_for_context(df_clean, None)
-                        with st.spinner("Thinking..."):
-                            response = get_ollama_response(user_input, player_context=player_context, chat_history=[])
-                            st.session_state.chat_history.append({"role": "assistant", "content": response})
-                        st.rerun()
-            
-            if len(st.session_state.chat_history) > 0:
-                col_clear, col_export, col_spacer = st.columns([1, 1, 3])
-                with col_clear:
-                    if st.button("Clear", type="secondary", use_container_width=True):
-                        st.session_state.chat_history = []
-                        st.rerun()
-                with col_export:
-                    # Export conversation
-                    chat_text = "\n\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in st.session_state.chat_history])
-                    st.download_button(
-                        label="Export",
-                        data=chat_text,
-                        file_name=f"chat_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                        mime="text/plain",
-                        key="export_chat",
-                        use_container_width=True
-                    )
+                elif analysis_to_explain == "🏃 Player Comparison Matrix":
+                    st.markdown("""
+                    <div class="info-box">
+                    <h4>🏃 Heatmap - Quick Player Performance Check</h4>
+                    <p><b>This is your one-page summary for every player.</b></p>
+                    <ul>
+                        <li><b>Green cells:</b> Player excels in this area - strength to leverage</li>
+                        <li><b>Yellow cells:</b> Average performance - room for growth</li>
+                        <li><b>Red cells:</b> Below team average - needs targeted training</li>
+                    </ul>
+                    <p><b>How to use it:</b></p>
+                    <ol>
+                        <li>Find players with lots of red - they need individualized programs</li>
+                        <li>Green-heavy players are your stars - manage them carefully to avoid overtraining</li>
+                        <li>Use this to create position-specific training (defenders need different patterns than forwards)</li>
+                    </ol>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                elif analysis_to_explain == "👥 All Analytics Overview":
+                    avg_load_val = df_clean['Player Load'].mean() if 'Player Load' in df_clean.columns else 0
+                    team_count = df_clean['Player Name'].nunique() if 'Player Name' in df_clean.columns else 0
+                    
+                    st.markdown(f"""
+                    <div class="success-box">
+                    <h4>📊 Your Complete Analytics Suite Overview</h4>
+                    <p>You have access to <b>7 powerful analysis tools</b> to optimize your team's performance:</p>
+                    
+                    <h5>📊 Dashboard Features:</h5>
+                    <ul>
+                        <li><b>KPIs:</b> Quick team snapshot - {team_count} players with {avg_load_val:.0f} avg load</li>
+                        <li><b>Correlation:</b> Understand which training aspects connect (e.g., does speed work increase load?)</li>
+                        <li><b>Distribution:</b> See who's over/under-performing compared to team averages</li>
+                        <li><b>Time Series:</b> Track individual players over time to catch fatigue early</li>
+                        <li><b>Speed Zones:</b> Optimize training intensity mix (% sprint vs recovery)</li>
+                        <li><b>Heart Rate:</b> Monitor cardiovascular fitness and match-readiness</li>
+                        <li><b>Player Comparison:</b> One-page view of every player's strengths/weaknesses</li>
+                        <li><b>Recommendations:</b> Data-driven coaching strategies</li>
+                    </ul>
+                    
+                    <h5>🎯 How to Use This:</h5>
+                    <ol>
+                        <li><b>Start here:</b> Read this explanation to understand what each graph means</li>
+                        <li><b>Check KPIs:</b> Get quick overview of team health</li>
+                        <li><b>Drill down:</b> Use player-specific analyses (Time Series, Comparisons) for individual attention</li>
+                        <li><b>Take action:</b> Use Recommendations section to create training plans</li>
+                    </ol>
+                    
+                    <p><b>💡 Pro Tip:</b> Bookmark this page and check it weekly to track improvement trends!</p>
+                    </div>
+                    """, unsafe_allow_html=True)
         
         st.markdown("---")
-        st.markdown("### Comprehensive Performance Dashboard")
+        st.markdown("### 📊 Comprehensive Performance Dashboard")
         
         # Key Performance Indicators
-        st.markdown("#### Key Performance Indicators (KPIs)")
+        st.markdown("#### 🎯 Key Performance Indicators (KPIs)")
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -3445,29 +2498,12 @@ elif page == "Performance Analytics":
         ]
         metrics_for_corr = [m for m in metrics_for_corr if m in df_clean.columns]
         
-        # Interactive correlation heatmap with Plotly
+        fig, ax = plt.subplots(figsize=(12, 8))
         corr_matrix = df_clean[metrics_for_corr].corr()
-        
-        fig_corr = go.Figure(data=go.Heatmap(
-            z=corr_matrix.values,
-            x=corr_matrix.columns,
-            y=corr_matrix.columns,
-            colorscale='RdBu',
-            zmid=0,
-            text=corr_matrix.round(2).values,
-            texttemplate='%{text}',
-            textfont={"size": 10},
-            hoverongaps=False,
-            colorbar=dict(title="Correlation")
-        ))
-        fig_corr.update_layout(
-            title='Performance Metrics Correlation Matrix (Interactive)',
-            height=700,
-            xaxis_title="",
-            yaxis_title="",
-            hovermode='closest'
-        )
-        st.plotly_chart(fig_corr, use_container_width=True)
+        sns.heatmap(corr_matrix, annot=True, fmt='.2f', cmap='RdYlBu_r', center=0, 
+                    square=True, linewidths=1, cbar_kws={"shrink": 0.8}, ax=ax)
+        ax.set_title('Performance Metrics Correlation Matrix', fontsize=14, fontweight='bold', pad=20)
+        st.pyplot(fig)
         
         st.markdown("""
         **Key Findings:**
@@ -3753,8 +2789,8 @@ elif page == "Performance Analytics":
         </div>
         """, unsafe_allow_html=True)
 
-elif page == "Load Prediction":
-    st.markdown('<h1 class="main-header">Predict Next Session Player Load</h1>', unsafe_allow_html=True)
+elif page == "🎯 Load Prediction":
+    st.markdown('<h1 class="main-header">🎯 Predict Next Session Player Load</h1>', unsafe_allow_html=True)
     
     if st.session_state.df is None:
         st.warning("⚠️ Please upload data in the Data Audit section first.")
@@ -4051,7 +3087,6 @@ st.sidebar.markdown("""
 Advanced analytics platform for optimizing player performance, preventing injuries, and maximizing team potential.
 
 **Version:** 1.0.0  
-**Developer:** Alvaro Martin-Pena  
 **Powered by:** Machine Learning & Sports Science
 
 ⚠️ **Ethical Note:** This system is designed to support coaching decisions, not replace professional judgment. Always combine data insights with coaching experience and medical expertise.
