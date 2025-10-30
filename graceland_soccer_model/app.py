@@ -934,7 +934,11 @@ def train_regression_model_fast(df, use_early_stopping=True, use_saved_model=Tru
         'Top Speed (mph)', 'Max Acceleration (yd/s/s)', 'Max Deceleration (yd/s/s)',
         'Distance Per Min (yd/min)', 'Hr Load', 'Hr Max (bpm)', 'Time In Red Zone (min)',
         'Impacts', 'Impact Zones: > 20 G (Impacts)', 'Impact Zones: 15 - 20 G (Impacts)',
-        'Power Plays', 'Power Score (w/kg)'
+        'Power Plays', 'Power Score (w/kg)',
+        # Additional recommended metrics if present can improve regression performance
+        'Distance in Speed Zone 4 (miles)',
+        'Distance in Speed Zone 5 (miles)',
+        'Time in HR Load Zone 85% - 96% Max HR (secs)'
     ]
     
     features = [c for c in features if c in df_clean.columns]
@@ -956,25 +960,25 @@ def train_regression_model_fast(df, use_early_stopping=True, use_saved_model=Tru
     # Use early stopping if requested
     if use_early_stopping:
         model = GradientBoostingRegressor(
-            n_estimators=1000,  # Large number for early stopping
+            n_estimators=1500,  # allow more boosting iterations
             learning_rate=0.05,
-            max_depth=4,
-            subsample=0.8,
-            min_samples_split=10,
-            min_samples_leaf=4,
-            validation_fraction=0.1,
-            n_iter_no_change=10,  # Stop if no improvement for 10 iterations
+            max_depth=5,
+            subsample=0.9,
+            min_samples_split=6,
+            min_samples_leaf=2,
+            validation_fraction=0.15,
+            n_iter_no_change=20,  # allow longer patience
             tol=1e-4,
             random_state=42
         )
     else:
         model = GradientBoostingRegressor(
-            n_estimators=200,
-            learning_rate=0.1,
-            max_depth=4,
-            subsample=0.8,
-            min_samples_split=10,
-            min_samples_leaf=4,
+            n_estimators=400,
+            learning_rate=0.07,
+            max_depth=5,
+            subsample=0.9,
+            min_samples_split=6,
+            min_samples_leaf=2,
             random_state=42
         )
     
