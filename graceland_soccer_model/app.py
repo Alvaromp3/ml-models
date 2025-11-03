@@ -1495,7 +1495,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
         # Wake up server first (especially important for free tier Render)
         if is_cloud:
             if status_text:
-                status_text.info("⏳ Waking up server (free tier may take 30-60 seconds)...")
+                status_text.info("⏳ Connecting to server...")
                 progress_bar.progress(0.08) if progress_bar else None
             
             # Try to wake up the server with a simple health check
@@ -1503,12 +1503,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                 wake_up_response = requests.get(f"{base_url}/api/tags", timeout=60)
                 if wake_up_response.status_code == 200:
                     if status_text:
-                        status_text.info("✅ Server is awake. Initiating download...")
                         progress_bar.progress(0.12) if progress_bar else None
-            except requests.exceptions.Timeout:
-                if status_text:
-                    status_text.warning("⚠️ Server is slow to respond (normal for free tier). Continuing anyway...")
-                    progress_bar.progress(0.12) if progress_bar else None
             except:
                 # Ignore wake-up errors, try download anyway
                 if status_text:
@@ -1524,7 +1519,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
             download_initiated = False
             try:
                 if status_text:
-                    status_text.info("🔄 Sending download request to Ollama...")
+                    status_text.info("🔄 Starting download...")
                     progress_bar.progress(0.15) if progress_bar else None
                 
                 # Use longer timeout for cloud services
@@ -1540,12 +1535,10 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                     # Download initiated successfully
                     download_initiated = True
                     if status_text:
-                        status_text.info("✅ Download request sent. Checking status...")
                         progress_bar.progress(0.15) if progress_bar else None
                 else:
                     # Status code not 200/201, but download might have started anyway
                     if status_text:
-                        status_text.warning(f"⚠️ Server returned status {response.status_code}, but download may have started. Checking...")
                         progress_bar.progress(0.15) if progress_bar else None
                     
                     # Wait a moment and check if model appeared
@@ -1567,7 +1560,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                 download_initiated = True  # Assume it started
                 if status_text:
                     progress_bar.progress(0.2) if progress_bar else None
-                    status_text.warning(f"⏳ Request timed out (this is normal for free tier Render).\n\n📋 **What's happening:**\n- The download may have started in the background\n- Free tier Render services can take 30-60 seconds to wake up\n- The download will continue even if this times out\n\n💡 **Next steps:**\n1. Wait 1-2 minutes\n2. Click 'Check Model Status' to verify\n3. If model appears, it's downloading!\n4. Full download takes 5-10 minutes total")
+                    status_text.warning("⏳ Timeout (normal for free tier). Download may have started. Wait 1-2 min then click 'Check Model Status'.")
                 
                 # Give it one more check after a short wait
                 time.sleep(5)
@@ -1587,8 +1580,8 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
             except requests.exceptions.ConnectionError:
                 if status_text:
                     progress_bar.progress(0.5) if progress_bar else None
-                    status_text.error(f"❌ Cannot connect to Ollama server at {base_url}.\n\n💡 Please ensure:\n1. The Render service is running\n2. Wait 30-60 seconds if it's spinning up (free tier)\n3. Check Render dashboard for service status")
-                return False, f"Cannot connect to Ollama server at {base_url}. Please ensure the service is running."
+                    status_text.error("❌ Cannot connect to server. Wait 30-60 sec (free tier) then try again.")
+                return False, "Cannot connect to server. Wait 30-60 seconds (free tier) then try again."
             except Exception as e:
                 error_msg = str(e)
                 # Check if it's a timeout-related error
@@ -1596,17 +1589,17 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                     download_initiated = True
                     if status_text:
                         progress_bar.progress(0.2) if progress_bar else None
-                        status_text.warning(f"⏳ Connection timeout occurred.\n\n📋 **This is normal for free tier Render services.**\n\nThe download request may have been sent successfully, but the response timed out.\n\n💡 **Please:**\n1. Wait 1-2 minutes\n2. Click '🔄 Check Model Status' to verify if download started\n3. The download continues in the background\n4. Full download takes 5-10 minutes")
+                        status_text.warning("⏳ Timeout (normal for free tier). Download may have started. Wait 1-2 min then check status.")
                 else:
                     if status_text:
                         progress_bar.progress(0.3) if progress_bar else None
-                        status_text.warning(f"⚠️ Error: {error_msg[:100]}\n\nThe download may still have started - please check status manually.")
-                    return False, f"Error starting download: {error_msg}. The download may still have started - please check status manually."
+                        status_text.warning(f"⚠️ Error: {error_msg[:80]}...")
+                    return False, f"Error: {error_msg[:100]}. Download may still have started - check status."
             
             # Monitor progress with polling (progress_bar and status_text already initialized above)
             if progress_container and download_initiated:
                 if status_text:
-                    status_text.info("🔄 Download initiated. Checking progress...")
+                    status_text.info("📥 Download in progress (5-10 minutes)...")
                     progress_bar.progress(0.2) if progress_bar else None
                 
                 # Poll for progress (every 5 seconds, up to 15 checks = ~75 seconds)
@@ -1633,10 +1626,11 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                             else:
                                 # Still downloading - update progress estimate
                                 # Estimate based on time (assuming 5-10 min average, but we only monitor for 75 sec)
-                                estimated_progress = min(0.15 + (poll_count / max_polls) * 0.20, 0.35)
+                                estimated_progress = min(0.2 + (poll_count / max_polls) * 0.15, 0.35)
                                 progress_bar.progress(estimated_progress)
                                 elapsed_sec = poll_count * 5
-                                status_text.info(f"⏳ Downloading model... ({elapsed_sec} seconds - download continues in background)")
+                                if poll_count % 3 == 0:  # Update every 15 seconds
+                                    status_text.info(f"📥 Downloading... ({elapsed_sec}s / ~5-10 min)")
                         else:
                             # Server issue, but continue checking
                             estimated_progress = min(0.15 + (poll_count / max_polls) * 0.20, 0.35)
@@ -1665,8 +1659,8 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                         return True, f"Model '{model}' downloaded successfully!"
                     else:
                         progress_bar.progress(0.4)
-                        status_text.warning("⏳ Download is in progress and continues in the background.\n\n💡 **Next steps:**\n1. The download will take 5-10 minutes total\n2. Use '🔄 Check Model Status' button to verify when it's ready\n3. The download continues even if you close this page\n4. Check Render logs for detailed progress: https://dashboard.render.com")
-                        return False, "Download initiated and in progress. Use 'Check Model Status' to verify when complete (usually 5-10 minutes)."
+                        status_text.info("⏳ Download in progress (5-10 min). Use 'Check Model Status' to verify when ready.")
+                        return False, "Download in progress. Check status in a few minutes."
                 else:
                     progress_bar.progress(0.4)
                     status_text.warning("⏳ Download initiated. Please use 'Check Model Status' to verify progress.")
