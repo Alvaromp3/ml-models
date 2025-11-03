@@ -9,6 +9,8 @@
 
 Advanced machine learning platform for analyzing soccer player performance, preventing injuries, and optimizing team lineups.
 
+**Live Demo URL:** https://ml-models-z9jxxmnmkkxtca7eewrywj.streamlit.app/
+
 ** Upcoming**: Professional mobile application for sports coaches with advanced analytics, real-time updates, and intuitive interface.
 
 ## Live Demo
