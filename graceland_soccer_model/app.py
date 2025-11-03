@@ -1461,6 +1461,150 @@ def check_model_status(model="llama3.2"):
             "message": f"Error checking model status: {str(e)}"
         }
 
+def download_model_with_progress(model="llama3.2", progress_container=None):
+    """Download Ollama model with progress bar display."""
+    if not OLLAMA_AVAILABLE:
+        return False, "Ollama library is not installed"
+    
+    try:
+        base_url = get_ollama_base_url()
+        is_cloud = not base_url.startswith("http://127.0.0.1") and not base_url.startswith("http://localhost")
+        timeout = 60 if is_cloud else 2
+        
+        # Check if model already exists
+        try:
+            models_response = requests.get(f"{base_url}/api/tags", timeout=timeout)
+            if models_response.status_code == 200:
+                models_data = models_response.json()
+                models = models_data.get('models', [])
+                model_names = [m.get('name', '') for m in models]
+                if model in model_names:
+                    return True, f"Model '{model}' is already installed!"
+        except:
+            pass
+        
+        # Initialize progress
+        if progress_container:
+            progress_container.info("🔄 Initiating model download...")
+        
+        # Start download using streaming API
+        try:
+            import time
+            pull_url = f"{base_url}/api/pull"
+            
+            # Start the pull request (non-blocking)
+            response = requests.post(
+                pull_url,
+                json={"name": model},
+                timeout=5  # Short timeout to just initiate
+            )
+            
+            if response.status_code not in [200, 201]:
+                # Even if status is not 200/201, the download might have started
+                # Check once more
+                time.sleep(1)
+                try:
+                    check = requests.get(f"{base_url}/api/tags", timeout=5)
+                    if check.status_code == 200:
+                        check_models = check.json().get('models', [])
+                        check_names = [m.get('name', '') for m in check_models]
+                        if model in check_names:
+                            return True, f"Model '{model}' is already available!"
+                except:
+                    pass
+                
+                return False, f"Failed to start download. Status: {response.status_code}. The download may still have started - please wait a few minutes."
+            
+            # Monitor progress with polling
+            if progress_container:
+                progress_bar = progress_container.progress(0)
+                status_text = progress_container.empty()
+                
+                status_text.info("🔄 Download initiated. Checking progress...")
+                progress_bar.progress(0.1)
+                
+                # Poll for progress (every 5 seconds, up to 15 checks = ~75 seconds)
+                # After that, inform user to check manually (download continues in background)
+                max_polls = 15  # 15 * 5 = 75 seconds of active monitoring
+                poll_count = 0
+                
+                while poll_count < max_polls:
+                    time.sleep(5)  # Wait 5 seconds between checks
+                    poll_count += 1
+                    
+                    try:
+                        # Check if model is now available
+                        check_response = requests.get(f"{base_url}/api/tags", timeout=10)
+                        if check_response.status_code == 200:
+                            check_models = check_response.json().get('models', [])
+                            check_names = [m.get('name', '') for m in check_models]
+                            
+                            if model in check_names:
+                                # Success!
+                                progress_bar.progress(1.0)
+                                status_text.success(f"✅ Model '{model}' is now available!")
+                                return True, f"Model '{model}' downloaded successfully!"
+                            else:
+                                # Still downloading - update progress estimate
+                                # Estimate based on time (assuming 5-10 min average, but we only monitor for 75 sec)
+                                estimated_progress = min(0.15 + (poll_count / max_polls) * 0.20, 0.35)
+                                progress_bar.progress(estimated_progress)
+                                elapsed_sec = poll_count * 5
+                                status_text.info(f"⏳ Downloading model... ({elapsed_sec} seconds - download continues in background)")
+                        else:
+                            # Server issue, but continue checking
+                            estimated_progress = min(0.15 + (poll_count / max_polls) * 0.20, 0.35)
+                            progress_bar.progress(estimated_progress)
+                            status_text.warning(f"Checking download status... ({poll_count}/{max_polls} checks)")
+                    except Exception as e:
+                        # Network issue, but continue
+                        estimated_progress = min(0.15 + (poll_count / max_polls) * 0.20, 0.35)
+                        progress_bar.progress(estimated_progress)
+                        if poll_count % 3 == 0:  # Show update every 15 seconds
+                            status_text.warning(f"Checking download status... ({poll_count}/{max_polls} checks)")
+                    
+                    # Update progress bar every iteration to show activity
+                    estimated = min(0.15 + (poll_count / max_polls) * 0.20, 0.35)
+                    progress_bar.progress(estimated)
+                
+                # Final check after monitoring period
+                status_text.info("⏳ Final check... Download continues in background...")
+                final_check = requests.get(f"{base_url}/api/tags", timeout=15)
+                if final_check.status_code == 200:
+                    final_models = final_check.json().get('models', [])
+                    final_names = [m.get('name', '') for m in final_models]
+                    if model in final_names:
+                        progress_bar.progress(1.0)
+                        status_text.success(f"✅ Model '{model}' is now available!")
+                        return True, f"Model '{model}' downloaded successfully!"
+                    else:
+                        progress_bar.progress(0.4)
+                        status_text.warning("⏳ Download is in progress and continues in the background.\n\n💡 **Next steps:**\n1. The download will take 5-10 minutes total\n2. Use '🔄 Check Model Status' button to verify when it's ready\n3. The download continues even if you close this page\n4. Check Render logs for detailed progress: https://dashboard.render.com")
+                        return False, "Download initiated and in progress. Use 'Check Model Status' to verify when complete (usually 5-10 minutes)."
+                else:
+                    progress_bar.progress(0.4)
+                    status_text.warning("⏳ Download initiated. Please use 'Check Model Status' to verify progress.")
+                    return False, "Download started. Please check status in a few minutes."
+                    
+            else:
+                # No progress container, just wait a bit and check
+                time.sleep(5)
+                check_response = requests.get(f"{base_url}/api/tags", timeout=10)
+                if check_response.status_code == 200:
+                    check_models = check_response.json().get('models', [])
+                    check_names = [m.get('name', '') for m in check_models]
+                    if model in check_names:
+                        return True, f"Model '{model}' downloaded successfully!"
+                return False, "Download initiated. Please wait 5-10 minutes and check status."
+                
+        except requests.exceptions.Timeout:
+            return False, "Download timeout - but download may still be in progress. Please wait 5-10 minutes."
+        except Exception as e:
+            return False, f"Download error: {str(e)}"
+            
+    except Exception as e:
+        return False, f"Error: {str(e)}"
+
 def get_ollama_response(user_message, player_context=None, chat_history=None, model="llama3.2"):
     """Get response from Ollama with player context, using timeouts to prevent blocking"""
     try:
@@ -3493,29 +3637,53 @@ elif page == "Performance Analytics":
                         </div>
                         """, unsafe_allow_html=True)
                         
-                        # Button to refresh model status
-                        if st.button("🔄 Check Model Status", key="check_model_status_btn", help="Check if llama3.2 model is installed and ready"):
-                            model_status_info = check_model_status("llama3.2")
-                            
-                            if model_status_info["available"]:
-                                st.success(model_status_info["message"])
-                                if "size_mb" in model_status_info and model_status_info["size_mb"] > 0:
-                                    st.info(f"Model size: {model_status_info['size_mb']:.1f} MB")
-                            elif model_status_info["status"] == "missing":
-                                st.warning(model_status_info["message"])
-                                if model_status_info.get("download_available"):
-                                    st.info("💡 The model will be downloaded automatically when you make your first request, or you can check the Render logs for download progress.")
-                                    st.markdown("""
-                                    <div style="font-size: 0.7rem; color: #6C757D; margin-top: 0.5rem;">
-                                        📊 <strong>To check download progress:</strong><br>
-                                        1. Go to <a href="https://dashboard.render.com" target="_blank">Render Dashboard</a><br>
-                                        2. Open your <code>ollama-server</code> service<br>
-                                        3. Click on "Logs" tab to see download progress<br>
-                                        4. Look for messages like "Downloading llama3.2 model..."
-                                    </div>
-                                    """, unsafe_allow_html=True)
+                        # Buttons row
+                        col_btn1, col_btn2 = st.columns(2)
+                        
+                        with col_btn1:
+                            if st.button("🔄 Check Model Status", key="check_model_status_btn", help="Check if llama3.2 model is installed and ready", use_container_width=True):
+                                model_status_info = check_model_status("llama3.2")
+                                
+                                if model_status_info["available"]:
+                                    st.success(model_status_info["message"])
+                                    if "size_mb" in model_status_info and model_status_info["size_mb"] > 0:
+                                        st.info(f"Model size: {model_status_info['size_mb']:.1f} MB")
+                                elif model_status_info["status"] == "missing":
+                                    st.warning(model_status_info["message"])
+                                    if model_status_info.get("download_available"):
+                                        st.info("💡 The model will be downloaded automatically when you make your first request, or you can check the Render logs for download progress.")
+                                        st.markdown("""
+                                        <div style="font-size: 0.7rem; color: #6C757D; margin-top: 0.5rem;">
+                                            📊 <strong>To check download progress:</strong><br>
+                                            1. Go to <a href="https://dashboard.render.com" target="_blank">Render Dashboard</a><br>
+                                            2. Open your <code>ollama-server</code> service<br>
+                                            3. Click on "Logs" tab to see download progress<br>
+                                            4. Look for messages like "Downloading llama3.2 model..."
+                                        </div>
+                                        """, unsafe_allow_html=True)
+                                else:
+                                    st.error(model_status_info["message"])
+                        
+                        with col_btn2:
+                            # Download button - only show if model is not available
+                            if not model_status_info["available"]:
+                                if st.button("⬇️ Download Model", key="download_model_btn", help="Download llama3.2 model with progress bar", type="primary", use_container_width=True):
+                                    # Create progress container
+                                    progress_container = st.container()
+                                    
+                                    # Download with progress
+                                    success, message = download_model_with_progress("llama3.2", progress_container)
+                                    
+                                    if success:
+                                        st.success(message)
+                                        st.balloons()  # Celebrate!
+                                        # Refresh page after a moment to show updated status
+                                        st.rerun()
+                                    else:
+                                        st.warning(message)
+                                        st.info("💡 The download may still be in progress in the background. Use 'Check Model Status' to verify.")
                             else:
-                                st.error(model_status_info["message"])
+                                st.info("✅ Model is ready!", help="Model is already installed")
                 
                 # Chat interface
                 st.markdown("---")
