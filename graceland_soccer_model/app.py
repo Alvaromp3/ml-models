@@ -1648,7 +1648,9 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                     progress_bar.progress(estimated)
                 
                 # Final check after monitoring period
-                status_text.info("⏳ Final check... Download continues in background...")
+                status_text.info("⏳ Monitoring complete. Checking final status...")
+                progress_bar.progress(0.4)
+                
                 final_check = requests.get(f"{base_url}/api/tags", timeout=15)
                 if final_check.status_code == 200:
                     final_models = final_check.json().get('models', [])
@@ -1658,12 +1660,23 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                         status_text.success(f"✅ Model '{model}' is now available!")
                         return True, f"Model '{model}' downloaded successfully!"
                     else:
-                        progress_bar.progress(0.4)
-                        status_text.info("⏳ Download in progress (5-10 min). Use 'Check Model Status' to verify when ready.")
-                        return False, "Download in progress. Check status in a few minutes."
+                        progress_bar.progress(0.5)
+                        status_text.success("""
+                        ⏳ **Download is running in the background**
+                        
+                        The model download has been initiated and continues even after monitoring stops.
+                        
+                        **What to do now:**
+                        1. Wait 5-10 minutes for the download to complete (~2GB)
+                        2. Click '🔄 Check Model Status' periodically to verify
+                        3. The download continues even if you navigate away
+                        
+                        **Note:** This is normal behavior - large downloads take time, especially on free tier services.
+                        """)
+                        return False, "Download in progress. Check status in 5-10 minutes."
                 else:
                     progress_bar.progress(0.4)
-                    status_text.warning("⏳ Download initiated. Please use 'Check Model Status' to verify progress.")
+                    status_text.warning("⏳ Download initiated. Use 'Check Model Status' to verify progress.")
                     return False, "Download started. Please check status in a few minutes."
                     
             else:
