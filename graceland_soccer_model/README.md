@@ -25,7 +25,7 @@ Advanced machine learning platform for analyzing soccer player performance, prev
 - **Player Load Analysis**: Individual player performance tracking and insights
 - **Team Lineup Calculator**: Optimize team formations with multiple strategies
 
-👉 **[Open Live Demo](https://ml-models-afmi4erd2llrbwjbxwc5qr.streamlit.app/)**
+👉 **[Open Live Demo](https://ml-models-z9jxxmnmkkxtca7eewrywj.streamlit.app/)**
 
 > **Note**: The demo is fully functional with sample Catapult data included. No installation required!
 
