@@ -3700,12 +3700,48 @@ elif page == "Performance Analytics":
                         st.session_state.selected_chat_player = None
                 
                 with col_info:
+                    # Check if Ollama is available and working
+                    ollama_ready = False
+                    
                     if not OLLAMA_AVAILABLE:
-                        st.warning("Ollama is not installed. Install it with: `pip install ollama`")
-                    elif not is_ollama_reachable():
-                        ollama_url = get_ollama_base_url()
-                        st.warning(f"Cannot connect to Ollama at {ollama_url}. Set OLLAMA_HOST environment variable if using a remote server.")
+                        st.info("""
+                        **AI Assistant (Optional Feature)**
+                        
+                        🤖 The AI Coach Assistant requires Ollama to be installed and running locally.
+                        
+                        **To enable:**
+                        1. Install Ollama: `pip install ollama`
+                        2. Run Ollama server: `ollama serve`
+                        3. Refresh this page
+                        
+                        **Note:** This feature works best when running locally. The rest of the analytics work perfectly without it!
+                        """)
                     else:
+                        # Check if server is reachable (quick check, don't block)
+                        try:
+                            ollama_ready = is_ollama_reachable()
+                        except:
+                            ollama_ready = False
+                        
+                        if not ollama_ready:
+                            ollama_url = get_ollama_base_url()
+                            st.info(f"""
+                            **AI Assistant (Optional Feature)**
+                            
+                            ⚠️ Cannot connect to Ollama at `{ollama_url}`
+                            
+                            **For local use:**
+                            1. Start Ollama: `ollama serve`
+                            2. Refresh this page
+                            
+                            **For cloud deployment:**
+                            - Configure `OLLAMA_HOST` in Streamlit secrets
+                            - Or use a remote Ollama service
+                            
+                            💡 **The rest of the app works perfectly without the AI Assistant!**
+                            """)
+                    
+                    if ollama_ready:
                         # Status display with model check
                         model_status_info = check_model_status("llama3.2")
                         status_color = "#28a745" if model_status_info["available"] else "#ffc107" if model_status_info["status"] == "missing" else "#dc3545"
@@ -3805,10 +3841,14 @@ elif page == "Performance Analytics":
                                 </div>
                                 """, unsafe_allow_html=True)
                 
-                # Chat input
-                user_input = st.chat_input("Ask your question here...")
+                # Chat input - only enable if Ollama is ready
+                if ollama_ready:
+                    user_input = st.chat_input("Ask your question here...")
+                else:
+                    st.chat_input("AI Assistant not available - Ollama is not running", disabled=True)
+                    user_input = None
                 
-                if user_input:
+                if user_input and ollama_ready:
                     # Add user message to history
                     st.session_state.chat_history.append({"role": "user", "content": user_input})
                     
@@ -3873,8 +3913,8 @@ elif page == "Performance Analytics":
                         # Rerun to show new messages
                         st.rerun()
                 
-                # Chat actions with suggestions
-                if len(st.session_state.chat_history) == 0:
+                # Chat actions with suggestions - only if Ollama is ready
+                if ollama_ready and len(st.session_state.chat_history) == 0:
                     st.markdown("**Quick Questions:**")
                     col_q1, col_q2, col_q3 = st.columns(3)
                     with col_q1:
