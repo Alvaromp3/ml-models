@@ -911,7 +911,7 @@ def generate_intelligent_recommendations(player_name, player_data, recent_data):
         if avg_power > 0 and 'Power Score (w/kg)' in recent_data.columns:
             power_vs_team = (avg_power / team_avg_power) if team_avg_power > 0 else 1
             if avg_power < team_avg_power * 0.9:
-                plan.append(f"💥 Power development: {avg_power:.2f} w/kg vs {team_avg_power:.2f} - Add plyometric training 2x/week")
+                plan.append(f"Power development: {avg_power:.2f} w/kg vs {team_avg_power:.2f} - Add plyometric training 2x/week")
             elif avg_power >= team_avg_power * 1.1:
                 plan.append(f"Power output: {avg_power:.2f} w/kg - Maintain with explosive training")
         
@@ -1611,7 +1611,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
             # Monitor progress with polling (progress_bar and status_text already initialized above)
             if progress_container and download_initiated:
                 if status_text:
-                    status_text.info("📥 Download in progress (5-10 minutes)...")
+                    status_text.info("Download in progress (5-10 minutes)...")
                     progress_bar.progress(0.2) if progress_bar else None
                 
                 # Poll for progress (every 5 seconds, up to 15 checks = ~75 seconds)
@@ -1642,7 +1642,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                                 progress_bar.progress(estimated_progress)
                                 elapsed_sec = poll_count * 5
                                 if poll_count % 3 == 0: # Update every 15 seconds
-                                    status_text.info(f"📥 Downloading... ({elapsed_sec}s / ~5-10 min)")
+                                    status_text.info(f"Downloading... ({elapsed_sec}s / ~5-10 min)")
                         else:
                             # Server issue, but continue checking
                             estimated_progress = min(0.15 + (poll_count / max_polls) * 0.20, 0.35)
@@ -2305,7 +2305,7 @@ elif page == "Data Audit":
         with col1:
             st.markdown(f"""
             <div class="metric-card-enhanced" style="text-align: center;">
-                <div style="font-size: 2rem; color: #1E88E5; margin-bottom: 0.5rem;">👥</div>
+                <div style="font-size: 2rem; color: #1E88E5; margin-bottom: 0.5rem;"></div>
                 <div style="font-size: 1.75rem; font-weight: 700; color: #212529;">{total_players}</div>
                 <div style="font-size: 0.85rem; color: #6C757D;">Total Players</div>
             </div>
@@ -2342,7 +2342,7 @@ elif page == "Data Audit":
                 <strong> Numeric Variables:</strong> <span class="badge badge-info">{len(numeric_cols)}</span>
             </div>
             <div class="info-box">
-                <strong>📝 Categorical Variables:</strong> <span class="badge badge-info">{len(cat_cols)}</span>
+                <strong>Categorical Variables:</strong> <span class="badge badge-info">{len(cat_cols)}</span>
             </div>
             """, unsafe_allow_html=True)
         
@@ -2477,7 +2477,8 @@ elif page == "Model Training":
                     model, metrics, features = train_regression_model_fast(df)
                     st.session_state.regression_model = model
                     
-                    st.success(" Model trained successfully!")
+                    st.success("Model trained successfully!")
+                    st.balloons()  # Celebrate successful training!
                     
                     st.markdown("### Train vs Test Performance")
                     
@@ -2488,7 +2489,7 @@ elif page == "Model Training":
                     with col1:
                         st.markdown("""
                         <div style="background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); padding: 1.5rem; border-radius: 12px; border-left: 5px solid #2196F3;">
-                            <h4 style="color: #2196F3; margin: 0 0 1rem 0;">🟢 Training Set</h4>
+                            <h4 style="color: #2196F3; margin: 0 0 1rem 0;">Training Set</h4>
                         </div>
                         """, unsafe_allow_html=True)
                         st.markdown(f"""
@@ -2515,7 +2516,7 @@ elif page == "Model Training":
                     with col2:
                         st.markdown("""
                         <div style="background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); padding: 1.5rem; border-radius: 12px; border-left: 5px solid #43A047;">
-                            <h4 style="color: #43A047; margin: 0 0 1rem 0;">🔵 Test Set</h4>
+                            <h4 style="color: #43A047; margin: 0 0 1rem 0;">Test Set</h4>
                         </div>
                         """, unsafe_allow_html=True)
                         st.markdown(f"""
@@ -2572,7 +2573,7 @@ elif page == "Model Training":
                     
                     # SHAP feature importance
                     if SHAP_AVAILABLE and 'generate_shap_analysis' in globals():
-                        with st.expander("🔬 SHAP Analysis (Advanced Explainability)", expanded=False):
+                        with st.expander("SHAP Analysis (Advanced Explainability)", expanded=False):
                             st.info("SHAP values explain individual predictions by showing feature contributions")
                             try:
                                 shap_values, X_transformed = generate_shap_analysis(model, st.session_state.df[features].head(100), features)
@@ -2645,14 +2646,14 @@ elif page == "Model Training":
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        st.markdown("#### 🟢 Training Set")
+                        st.markdown("#### Training Set")
                         train_val = metrics['train'].get(metric_type, 0)
                         st.metric(metric_type, f"{train_val:.4f}")
                         st.metric("Accuracy", f"{metrics['train']['Accuracy']:.4f}")
                         st.metric("F1 Score", f"{metrics['train']['F1']:.4f}")
                     
                     with col2:
-                        st.markdown("#### 🔵 Test Set")
+                        st.markdown("#### Test Set")
                         test_val = metrics['test'].get(metric_type, 0)
                         st.metric(metric_type, f"{test_val:.4f}")
                         st.metric("Accuracy", f"{metrics['test']['Accuracy']:.4f}")
@@ -2748,7 +2749,7 @@ elif page == "Player Load Analysis":
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("#### 🏋 Training Sessions")
+                st.markdown("#### Training Sessions")
                 training_data = df[df['Session Type'] == 'Training'].groupby('Player Name')['Player Load'].mean().sort_values(ascending=False)
                 st.dataframe(training_data.head(10).reset_index().rename(columns={'Player Load': 'Avg Player Load'}), use_container_width=True)
                 
@@ -3011,7 +3012,7 @@ elif page == "Injury Prevention":
             # Export to Excel button
             col_export, col_space = st.columns([1, 5])
             with col_export:
-                if st.button("📥 Export to Excel", type="secondary"):
+                if st.button("Export to Excel", type="secondary"):
                     try:
                         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                         filename = f"reports/injury_risk_{timestamp}.xlsx"
@@ -3036,7 +3037,7 @@ elif page == "Injury Prevention":
                             pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
                         
                         st.success(f" Exported to: {filename}")
-                        st.info("📁 File saved in reports/ directory")
+                        st.info("File saved in reports/ directory")
                         
                     except Exception as e:
                         st.error(f"Error exporting to Excel: {str(e)}")
@@ -3343,7 +3344,7 @@ elif page == "Team Lineup Calculator":
             )
         
         with col2:
-            st.markdown("#### 🔢 Team Size")
+            st.markdown("#### Team Size")
             team_size = st.slider("Number of players to select", min_value=5, max_value=20, value=11)
         
         # Player exclusion section
@@ -3451,7 +3452,7 @@ elif page == "Team Lineup Calculator":
                     'Hr Load_norm': 0.15
                 }
             else: # Custom Weights
-                st.markdown("#### 🎛 Custom Weight Configuration")
+                st.markdown("#### Custom Weight Configuration")
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     w_load = st.slider("Player Load", 0.0, 1.0, 0.25, 0.05)
@@ -3956,7 +3957,7 @@ elif page == "Performance Analytics":
                             player_context = f"REQUESTED_PLAYER: {st.session_state.selected_chat_player} NOT FOUND in dataset.\nAVAILABLE_PLAYERS: {', '.join(available_players[:20])}{' (and more)' if len(available_players) > 20 else ''}"
                     
                     # Show loading
-                    with st.spinner("🤔 Thinking..."):
+                    with st.spinner("Thinking..."):
                         # Get response from Ollama
                         response = get_ollama_response(
                             user_input, 
@@ -4048,7 +4049,7 @@ elif page == "Performance Analytics":
             st.metric("Avg Energy (kcal)", f"{avg_energy:.0f}")
         
         # Correlation Analysis
-        st.markdown("#### 🔗 Correlation Analysis")
+        st.markdown("#### Correlation Analysis")
         st.info(" **Coach Insight:** This heatmap shows which metrics are strongly related. Strong positive correlations (red) indicate metrics that increase together.")
         
         metrics_for_corr = [
@@ -4322,7 +4323,7 @@ elif page == "Performance Analytics":
                 """)
             
             # Final Recommendations
-            st.markdown("### 📝 Comprehensive Coaching Recommendations")
+            st.markdown("### Comprehensive Coaching Recommendations")
             
             st.markdown("""
             <div class="success-box">
