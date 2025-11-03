@@ -1483,23 +1483,53 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
                         # Model not found - try to download it automatically
                         logging.info(f"Model '{model}' not found, attempting to download...")
                         try:
-                            # Use Ollama API to pull the model
+                            # Use Ollama API to pull the model (start download, don't wait for completion)
+                            # Use a shorter timeout to start the download, then let it continue in background
                             pull_response = requests.post(
                                 f"{base_url}/api/pull",
                                 json={"name": model},
-                                timeout=600 if is_cloud else 300  # Longer timeout for cloud downloads
+                                timeout=10  # Short timeout just to initiate the download
                             )
                             if pull_response.status_code in [200, 201]:
-                                logging.info(f"Successfully started downloading model '{model}'")
-                                return f"⚠ Model '{model}' is downloading now (this may take 5-10 minutes). Please wait a moment and try again. If this message persists, the download may still be in progress."
+                                logging.info(f"Successfully initiated download of model '{model}'")
+                                return f"⏳ Model '{model}' download has been initiated (this may take 5-10 minutes).\n\n💡 **What to do:**\n1. Wait 5-10 minutes for the download to complete\n2. Check the '🔄 Check Model Status' button above to see progress\n3. Try your question again after a few minutes\n\n📊 You can also check download progress in Render logs: https://dashboard.render.com"
                             else:
-                                # If pull fails, return helpful message
-                                return f"Model '{model}' is not installed. Attempted to download automatically but failed. Available models: {', '.join(model_names[:5]) if model_names else 'None'}. The model will be downloaded automatically on the next server restart."
+                                # If pull fails immediately, try to check status again
+                                try:
+                                    # Wait a moment and check if download started anyway
+                                    import time
+                                    time.sleep(2)
+                                    recheck = requests.get(f"{base_url}/api/tags", timeout=health_timeout)
+                                    if recheck.status_code == 200:
+                                        recheck_models = recheck.json().get('models', [])
+                                        recheck_names = [m.get('name', '') for m in recheck_models]
+                                        if model in recheck_names:
+                                            # Model appeared! Continue with the request
+                                            pass  # Will fall through to continue processing
+                                        else:
+                                            return f"Model '{model}' download may be in progress. Status code: {pull_response.status_code}. Please wait 5-10 minutes and try again, or check Render logs."
+                                    else:
+                                        return f"Model '{model}' is not installed. Download attempt returned status {pull_response.status_code}. Please wait a few minutes and try again."
+                                except:
+                                    return f"Model '{model}' download initiated. Please wait 5-10 minutes and try again. Status: {pull_response.status_code}"
                         except requests.exceptions.Timeout:
-                            return f"Model '{model}' download started but is taking time. Please wait 5-10 minutes and try again. This is normal for free tier Render services."
+                            # Timeout is OK - download may have started
+                            return f"⏳ Model '{model}' download initiated (timeout is normal - download continues in background).\n\nPlease wait 5-10 minutes, then:\n1. Click '🔄 Check Model Status' above to verify\n2. Try your question again\n\n📊 Check progress: https://dashboard.render.com → ollama-server → Logs"
                         except Exception as pull_error:
                             logging.warning(f"Failed to auto-download model: {str(pull_error)}")
-                            return f"Model '{model}' is not installed. Auto-download failed: {str(pull_error)}. Available models: {', '.join(model_names[:5]) if model_names else 'None'}. The model will be downloaded automatically on the next server restart."
+                            # Check one more time if model magically appeared
+                            try:
+                                final_check = requests.get(f"{base_url}/api/tags", timeout=5)
+                                if final_check.status_code == 200:
+                                    final_models = final_check.json().get('models', [])
+                                    final_names = [m.get('name', '') for m in final_models]
+                                    if model in final_names:
+                                        # Model is there! Continue
+                                        pass
+                                    else:
+                                        return f"⚠️ Model '{model}' download error: {str(pull_error)}. The download may still be in progress. Please wait 5-10 minutes and try again. Check Render logs for details."
+                            except:
+                                return f"⚠️ Model '{model}' download issue: {str(pull_error)}. Please wait a few minutes and try again, or check Render logs."
                 except:
                     pass  # If parsing fails, continue anyway
         except requests.exceptions.Timeout:
