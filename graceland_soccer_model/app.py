@@ -1371,7 +1371,10 @@ def is_ollama_reachable() -> bool:
     try:
         # Try connecting to configured Ollama URL
         base_url = get_ollama_base_url()
-        requests.get(f"{base_url}/api/tags", timeout=2)
+        # Use longer timeout for cloud deployments (Render free tier can be slow)
+        is_cloud = not base_url.startswith("http://127.0.0.1") and not base_url.startswith("http://localhost")
+        timeout = 60 if is_cloud else 2  # 60 seconds for cloud, 2 for local
+        requests.get(f"{base_url}/api/tags", timeout=timeout)
         return True
     except Exception:
         return False
@@ -1382,12 +1385,27 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
         if not OLLAMA_AVAILABLE:
             return "Ollama library is not installed. Install it with: pip install ollama"
 
-        # Quick health check to ensure Ollama server is responsive
+        # Health check to ensure Ollama server is responsive
         base_url = get_ollama_base_url()
+        is_cloud = not base_url.startswith("http://127.0.0.1") and not base_url.startswith("http://localhost")
+        health_timeout = 60 if is_cloud else 2  # Longer timeout for cloud services
+        
         try:
-            requests.get(f"{base_url}/api/tags", timeout=2)
-        except Exception:
-            return f"Cannot connect to Ollama at {base_url}. Please ensure Ollama is running. For cloud deployments, set OLLAMA_HOST environment variable to your Ollama service URL."
+            health_response = requests.get(f"{base_url}/api/tags", timeout=health_timeout)
+            # Check if models are available
+            if health_response.status_code == 200:
+                try:
+                    models = health_response.json().get('models', [])
+                    model_names = [m.get('name', '') for m in models]
+                    if model and model not in model_names:
+                        # Model not found, return helpful message
+                        return f"Model '{model}' is not installed on the Ollama server. Available models: {', '.join(model_names[:5]) if model_names else 'None'}. Please install the model first on your Ollama server."
+                except:
+                    pass  # If parsing fails, continue anyway
+        except requests.exceptions.Timeout:
+            return f"Ollama server at {base_url} is taking too long to respond. This is normal for free tier Render services (they spin down after inactivity). Please wait 30-60 seconds and try again."
+        except Exception as e:
+            return f"Cannot connect to Ollama at {base_url}. Error: {str(e)}. For cloud deployments, ensure the service is running and OLLAMA_HOST is set correctly."
 
         # Build system prompt
         system_prompt = (
@@ -1425,12 +1443,13 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
         # The ollama library automatically uses OLLAMA_HOST environment variable
         try:
             # Use llama3.2 with increased token limit for detailed responses
+            # Note: ollama library handles timeouts internally, but cloud services may need patience
             resp = ollama.chat(
                 model="llama3.2",
                 messages=messages,
                 options={
                     'temperature': 0.7, 
-                    'num_predict': 1024,  # Increased to allow 2000+ character responses
+                    'num_predict': 512,  # Reduced for faster responses on cloud
                     'top_k': 40,
                     'top_p': 0.9,
                     'repeat_penalty': 1.1
@@ -1440,20 +1459,27 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
                 content = resp['message']['content'].strip()
                 return content if content else "I'm ready to help! Please ask your question."
         except Exception as e1:
-            logging.warning(f"Error with llama3.2: {str(e1)}")
-            # Quick fallback
+            error_msg = str(e1)
+            logging.warning(f"Error with llama3.2: {error_msg}")
+            
+            # Check if it's a connection/timeout error
+            if "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+                return f"Ollama server at {base_url} is slow to respond. For Render free tier, this is normal. Please wait 30-60 seconds for the service to wake up, then try again."
+            
+            # Quick fallback - try with simpler message
             try:
                 resp = ollama.chat(
                     model="llama3.2",
                     messages=[messages[-1]],  # Just last message, no history for speed
-                    options={'num_predict': 1024}  # Also increased for fallback
+                    options={'num_predict': 256}  # Even shorter for fallback
                 )
                 if resp and 'message' in resp and 'content' in resp['message']:
                     return resp['message']['content'].strip()
             except Exception as e2:
                 logging.warning(f"Error with fallback: {str(e2)}")
+                return f"Could not get response from Ollama. Error: {str(e2)}. If using Render free tier, wait 30-60 seconds and try again."
 
-        return "Could not get a response. Please try again or check if Ollama is running."
+        return "Could not get a response. Please try again. If using Render free tier, wait 30-60 seconds for the service to wake up."
     except Exception as e:
         logging.error(f"Error getting Ollama response: {str(e)}")
         return f"Assistant temporarily unavailable. {str(e)}"
