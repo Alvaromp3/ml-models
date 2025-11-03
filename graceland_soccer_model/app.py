@@ -4348,7 +4348,12 @@ elif page == "Performance Analytics":
             )
 
 elif page == "Load Prediction":
-    st.markdown('<h1 class="main-header">Predict Next Session Player Load</h1>', unsafe_allow_html=True)
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; border-radius: 15px; margin-bottom: 2rem;'>
+        <h1 style='color: white; margin: 0; text-align: center; font-size: 2.5rem;'>🎯 Player Load Prediction</h1>
+        <p style='color: rgba(255,255,255,0.9); text-align: center; margin-top: 0.5rem; font-size: 1.1rem;'>Predict next session load based on machine learning analysis</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     if st.session_state.df is None:
         st.warning("⚠️ Please upload data in the Data Audit section first.")
@@ -4358,7 +4363,12 @@ elif page == "Load Prediction":
         df = st.session_state.df
         df_clean = limpiar_datos_regression(df)
         
-        st.markdown("### 👤 Select Player & Session Type")
+        # Improved player and session selection with cards
+        st.markdown("""
+        <div style='background: #F8F9FA; padding: 1.5rem; border-radius: 10px; border-left: 4px solid #667eea; margin-bottom: 2rem;'>
+            <h3 style='margin: 0 0 1rem 0; color: #333;'>👤 Select Player & Session Type</h3>
+        </div>
+        """, unsafe_allow_html=True)
         
         if 'Player Name' in df_clean.columns:
             col1, col2 = st.columns(2)
@@ -4395,8 +4405,14 @@ elif page == "Load Prediction":
                     player_data_filtered = player_data
                 
                 if len(player_data_filtered) > 0:
-                    st.markdown("---")
-                    st.markdown(f"### 📊 Predicting Load for {selected_player_pred} - Next {session_type}")
+                    # Enhanced header for prediction section
+                    session_emoji = "⚽" if session_type == "Match" else "🏃"
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0;'>
+                        <h2 style='color: white; margin: 0; text-align: center;'>{session_emoji} Predicting Load for <strong>{selected_player_pred}</strong></h2>
+                        <p style='color: rgba(255,255,255,0.9); text-align: center; margin: 0.5rem 0 0 0;'>Next Session: {session_type}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
                     # Get the most recent session - prioritize 'all' split which has total session data
                     if 'Session Title' in player_data_filtered.columns and 'Split Name' in player_data_filtered.columns:
@@ -4502,43 +4518,67 @@ elif page == "Load Prediction":
                             except:
                                 return "N/A"
                         
+                        # Enhanced metrics display with cards
+                        st.markdown("""
+                        <div style='background: #F8F9FA; padding: 1rem; border-radius: 10px; margin: 1.5rem 0;'>
+                            <h3 style='margin: 0 0 1rem 0; color: #333;'>📈 Recent Session Performance</h3>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
                         col1, col2, col3 = st.columns(3)
                         
                         with col1:
-                            st.markdown("#### 📈 Recent Session Metrics")
+                            st.markdown("""
+                            <div style='background: white; padding: 1.2rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid #1E88E5;'>
+                                <h4 style='margin: 0 0 1rem 0; color: #1E88E5;'>⚡ Performance Metrics</h4>
+                            </div>
+                            """, unsafe_allow_html=True)
                             player_load = safe_get_metric(recent_session.get('Player Load', 0), 0)
-                            st.metric("Last Player Load", f"{player_load:.1f}" if player_load > 0 else "N/A")
+                            st.metric("📊 Player Load", f"{player_load:.1f}" if player_load > 0 else "N/A", 
+                                     delta=f"Baseline: {player_load:.1f}" if player_load > 0 else None)
                             
                             energy = safe_get_metric(recent_session.get('Energy (kcal)', 0), 0)
-                            st.metric("Last Energy (kcal)", f"{energy:.0f}" if energy > 0 else "N/A")
+                            st.metric("🔥 Energy (kcal)", f"{energy:.0f}" if energy > 0 else "N/A")
                             
                             if 'Duration' in recent_session.index:
                                 duration = format_duration(recent_session['Duration'])
-                                st.metric("Session Duration", duration)
+                                st.metric("⏱️ Duration", duration)
                             else:
-                                st.metric("Session Duration", "N/A")
+                                st.metric("⏱️ Duration", "N/A")
                         
                         with col2:
+                            st.markdown("""
+                            <div style='background: white; padding: 1.2rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid #43A047;'>
+                                <h4 style='margin: 0 0 1rem 0; color: #43A047;'>🏃 Movement Metrics</h4>
+                            </div>
+                            """, unsafe_allow_html=True)
                             distance = safe_get_metric(recent_session.get('Distance (miles)', 0), 0)
-                            st.metric("Last Distance", f"{distance:.2f} miles" if distance > 0 else "N/A")
+                            st.metric("📏 Distance", f"{distance:.2f} miles" if distance > 0 else "N/A")
                             
                             top_speed = safe_get_metric(recent_session.get('Top Speed (mph)', 0), 0)
-                            st.metric("Last Top Speed", f"{top_speed:.1f} mph" if top_speed > 0 else "N/A")
+                            st.metric("🚀 Top Speed", f"{top_speed:.1f} mph" if top_speed > 0 else "N/A")
                         
                         with col3:
+                            st.markdown("""
+                            <div style='background: white; padding: 1.2rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid #E53935;'>
+                                <h4 style='margin: 0 0 1rem 0; color: #E53935;'>❤️ Heart Rate & Impact</h4>
+                            </div>
+                            """, unsafe_allow_html=True)
                             hr_load = safe_get_metric(recent_session.get('Hr Load', 0), 0)
-                            st.metric("Last HR Load", f"{hr_load:.1f}" if hr_load > 0 else "N/A")
+                            st.metric("💓 HR Load", f"{hr_load:.1f}" if hr_load > 0 else "N/A")
                             
                             hr_max = safe_get_metric(recent_session.get('Hr Max (bpm)', 0), 0)
-                            st.metric("Heart Rate Max", f"{hr_max:.0f} bpm" if hr_max > 0 else "N/A")
+                            st.metric("❤️ HR Max", f"{hr_max:.0f} bpm" if hr_max > 0 else "N/A")
                             
                             impacts = safe_get_metric(recent_session.get('Impacts', 0), 0)
-                            st.metric("Last Impacts", f"{int(impacts)}" if impacts > 0 else "N/A")
+                            st.metric("💥 Impacts", f"{int(impacts)}" if impacts > 0 else "N/A")
                         
-                        st.markdown("---")
-                        
-                        # Predict next session load
-                        st.markdown("### 🔮 Next Session Prediction")
+                        # Predict next session load with enhanced header
+                        st.markdown("""
+                        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0;'>
+                            <h2 style='color: white; margin: 0; text-align: center;'>🔮 Next Session Prediction</h2>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
                         # Prepare input features
                         features_for_pred = [
@@ -4588,18 +4628,38 @@ elif page == "Load Prediction":
                                 col_pred1, col_pred2 = st.columns([2, 1])
                                 
                                 with col_pred1:
+                                    # Determine background color based on load status
+                                    if "LOW" in load_status:
+                                        bg_color = "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"
+                                    elif "MODERATE" in load_status:
+                                        bg_color = "linear-gradient(135deg, #fbb040 0%, #f9ed32 100%)"
+                                    elif "HIGH" in load_status:
+                                        bg_color = "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+                                    else:  # VERY HIGH
+                                        bg_color = "linear-gradient(135deg, #eb3349 0%, #f45c43 100%)"
+                                    
                                     st.markdown(f"""
-                                    <div style='background-color:#1E88E5; padding:2rem; border-radius:15px; color:white; text-align:center;'>
-                                        <h2 style='margin:0; color:white;'>🎯 Predicted Player Load</h2>
-                                        <h1 style='margin:0.5rem 0; font-size:4rem; color:white;'>{predicted_load:.1f}</h1>
-                                        <p style='margin:0; font-size:1.2rem;'><b>Status:</b> {load_status}</p>
-                                        <p style='margin:0; font-size:0.9rem;'>{load_category}</p>
+                                    <div style='background: {bg_color}; padding: 2.5rem; border-radius: 20px; color: white; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2);'>
+                                        <div style='font-size: 1.2rem; margin-bottom: 0.5rem; opacity: 0.95;'>🎯 Predicted Player Load</div>
+                                        <h1 style='margin: 0.5rem 0; font-size: 5rem; font-weight: bold; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);'>{predicted_load:.1f}</h1>
+                                        <div style='background: rgba(255,255,255,0.2); padding: 0.8rem; border-radius: 10px; margin-top: 1rem;'>
+                                            <p style='margin: 0; font-size: 1.3rem; font-weight: bold;'>{load_status}</p>
+                                            <p style='margin: 0.3rem 0 0 0; font-size: 1rem; opacity: 0.9;'>{load_category}</p>
+                                        </div>
                                     </div>
                                     """, unsafe_allow_html=True)
                                 
                                 with col_pred2:
-                                    st.markdown("#### 📊 Risk Assessment")
-                                    st.markdown(f"**{load_risk}**")
+                                    st.markdown("""
+                                    <div style='background: white; padding: 1.5rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 4px solid #667eea;'>
+                                        <h3 style='margin: 0 0 1rem 0; color: #333;'>📊 Risk Assessment</h3>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    st.markdown(f"""
+                                    <div style='background: #F8F9FA; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 4px solid #667eea;'>
+                                        <p style='margin: 0; font-size: 1rem; color: #333;'><strong>{load_risk}</strong></p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
                                     
                                     # Calculate load change
                                     if 'Player Load' in recent_session.index:
