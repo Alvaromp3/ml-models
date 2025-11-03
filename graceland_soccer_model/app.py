@@ -75,10 +75,11 @@ except ImportError:
     logging.warning("Advanced ML extensions not available")
 
 # Ollama integration for AI Coach Assistant
-# Configure Ollama host from environment (supports cloud deployments)
-# Default to localhost if not set, but allow override via environment variable
+# OLLAMA_HOST will be read from secrets or environment when needed
+# Default to localhost if not set
 if "OLLAMA_HOST" not in os.environ:
     os.environ["OLLAMA_HOST"] = "http://127.0.0.1:11434"
+
 try:
     import ollama
     OLLAMA_AVAILABLE = True
@@ -1343,7 +1344,24 @@ def format_player_data_for_context(df_clean, player_name=None):
 
 # Ollama configuration - supports both local and cloud deployments
 def get_ollama_base_url() -> str:
-    """Get Ollama base URL from environment or default to localhost."""
+    """Get Ollama base URL from Streamlit secrets, environment, or default to localhost."""
+    # First try to get from Streamlit secrets (for Streamlit Cloud)
+    try:
+        if hasattr(st, 'secrets'):
+            # Try dictionary-style access
+            if isinstance(st.secrets, dict) and 'general' in st.secrets:
+                ollama_host = st.secrets['general'].get('OLLAMA_HOST', None)
+                if ollama_host:
+                    return str(ollama_host).rstrip('/')
+            # Try attribute-style access
+            elif hasattr(st.secrets, 'general'):
+                ollama_host = getattr(st.secrets.general, 'OLLAMA_HOST', None)
+                if ollama_host:
+                    return str(ollama_host).rstrip('/')
+    except (AttributeError, KeyError, TypeError, Exception):
+        pass
+    
+    # Fall back to environment variable
     return os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip('/')
 
 def is_ollama_reachable() -> bool:
