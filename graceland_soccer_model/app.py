@@ -1398,8 +1398,26 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
                     models = health_response.json().get('models', [])
                     model_names = [m.get('name', '') for m in models]
                     if model and model not in model_names:
-                        # Model not found, return helpful message
-                        return f"Model '{model}' is not installed on the Ollama server. Available models: {', '.join(model_names[:5]) if model_names else 'None'}. Please install the model first on your Ollama server."
+                        # Model not found - try to download it automatically
+                        logging.info(f"Model '{model}' not found, attempting to download...")
+                        try:
+                            # Use Ollama API to pull the model
+                            pull_response = requests.post(
+                                f"{base_url}/api/pull",
+                                json={"name": model},
+                                timeout=600 if is_cloud else 300  # Longer timeout for cloud downloads
+                            )
+                            if pull_response.status_code in [200, 201]:
+                                logging.info(f"Successfully started downloading model '{model}'")
+                                return f"⚠ Model '{model}' is downloading now (this may take 5-10 minutes). Please wait a moment and try again. If this message persists, the download may still be in progress."
+                            else:
+                                # If pull fails, return helpful message
+                                return f"Model '{model}' is not installed. Attempted to download automatically but failed. Available models: {', '.join(model_names[:5]) if model_names else 'None'}. The model will be downloaded automatically on the next server restart."
+                        except requests.exceptions.Timeout:
+                            return f"Model '{model}' download started but is taking time. Please wait 5-10 minutes and try again. This is normal for free tier Render services."
+                        except Exception as pull_error:
+                            logging.warning(f"Failed to auto-download model: {str(pull_error)}")
+                            return f"Model '{model}' is not installed. Auto-download failed: {str(pull_error)}. Available models: {', '.join(model_names[:5]) if model_names else 'None'}. The model will be downloaded automatically on the next server restart."
                 except:
                     pass  # If parsing fails, continue anyway
         except requests.exceptions.Timeout:
