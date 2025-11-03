@@ -4524,7 +4524,7 @@ elif page == "Load Prediction":
                         </div>
                         """, unsafe_allow_html=True)
                         
-                        col1, col2, col3 = st.columns(3)
+                        col1, col2 = st.columns(2)
                         
                         with col1:
                             st.markdown("""
@@ -4556,18 +4556,6 @@ elif page == "Load Prediction":
                             
                             top_speed = safe_get_metric(recent_session.get('Top Speed (mph)', 0), 0)
                             st.metric("Top Speed", f"{top_speed:.1f} mph" if top_speed > 0 else "N/A")
-                        
-                        with col3:
-                            st.markdown("""
-                            <div style='background: #FFFFFF; padding: 1.5rem; border-radius: 8px; border: 1px solid #E0E0E0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1rem;'>
-                                <h4 style='margin: 0 0 1.25rem 0; color: #E53935; font-weight: 600; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.5px;'>Heart Rate & Impact</h4>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            hr_load = safe_get_metric(recent_session.get('Hr Load', 0), 0)
-                            st.metric("HR Load", f"{hr_load:.1f}" if hr_load > 0 else "N/A")
-                            
-                            hr_max = safe_get_metric(recent_session.get('Hr Max (bpm)', 0), 0)
-                            st.metric("HR Max", f"{hr_max:.0f} bpm" if hr_max > 0 else "N/A")
                             
                             impacts = safe_get_metric(recent_session.get('Impacts', 0), 0)
                             st.metric("Impacts", f"{int(impacts)}" if impacts > 0 else "N/A")
