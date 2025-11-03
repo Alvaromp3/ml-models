@@ -4349,24 +4349,24 @@ elif page == "Performance Analytics":
 
 elif page == "Load Prediction":
     st.markdown("""
-    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; border-radius: 15px; margin-bottom: 2rem;'>
-        <h1 style='color: white; margin: 0; text-align: center; font-size: 2.5rem;'>🎯 Player Load Prediction</h1>
-        <p style='color: rgba(255,255,255,0.9); text-align: center; margin-top: 0.5rem; font-size: 1.1rem;'>Predict next session load based on machine learning analysis</p>
+    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2.5rem; border-radius: 12px; margin-bottom: 2.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
+        <h1 style='color: white; margin: 0; text-align: center; font-size: 2.5rem; font-weight: 600; letter-spacing: -0.5px;'>Player Load Prediction</h1>
+        <p style='color: rgba(255,255,255,0.95); text-align: center; margin-top: 0.75rem; font-size: 1.05rem; font-weight: 300;'>Predict next session load based on machine learning analysis</p>
     </div>
     """, unsafe_allow_html=True)
     
     if st.session_state.df is None:
-        st.warning("⚠️ Please upload data in the Data Audit section first.")
+        st.warning("Please upload data in the Data Audit section first.")
     elif st.session_state.regression_model is None:
-        st.warning("⚠️ Please train the regression model first in Model Training section.")
+        st.warning("Please train the regression model first in Model Training section.")
     else:
         df = st.session_state.df
         df_clean = limpiar_datos_regression(df)
         
-        # Improved player and session selection with cards
+        # Professional player and session selection
         st.markdown("""
-        <div style='background: #F8F9FA; padding: 1.5rem; border-radius: 10px; border-left: 4px solid #667eea; margin-bottom: 2rem;'>
-            <h3 style='margin: 0 0 1rem 0; color: #333;'>👤 Select Player & Session Type</h3>
+        <div style='background: #FFFFFF; padding: 2rem; border-radius: 8px; border: 1px solid #E0E0E0; margin-bottom: 2.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
+            <h3 style='margin: 0 0 1.5rem 0; color: #212121; font-weight: 600; font-size: 1.3rem;'>Player & Session Selection</h3>
         </div>
         """, unsafe_allow_html=True)
         
@@ -4375,14 +4375,14 @@ elif page == "Load Prediction":
             
             with col1:
                 selected_player_pred = st.selectbox(
-                    "👤 Select Player",
+                    "Select Player",
                     ['Choose a player...'] + sorted(df_clean['Player Name'].unique()),
                     key="pred_player_selector"
                 )
             
             with col2:
                 session_type = st.selectbox(
-                    "📅 Session Type",
+                    "Session Type",
                     ['Training Session', 'Match']
                 )
             
@@ -4405,12 +4405,11 @@ elif page == "Load Prediction":
                     player_data_filtered = player_data
                 
                 if len(player_data_filtered) > 0:
-                    # Enhanced header for prediction section
-                    session_emoji = "⚽" if session_type == "Match" else "🏃"
+                    # Professional header for prediction section
                     st.markdown(f"""
-                    <div style='background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0;'>
-                        <h2 style='color: white; margin: 0; text-align: center;'>{session_emoji} Predicting Load for <strong>{selected_player_pred}</strong></h2>
-                        <p style='color: rgba(255,255,255,0.9); text-align: center; margin: 0.5rem 0 0 0;'>Next Session: {session_type}</p>
+                    <div style='background: #FFFFFF; padding: 2rem; border-radius: 8px; border-left: 4px solid #667eea; margin: 2.5rem 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
+                        <h2 style='color: #212121; margin: 0 0 0.5rem 0; font-weight: 600; font-size: 1.8rem;'>Load Prediction: {selected_player_pred}</h2>
+                        <p style='color: #757575; margin: 0; font-size: 1rem;'>Session Type: {session_type}</p>
                     </div>
                     """, unsafe_allow_html=True)
                     
@@ -4518,10 +4517,10 @@ elif page == "Load Prediction":
                             except:
                                 return "N/A"
                         
-                        # Enhanced metrics display with cards
+                        # Professional metrics display
                         st.markdown("""
-                        <div style='background: #F8F9FA; padding: 1rem; border-radius: 10px; margin: 1.5rem 0;'>
-                            <h3 style='margin: 0 0 1rem 0; color: #333;'>📈 Recent Session Performance</h3>
+                        <div style='background: #FFFFFF; padding: 1.5rem; border-radius: 8px; border: 1px solid #E0E0E0; margin: 2rem 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
+                            <h3 style='margin: 0 0 1.5rem 0; color: #212121; font-weight: 600; font-size: 1.3rem;'>Recent Session Performance</h3>
                         </div>
                         """, unsafe_allow_html=True)
                         
@@ -4529,54 +4528,54 @@ elif page == "Load Prediction":
                         
                         with col1:
                             st.markdown("""
-                            <div style='background: white; padding: 1.2rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid #1E88E5;'>
-                                <h4 style='margin: 0 0 1rem 0; color: #1E88E5;'>⚡ Performance Metrics</h4>
+                            <div style='background: #FFFFFF; padding: 1.5rem; border-radius: 8px; border: 1px solid #E0E0E0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1rem;'>
+                                <h4 style='margin: 0 0 1.25rem 0; color: #1E88E5; font-weight: 600; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.5px;'>Performance Metrics</h4>
                             </div>
                             """, unsafe_allow_html=True)
                             player_load = safe_get_metric(recent_session.get('Player Load', 0), 0)
-                            st.metric("📊 Player Load", f"{player_load:.1f}" if player_load > 0 else "N/A", 
+                            st.metric("Player Load", f"{player_load:.1f}" if player_load > 0 else "N/A", 
                                      delta=f"Baseline: {player_load:.1f}" if player_load > 0 else None)
                             
                             energy = safe_get_metric(recent_session.get('Energy (kcal)', 0), 0)
-                            st.metric("🔥 Energy (kcal)", f"{energy:.0f}" if energy > 0 else "N/A")
+                            st.metric("Energy", f"{energy:.0f} kcal" if energy > 0 else "N/A")
                             
                             if 'Duration' in recent_session.index:
                                 duration = format_duration(recent_session['Duration'])
-                                st.metric("⏱️ Duration", duration)
+                                st.metric("Duration", duration)
                             else:
-                                st.metric("⏱️ Duration", "N/A")
+                                st.metric("Duration", "N/A")
                         
                         with col2:
                             st.markdown("""
-                            <div style='background: white; padding: 1.2rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid #43A047;'>
-                                <h4 style='margin: 0 0 1rem 0; color: #43A047;'>🏃 Movement Metrics</h4>
+                            <div style='background: #FFFFFF; padding: 1.5rem; border-radius: 8px; border: 1px solid #E0E0E0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1rem;'>
+                                <h4 style='margin: 0 0 1.25rem 0; color: #43A047; font-weight: 600; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.5px;'>Movement Metrics</h4>
                             </div>
                             """, unsafe_allow_html=True)
                             distance = safe_get_metric(recent_session.get('Distance (miles)', 0), 0)
-                            st.metric("📏 Distance", f"{distance:.2f} miles" if distance > 0 else "N/A")
+                            st.metric("Distance", f"{distance:.2f} miles" if distance > 0 else "N/A")
                             
                             top_speed = safe_get_metric(recent_session.get('Top Speed (mph)', 0), 0)
-                            st.metric("🚀 Top Speed", f"{top_speed:.1f} mph" if top_speed > 0 else "N/A")
+                            st.metric("Top Speed", f"{top_speed:.1f} mph" if top_speed > 0 else "N/A")
                         
                         with col3:
                             st.markdown("""
-                            <div style='background: white; padding: 1.2rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid #E53935;'>
-                                <h4 style='margin: 0 0 1rem 0; color: #E53935;'>❤️ Heart Rate & Impact</h4>
+                            <div style='background: #FFFFFF; padding: 1.5rem; border-radius: 8px; border: 1px solid #E0E0E0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1rem;'>
+                                <h4 style='margin: 0 0 1.25rem 0; color: #E53935; font-weight: 600; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.5px;'>Heart Rate & Impact</h4>
                             </div>
                             """, unsafe_allow_html=True)
                             hr_load = safe_get_metric(recent_session.get('Hr Load', 0), 0)
-                            st.metric("💓 HR Load", f"{hr_load:.1f}" if hr_load > 0 else "N/A")
+                            st.metric("HR Load", f"{hr_load:.1f}" if hr_load > 0 else "N/A")
                             
                             hr_max = safe_get_metric(recent_session.get('Hr Max (bpm)', 0), 0)
-                            st.metric("❤️ HR Max", f"{hr_max:.0f} bpm" if hr_max > 0 else "N/A")
+                            st.metric("HR Max", f"{hr_max:.0f} bpm" if hr_max > 0 else "N/A")
                             
                             impacts = safe_get_metric(recent_session.get('Impacts', 0), 0)
-                            st.metric("💥 Impacts", f"{int(impacts)}" if impacts > 0 else "N/A")
+                            st.metric("Impacts", f"{int(impacts)}" if impacts > 0 else "N/A")
                         
-                        # Predict next session load with enhanced header
+                        # Professional prediction header
                         st.markdown("""
-                        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0;'>
-                            <h2 style='color: white; margin: 0; text-align: center;'>🔮 Next Session Prediction</h2>
+                        <div style='background: #FFFFFF; padding: 2rem; border-radius: 8px; border: 1px solid #E0E0E0; margin: 2.5rem 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
+                            <h2 style='color: #212121; margin: 0; font-weight: 600; font-size: 1.8rem;'>Next Session Prediction</h2>
                         </div>
                         """, unsafe_allow_html=True)
                         
@@ -4602,62 +4601,57 @@ elif page == "Load Prediction":
                                 if session_type == 'Match':
                                     if 'Tags' in recent_session.index and recent_session['Tags'] and 'game' in str(recent_session['Tags']).lower():
                                         load_category = "High Intensity"
-                                        st.info("📌 **Match Prediction:** Based on player's last match performance")
+                                        st.info("**Match Prediction:** Based on player's last match performance")
                                     else:
                                         predicted_load = predicted_load * 1.35
                                         load_category = "High Intensity"
-                                        st.info("📌 **Match Prediction:** Based on last training with 35% match intensity adjustment")
+                                        st.info("**Match Prediction:** Based on last training with 35% match intensity adjustment")
                                 else:
                                     load_category = "Moderate Intensity"
-                                    st.info("📌 **Training Prediction:** Based on player's recent training session patterns")
+                                    st.info("**Training Prediction:** Based on player's recent training session patterns")
                                 
-                                # Categorize load level
+                                # Categorize load level (professional labels)
                                 if predicted_load < 150:
-                                    load_status = "🟢 LOW"
+                                    load_status = "LOW"
+                                    load_status_color = "#43A047"
                                     load_risk = "Low risk - can increase intensity if desired"
                                 elif predicted_load < 350:
-                                    load_status = "🟡 MODERATE"
+                                    load_status = "MODERATE"
+                                    load_status_color = "#FFB300"
                                     load_risk = "Optimal range - good training intensity"
                                 elif predicted_load < 500:
-                                    load_status = "🟠 HIGH"
+                                    load_status = "HIGH"
+                                    load_status_color = "#FF6F00"
                                     load_risk = "High load - ensure adequate recovery after"
                                 else:
-                                    load_status = "🔴 VERY HIGH"
+                                    load_status = "VERY HIGH"
+                                    load_status_color = "#E53935"
                                     load_risk = "Very high load - high injury risk, consider reducing intensity"
                                 
                                 col_pred1, col_pred2 = st.columns([2, 1])
                                 
                                 with col_pred1:
-                                    # Determine background color based on load status
-                                    if "LOW" in load_status:
-                                        bg_color = "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"
-                                    elif "MODERATE" in load_status:
-                                        bg_color = "linear-gradient(135deg, #fbb040 0%, #f9ed32 100%)"
-                                    elif "HIGH" in load_status:
-                                        bg_color = "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
-                                    else:  # VERY HIGH
-                                        bg_color = "linear-gradient(135deg, #eb3349 0%, #f45c43 100%)"
-                                    
+                                    # Professional prediction card
                                     st.markdown(f"""
-                                    <div style='background: {bg_color}; padding: 2.5rem; border-radius: 20px; color: white; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2);'>
-                                        <div style='font-size: 1.2rem; margin-bottom: 0.5rem; opacity: 0.95;'>🎯 Predicted Player Load</div>
-                                        <h1 style='margin: 0.5rem 0; font-size: 5rem; font-weight: bold; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);'>{predicted_load:.1f}</h1>
-                                        <div style='background: rgba(255,255,255,0.2); padding: 0.8rem; border-radius: 10px; margin-top: 1rem;'>
-                                            <p style='margin: 0; font-size: 1.3rem; font-weight: bold;'>{load_status}</p>
-                                            <p style='margin: 0.3rem 0 0 0; font-size: 1rem; opacity: 0.9;'>{load_category}</p>
+                                    <div style='background: #FFFFFF; padding: 3rem; border-radius: 12px; border: 2px solid {load_status_color}; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center;'>
+                                        <div style='font-size: 0.95rem; margin-bottom: 1rem; color: #757575; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;'>Predicted Player Load</div>
+                                        <h1 style='margin: 0.5rem 0; font-size: 4.5rem; font-weight: 700; color: {load_status_color}; letter-spacing: -2px;'>{predicted_load:.1f}</h1>
+                                        <div style='margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #E0E0E0;'>
+                                            <div style='display: inline-block; background: {load_status_color}; color: white; padding: 0.5rem 1.5rem; border-radius: 20px; font-weight: 600; font-size: 1rem; letter-spacing: 0.5px;'>{load_status}</div>
+                                            <p style='margin: 0.75rem 0 0 0; color: #757575; font-size: 0.95rem;'>{load_category}</p>
                                         </div>
                                     </div>
                                     """, unsafe_allow_html=True)
                                 
                                 with col_pred2:
                                     st.markdown("""
-                                    <div style='background: white; padding: 1.5rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 4px solid #667eea;'>
-                                        <h3 style='margin: 0 0 1rem 0; color: #333;'>📊 Risk Assessment</h3>
+                                    <div style='background: #FFFFFF; padding: 2rem; border-radius: 12px; border: 1px solid #E0E0E0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 1rem;'>
+                                        <h3 style='margin: 0 0 1.25rem 0; color: #212121; font-weight: 600; font-size: 1.2rem;'>Risk Assessment</h3>
                                     </div>
                                     """, unsafe_allow_html=True)
                                     st.markdown(f"""
-                                    <div style='background: #F8F9FA; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 4px solid #667eea;'>
-                                        <p style='margin: 0; font-size: 1rem; color: #333;'><strong>{load_risk}</strong></p>
+                                    <div style='background: #F8F9FA; padding: 1.25rem; border-radius: 8px; border-left: 4px solid {load_status_color}; margin-bottom: 1rem;'>
+                                        <p style='margin: 0; font-size: 0.95rem; color: #424242; line-height: 1.6;'><strong>{load_risk}</strong></p>
                                     </div>
                                     """, unsafe_allow_html=True)
                                     
@@ -4667,30 +4661,35 @@ elif page == "Load Prediction":
                                         load_change = ((predicted_load - last_load) / last_load) * 100 if last_load > 0 else 0
                                         
                                         if abs(load_change) < 5:
-                                            change_emoji = "➡️"
+                                            change_symbol = ""
                                             change_status = "Stable"
+                                            delta_value = None
                                         elif load_change > 20:
-                                            change_emoji = "📈"
+                                            change_symbol = "+"
                                             change_status = "Significant Increase"
+                                            delta_value = f"+{abs(load_change):.1f}%"
                                         elif load_change > 5:
-                                            change_emoji = "📊"
+                                            change_symbol = "+"
                                             change_status = "Moderate Increase"
+                                            delta_value = f"+{abs(load_change):.1f}%"
                                         elif load_change < -20:
-                                            change_emoji = "📉"
+                                            change_symbol = ""
                                             change_status = "Significant Decrease"
+                                            delta_value = f"{load_change:.1f}%"
                                         else:
-                                            change_emoji = "📉"
+                                            change_symbol = ""
                                             change_status = "Moderate Decrease"
+                                            delta_value = f"{load_change:.1f}%"
                                         
-                                        st.metric("Load Change", f"{change_emoji} {abs(load_change):.1f}%")
+                                        st.metric("Load Change", f"{abs(load_change):.1f}%", delta=delta_value)
                                         
                                         if abs(load_change) > 20:
-                                            st.warning(f"⚠️ {change_status} from last session ({load_change:+.1f}%)")
-                            
+                                            st.warning(f"{change_status} from last session ({load_change:+.1f}%)")
+                                            
                             except Exception as e:
-                                st.error(f"❌ Error making prediction: {str(e)}")
+                                st.error(f"Error making prediction: {str(e)}")
                         else:
-                            st.error("❌ Not enough features available for prediction")
+                            st.error("Not enough features available for prediction")
                 else:
                     st.warning(f"No data available for {selected_player_pred}")
         else:
