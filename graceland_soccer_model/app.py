@@ -4693,7 +4693,7 @@ elif page == "Load Prediction":
                 else:
                     st.warning(f"No data available for {selected_player_pred}")
         else:
-            st.warning("⚠️ 'Player Name' column not found in dataset")
+            st.warning("'Player Name' column not found in dataset")
 
 # Footer
 st.sidebar.markdown("---")
