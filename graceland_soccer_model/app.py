@@ -1483,45 +1483,131 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
         except:
             pass
         
-        # Initialize progress
+        # Initialize progress bar and status text FIRST (before any operations)
+        progress_bar = None
+        status_text = None
         if progress_container:
-            progress_container.info("🔄 Initiating model download...")
+            progress_bar = progress_container.progress(0)
+            status_text = progress_container.empty()
+            status_text.info("🔄 Initiating model download...")
+            progress_bar.progress(0.05)
+        
+        # Wake up server first (especially important for free tier Render)
+        if is_cloud:
+            if status_text:
+                status_text.info("⏳ Waking up server (free tier may take 30-60 seconds)...")
+                progress_bar.progress(0.08) if progress_bar else None
+            
+            # Try to wake up the server with a simple health check
+            try:
+                wake_up_response = requests.get(f"{base_url}/api/tags", timeout=60)
+                if wake_up_response.status_code == 200:
+                    if status_text:
+                        status_text.info("✅ Server is awake. Initiating download...")
+                        progress_bar.progress(0.12) if progress_bar else None
+            except requests.exceptions.Timeout:
+                if status_text:
+                    status_text.warning("⚠️ Server is slow to respond (normal for free tier). Continuing anyway...")
+                    progress_bar.progress(0.12) if progress_bar else None
+            except:
+                # Ignore wake-up errors, try download anyway
+                if status_text:
+                    progress_bar.progress(0.12) if progress_bar else None
+                pass
         
         # Start download using streaming API
         try:
             import time
             pull_url = f"{base_url}/api/pull"
             
-            # Start the pull request (non-blocking)
-            response = requests.post(
-                pull_url,
-                json={"name": model},
-                timeout=5  # Short timeout to just initiate
-            )
-            
-            if response.status_code not in [200, 201]:
-                # Even if status is not 200/201, the download might have started
-                # Check once more
-                time.sleep(1)
+            # Start the pull request (non-blocking) with better error handling
+            download_initiated = False
+            try:
+                if status_text:
+                    status_text.info("🔄 Sending download request to Ollama...")
+                    progress_bar.progress(0.15) if progress_bar else None
+                
+                # Use longer timeout for cloud services
+                download_timeout = 60 if is_cloud else 15
+                
+                response = requests.post(
+                    pull_url,
+                    json={"name": model},
+                    timeout=download_timeout  # Much longer timeout for cloud services
+                )
+                
+                if response.status_code in [200, 201]:
+                    # Download initiated successfully
+                    download_initiated = True
+                    if status_text:
+                        status_text.info("✅ Download request sent. Checking status...")
+                        progress_bar.progress(0.15) if progress_bar else None
+                else:
+                    # Status code not 200/201, but download might have started anyway
+                    if status_text:
+                        status_text.warning(f"⚠️ Server returned status {response.status_code}, but download may have started. Checking...")
+                        progress_bar.progress(0.15) if progress_bar else None
+                    
+                    # Wait a moment and check if model appeared
+                    time.sleep(2)
+                    try:
+                        check = requests.get(f"{base_url}/api/tags", timeout=10)
+                        if check.status_code == 200:
+                            check_models = check.json().get('models', [])
+                            check_names = [m.get('name', '') for m in check_models]
+                            if model in check_names:
+                                if status_text:
+                                    progress_bar.progress(1.0) if progress_bar else None
+                                    status_text.success(f"✅ Model '{model}' is already available!")
+                                return True, f"Model '{model}' is already available!"
+                    except:
+                        pass
+            except (requests.exceptions.Timeout, requests.exceptions.ReadTimeout) as timeout_err:
+                # Timeout is OK - the download may still have started (especially for free tier Render)
+                download_initiated = True  # Assume it started
+                if status_text:
+                    progress_bar.progress(0.2) if progress_bar else None
+                    status_text.warning(f"⏳ Request timed out (this is normal for free tier Render).\n\n📋 **What's happening:**\n- The download may have started in the background\n- Free tier Render services can take 30-60 seconds to wake up\n- The download will continue even if this times out\n\n💡 **Next steps:**\n1. Wait 1-2 minutes\n2. Click 'Check Model Status' to verify\n3. If model appears, it's downloading!\n4. Full download takes 5-10 minutes total")
+                
+                # Give it one more check after a short wait
+                time.sleep(5)
                 try:
-                    check = requests.get(f"{base_url}/api/tags", timeout=5)
-                    if check.status_code == 200:
-                        check_models = check.json().get('models', [])
-                        check_names = [m.get('name', '') for m in check_models]
-                        if model in check_names:
-                            return True, f"Model '{model}' is already available!"
+                    final_check = requests.get(f"{base_url}/api/tags", timeout=10)
+                    if final_check.status_code == 200:
+                        final_models = final_check.json().get('models', [])
+                        final_names = [m.get('name', '') for m in final_models]
+                        if model in final_names:
+                            if status_text:
+                                progress_bar.progress(1.0) if progress_bar else None
+                                status_text.success(f"✅ Model '{model}' is available!")
+                            return True, f"Model '{model}' is available!"
                 except:
                     pass
-                
-                return False, f"Failed to start download. Status: {response.status_code}. The download may still have started - please wait a few minutes."
+                    
+            except requests.exceptions.ConnectionError:
+                if status_text:
+                    progress_bar.progress(0.5) if progress_bar else None
+                    status_text.error(f"❌ Cannot connect to Ollama server at {base_url}.\n\n💡 Please ensure:\n1. The Render service is running\n2. Wait 30-60 seconds if it's spinning up (free tier)\n3. Check Render dashboard for service status")
+                return False, f"Cannot connect to Ollama server at {base_url}. Please ensure the service is running."
+            except Exception as e:
+                error_msg = str(e)
+                # Check if it's a timeout-related error
+                if "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
+                    download_initiated = True
+                    if status_text:
+                        progress_bar.progress(0.2) if progress_bar else None
+                        status_text.warning(f"⏳ Connection timeout occurred.\n\n📋 **This is normal for free tier Render services.**\n\nThe download request may have been sent successfully, but the response timed out.\n\n💡 **Please:**\n1. Wait 1-2 minutes\n2. Click '🔄 Check Model Status' to verify if download started\n3. The download continues in the background\n4. Full download takes 5-10 minutes")
+                else:
+                    if status_text:
+                        progress_bar.progress(0.3) if progress_bar else None
+                        status_text.warning(f"⚠️ Error: {error_msg[:100]}\n\nThe download may still have started - please check status manually.")
+                    return False, f"Error starting download: {error_msg}. The download may still have started - please check status manually."
             
-            # Monitor progress with polling
-            if progress_container:
-                progress_bar = progress_container.progress(0)
-                status_text = progress_container.empty()
-                
-                status_text.info("🔄 Download initiated. Checking progress...")
-                progress_bar.progress(0.1)
+            # Monitor progress with polling (progress_bar and status_text already initialized above)
+            if progress_container and download_initiated:
+                if status_text:
+                    status_text.info("🔄 Download initiated. Checking progress...")
+                    progress_bar.progress(0.2) if progress_bar else None
                 
                 # Poll for progress (every 5 seconds, up to 15 checks = ~75 seconds)
                 # After that, inform user to check manually (download continues in background)
