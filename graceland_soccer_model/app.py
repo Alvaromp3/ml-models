@@ -1379,6 +1379,88 @@ def is_ollama_reachable() -> bool:
     except Exception:
         return False
 
+def check_model_status(model="llama3.2"):
+    """Check if a specific model is installed and return status information."""
+    if not OLLAMA_AVAILABLE:
+        return {
+            "available": False,
+            "status": "error",
+            "message": "Ollama library is not installed"
+        }
+    
+    try:
+        base_url = get_ollama_base_url()
+        is_cloud = not base_url.startswith("http://127.0.0.1") and not base_url.startswith("http://localhost")
+        timeout = 60 if is_cloud else 2
+        
+        # Check if server is reachable
+        try:
+            health_response = requests.get(f"{base_url}/api/tags", timeout=timeout)
+            if health_response.status_code != 200:
+                return {
+                    "available": False,
+                    "status": "error",
+                    "message": f"Ollama server returned status {health_response.status_code}"
+                }
+        except requests.exceptions.Timeout:
+            return {
+                "available": False,
+                "status": "timeout",
+                "message": "Ollama server is taking too long to respond. This is normal for free tier Render services - wait 30-60 seconds."
+            }
+        except Exception as e:
+            return {
+                "available": False,
+                "status": "error",
+                "message": f"Cannot connect to Ollama: {str(e)}"
+            }
+        
+        # Get list of models
+        try:
+            models_response = requests.get(f"{base_url}/api/tags", timeout=timeout)
+            models_data = models_response.json()
+            models = models_data.get('models', [])
+            model_names = [m.get('name', '') for m in models]
+            
+            # Check if our model is in the list
+            model_found = model in model_names
+            
+            if model_found:
+                # Get model details
+                model_info = next((m for m in models if m.get('name') == model), {})
+                size = model_info.get('size', 0)
+                size_mb = size / (1024 * 1024) if size > 0 else 0
+                
+                return {
+                    "available": True,
+                    "status": "installed",
+                    "message": f"✅ Model '{model}' is installed and ready",
+                    "models": model_names,
+                    "size_mb": size_mb
+                }
+            else:
+                # Check if there's an active download (by checking if server is responsive but model missing)
+                return {
+                    "available": False,
+                    "status": "missing",
+                    "message": f"⚠️ Model '{model}' is not installed. Available models: {', '.join(model_names[:3]) if model_names else 'None'}",
+                    "models": model_names,
+                    "download_available": True
+                }
+        except Exception as e:
+            return {
+                "available": False,
+                "status": "error",
+                "message": f"Error checking models: {str(e)}"
+            }
+            
+    except Exception as e:
+        return {
+            "available": False,
+            "status": "error",
+            "message": f"Error checking model status: {str(e)}"
+        }
+
 def get_ollama_response(user_message, player_context=None, chat_history=None, model="llama3.2"):
     """Get response from Ollama with player context, using timeouts to prevent blocking"""
     try:
@@ -3370,11 +3452,40 @@ elif page == "Performance Analytics":
                         ollama_url = get_ollama_base_url()
                         st.warning(f"Cannot connect to Ollama at {ollama_url}. Set OLLAMA_HOST environment variable if using a remote server.")
                     else:
-                        st.markdown("""
-                        <div style="font-size: 0.75rem; color: #6C757D; padding: 0.5rem; background: #F8F9FA; border-radius: 4px;">
-                            Status: Ollama connected
+                        # Status display with model check
+                        model_status_info = check_model_status("llama3.2")
+                        status_color = "#28a745" if model_status_info["available"] else "#ffc107" if model_status_info["status"] == "missing" else "#dc3545"
+                        status_icon = "✅" if model_status_info["available"] else "⚠️" if model_status_info["status"] == "missing" else "❌"
+                        
+                        st.markdown(f"""
+                        <div style="font-size: 0.75rem; color: {status_color}; padding: 0.5rem; background: #F8F9FA; border-radius: 4px; margin-bottom: 0.5rem;">
+                            {status_icon} {model_status_info["message"]}
                         </div>
                         """, unsafe_allow_html=True)
+                        
+                        # Button to refresh model status
+                        if st.button("🔄 Check Model Status", key="check_model_status_btn", help="Check if llama3.2 model is installed and ready"):
+                            model_status_info = check_model_status("llama3.2")
+                            
+                            if model_status_info["available"]:
+                                st.success(model_status_info["message"])
+                                if "size_mb" in model_status_info and model_status_info["size_mb"] > 0:
+                                    st.info(f"Model size: {model_status_info['size_mb']:.1f} MB")
+                            elif model_status_info["status"] == "missing":
+                                st.warning(model_status_info["message"])
+                                if model_status_info.get("download_available"):
+                                    st.info("💡 The model will be downloaded automatically when you make your first request, or you can check the Render logs for download progress.")
+                                    st.markdown("""
+                                    <div style="font-size: 0.7rem; color: #6C757D; margin-top: 0.5rem;">
+                                        📊 <strong>To check download progress:</strong><br>
+                                        1. Go to <a href="https://dashboard.render.com" target="_blank">Render Dashboard</a><br>
+                                        2. Open your <code>ollama-server</code> service<br>
+                                        3. Click on "Logs" tab to see download progress<br>
+                                        4. Look for messages like "Downloading llama3.2 model..."
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                            else:
+                                st.error(model_status_info["message"])
                 
                 # Chat interface
                 st.markdown("---")
