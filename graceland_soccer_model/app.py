@@ -26,7 +26,7 @@ try:
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
-    st.warning("⚠️ PDF export requires reportlab. Install with: pip install reportlab")
+    st.warning("PDF export requires reportlab. Install with: pip install reportlab")
 
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, PowerTransformer
@@ -90,7 +90,7 @@ except ImportError:
 # Set page config
 st.set_page_config(
     page_title="Elite Sports Performance Analytics | Alvaro Martin-Pena",
-    page_icon="⚽",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -680,9 +680,9 @@ def limpiar_datos_classification(df):
     # Professional injury risk calculation with balanced thresholds
     if 'Player Load' in df_clean.columns:
         # Calculate percentiles for clinically-based risk assessment
-        load_95th = df_clean['Player Load'].quantile(0.95)  # Top 5% - truly elevated load
-        load_80th = df_clean['Player Load'].quantile(0.80)  # Upper moderate
-        load_60th = df_clean['Player Load'].quantile(0.60)  # Balanced threshold for medium risk
+        load_95th = df_clean['Player Load'].quantile(0.95) # Top 5% - truly elevated load
+        load_80th = df_clean['Player Load'].quantile(0.80) # Upper moderate
+        load_60th = df_clean['Player Load'].quantile(0.60) # Balanced threshold for medium risk
         
         # Check for additional risk factors
         has_energy = 'Energy (kcal)' in df_clean.columns
@@ -808,13 +808,13 @@ def generate_intelligent_recommendations(player_name, player_data, recent_data):
                 older_load = player_data_sorted['Player Load'].head(3).mean()
                 
                 if recent_load > older_load * 1.15:
-                    recommendations['trends']['load_trend'] = '⚠️ INCREASING LOAD TREND'
+                    recommendations['trends']['load_trend'] = 'INCREASING LOAD TREND'
                     recommendations['trends']['load_change'] = f"{((recent_load / older_load - 1) * 100):.1f}% increase"
                 elif recent_load < older_load * 0.85:
-                    recommendations['trends']['load_trend'] = '✅ DECREASING LOAD TREND'
+                    recommendations['trends']['load_trend'] = 'DECREASING LOAD TREND'
                     recommendations['trends']['load_change'] = f"{((1 - recent_load / older_load) * 100):.1f}% decrease"
                 else:
-                    recommendations['trends']['load_trend'] = '➡️ STABLE LOAD'
+                    recommendations['trends']['load_trend'] = 'STABLE LOAD'
         
         # Generate specific insights based on data
         insights = []
@@ -825,21 +825,21 @@ def generate_intelligent_recommendations(player_name, player_data, recent_data):
         if avg_load > 0:
             load_vs_team_pct = ((avg_load / team_avg_load - 1) * 100) if team_avg_load > 0 else 0
             if abs(load_vs_team_pct) > 15:
-                insights.append(f"📊 Load Status: {avg_load:.1f} avg ({load_vs_team_pct:+.1f}% vs team avg of {team_avg_load:.1f})")
+                insights.append(f"Load Status: {avg_load:.1f} avg ({load_vs_team_pct:+.1f}% vs team avg of {team_avg_load:.1f})")
                 
                 if load_vs_team_pct > 15:
-                    actions.append(f"⚠️ REDUCE intensity: Target {avg_load * 0.7:.0f} load in next 3 sessions (currently {avg_load:.0f})")
-                    plan.append(f"📉 Gradual load reduction: Days 1-2 at {avg_load * 0.6:.0f}, Day 3 at {avg_load * 0.8:.0f}")
+                    actions.append(f"REDUCE intensity: Target {avg_load * 0.7:.0f} load in next 3 sessions (currently {avg_load:.0f})")
+                    plan.append(f"Gradual load reduction: Days 1-2 at {avg_load * 0.6:.0f}, Day 3 at {avg_load * 0.8:.0f}")
                 elif load_vs_team_pct < -15:
-                    insights.append("📈 Load is below team average - can increase intensity")
-                    actions.append(f"💪 INCREASE intensity: Target {team_avg_load:.0f} load to reach team baseline")
-                    plan.append(f"📈 Progressive overload: Increase by 10% weekly until reaching {team_avg_load:.0f}")
+                    insights.append("Load is below team average - can increase intensity")
+                    actions.append(f"INCREASE intensity: Target {team_avg_load:.0f} load to reach team baseline")
+                    plan.append(f"Progressive overload: Increase by 10% weekly until reaching {team_avg_load:.0f}")
         
         if max_load > avg_load * 1.6:
             load_spike = ((max_load / avg_load) * 100) - 100
-            insights.append(f"⚠️ LOAD SPIKES: Max ({max_load:.0f}) is {load_spike:.0f}% above average ({avg_load:.0f})")
-            actions.append(f"🚨 Implement CAP: Don't exceed {avg_load * 0.8:.0f} in any session")
-            plan.append(f"📋 Load management protocol: 3 sessions at max {avg_load * 0.85:.0f}, then reassess")
+            insights.append(f"LOAD SPIKES: Max ({max_load:.0f}) is {load_spike:.0f}% above average ({avg_load:.0f})")
+            actions.append(f"Implement CAP: Don't exceed {avg_load * 0.8:.0f} in any session")
+            plan.append(f"Load management protocol: 3 sessions at max {avg_load * 0.85:.0f}, then reassess")
         
         # Consistency analysis
         if len(player_data) >= 3:
@@ -849,28 +849,28 @@ def generate_intelligent_recommendations(player_name, player_data, recent_data):
                 load_variance = max_load - min_load
                 
                 if cv > 0.4:
-                    insights.append(f"⚠️ INCONSISTENT TRAINING: {cv*100:.0f}% variation (range: {min_load:.0f}-{max_load:.0f})")
-                    actions.append(f"📊 Standardize loads: Target {avg_load:.0f} ±{avg_load*0.2:.0f} for next 5 sessions")
-                    plan.append(f"🎯 Load consistency program: Current variance {load_variance:.0f}, target {avg_load*0.3:.0f}")
+                    insights.append(f"INCONSISTENT TRAINING: {cv*100:.0f}% variation (range: {min_load:.0f}-{max_load:.0f})")
+                    actions.append(f"Standardize loads: Target {avg_load:.0f} ±{avg_load*0.2:.0f} for next 5 sessions")
+                    plan.append(f"Load consistency program: Current variance {load_variance:.0f}, target {avg_load*0.3:.0f}")
         
         # Speed-specific recommendations
         if 'Top Speed (mph)' in recent_data.columns and max_speed > 0 and team_max_speed > 0:
             speed_deficit_pct = ((max_speed / team_max_speed) - 1) * 100
             if max_speed < team_max_speed * 0.85:
-                insights.append(f"⚡ SPEED GAP: {max_speed:.1f} mph vs team max {team_max_speed:.1f} mph ({speed_deficit_pct:.0f}% below)")
-                actions.append(f"🏃 Sprint development: Add 4-6 x 30m max speed sprints 2x/week")
-                plan.append(f"🎯 Speed training plan: Target max speed {team_max_speed * 0.95:.1f} mph within 4 weeks")
+                insights.append(f"SPEED GAP: {max_speed:.1f} mph vs team max {team_max_speed:.1f} mph ({speed_deficit_pct:.0f}% below)")
+                actions.append(f"Sprint development: Add 4-6 x 30m max speed sprints 2x/week")
+                plan.append(f"Speed training plan: Target max speed {team_max_speed * 0.95:.1f} mph within 4 weeks")
             elif max_speed >= team_max_speed * 0.95:
-                insights.append(f"✅ ELITE SPEED: {max_speed:.1f} mph ({((max_speed/team_max_speed - 1)*100):+.0f}% vs team max)")
-                plan.append("⭐ Maintain speed: Preserve sprint ability with 1-2 maintenance sessions/week")
+                insights.append(f"ELITE SPEED: {max_speed:.1f} mph ({((max_speed/team_max_speed - 1)*100):+.0f}% vs team max)")
+                plan.append("Maintain speed: Preserve sprint ability with 1-2 maintenance sessions/week")
             
             # Sprint volume analysis
             if avg_sprint > 0 and 'Sprint Distance (yards)' in recent_data.columns:
                 sprint_vs_team = (avg_sprint / team_avg_sprint) if team_avg_sprint > 0 else 1
                 if avg_sprint < team_avg_sprint * 0.8:
-                    plan.append(f"📊 Low sprint volume: {avg_sprint:.0f} yds vs team avg {team_avg_sprint:.0f} yds - Increase to 200-300yds/session")
+                    plan.append(f"Low sprint volume: {avg_sprint:.0f} yds vs team avg {team_avg_sprint:.0f} yds - Increase to 200-300yds/session")
                 elif avg_sprint > team_avg_sprint * 1.2:
-                    plan.append(f"⚡ High sprint volume: {avg_sprint:.0f} yds - Monitor for fatigue")
+                    plan.append(f"High sprint volume: {avg_sprint:.0f} yds - Monitor for fatigue")
         
         # Energy efficiency analysis
         if avg_energy > 0 and avg_distance > 0:
@@ -882,30 +882,30 @@ def generate_intelligent_recommendations(player_name, player_data, recent_data):
             if team_efficiency > 0:
                 efficiency_ratio = energy_per_mile / team_efficiency
                 if efficiency_ratio > 1.2:
-                    insights.append(f"⚠️ LOW EFFICIENCY: {energy_per_mile:.0f} kcal/mile vs team {team_efficiency:.0f} ({efficiency_ratio:.1f}x)")
-                    plan.append(f"💪 Efficiency improvement: {avg_energy:.0f} kcal over {avg_distance:.1f}mi - Focus on anaerobic threshold work")
+                    insights.append(f"LOW EFFICIENCY: {energy_per_mile:.0f} kcal/mile vs team {team_efficiency:.0f} ({efficiency_ratio:.1f}x)")
+                    plan.append(f"Efficiency improvement: {avg_energy:.0f} kcal over {avg_distance:.1f}mi - Focus on anaerobic threshold work")
                 elif efficiency_ratio < 0.9:
-                    insights.append(f"✅ EFFICIENT MOVEMENT: {energy_per_mile:.0f} kcal/mile ({((1-efficiency_ratio)*100):.0f}% more efficient)")
+                    insights.append(f"EFFICIENT MOVEMENT: {energy_per_mile:.0f} kcal/mile ({((1-efficiency_ratio)*100):.0f}% more efficient)")
         
         # Impact analysis
         team_avg_impacts = recent_data['Impacts'].mean() if 'Impacts' in recent_data.columns else 0
         if total_impacts > 0 and team_avg_impacts > 0:
             impact_vs_team = avg_impacts / team_avg_impacts
             if impact_vs_team > 1.3:
-                insights.append(f"⚡ HIGH IMPACTS: {avg_impacts:.0f}/session vs team {team_avg_impacts:.0f} ({impact_vs_team:.1f}x)")
-                actions.append("🦵 Monitor legs: High impact load detected - prioritize recovery protocols")
-                plan.append(f"🔄 Impact management: Current {avg_impacts:.0f} impacts/session - Add 1 extra recovery day this week")
+                insights.append(f"HIGH IMPACTS: {avg_impacts:.0f}/session vs team {team_avg_impacts:.0f} ({impact_vs_team:.1f}x)")
+                actions.append("Monitor legs: High impact load detected - prioritize recovery protocols")
+                plan.append(f"Impact management: Current {avg_impacts:.0f} impacts/session - Add 1 extra recovery day this week")
             elif impact_vs_team < 0.7:
-                plan.append("⚪ Low impact exposure - may need more contact training")
+                plan.append("Low impact exposure - may need more contact training")
         
         # HR Load analysis
         if avg_hr_load > 0 and 'Hr Load' in recent_data.columns:
             hr_vs_team = (avg_hr_load / team_avg_hr) if team_avg_hr > 0 else 1
             if avg_hr_load > team_avg_hr * 1.3:
-                insights.append(f"❤️ HIGH HR STRESS: {avg_hr_load:.1f} vs team {team_avg_hr:.1f} ({hr_vs_team:.1f}x)")
-                plan.append(f"🫀 Cardiovascular stress high - Ensure 48h recovery between intense sessions")
+                insights.append(f"HIGH HR STRESS: {avg_hr_load:.1f} vs team {team_avg_hr:.1f} ({hr_vs_team:.1f}x)")
+                plan.append(f"Cardiovascular stress high - Ensure 48h recovery between intense sessions")
             elif avg_hr_load < team_avg_hr * 0.8:
-                plan.append(f"❤️ HR Capacity: {avg_hr_load:.1f} below team avg - Consider more high-intensity work")
+                plan.append(f"HR Capacity: {avg_hr_load:.1f} below team avg - Consider more high-intensity work")
         
         # Power analysis
         if avg_power > 0 and 'Power Score (w/kg)' in recent_data.columns:
@@ -913,15 +913,15 @@ def generate_intelligent_recommendations(player_name, player_data, recent_data):
             if avg_power < team_avg_power * 0.9:
                 plan.append(f"💥 Power development: {avg_power:.2f} w/kg vs {team_avg_power:.2f} - Add plyometric training 2x/week")
             elif avg_power >= team_avg_power * 1.1:
-                plan.append(f"✅ Power output: {avg_power:.2f} w/kg - Maintain with explosive training")
+                plan.append(f"Power output: {avg_power:.2f} w/kg - Maintain with explosive training")
         
         # Session frequency and volume
         sessions_count = len(player_data)
         if sessions_count >= 3:
-            avg_sessions_per_week = sessions_count / 2  # Assuming 2-week period
-            plan.append(f"📅 Training frequency: {avg_sessions_per_week:.1f} sessions/week detected")
+            avg_sessions_per_week = sessions_count / 2 # Assuming 2-week period
+            plan.append(f"Training frequency: {avg_sessions_per_week:.1f} sessions/week detected")
             if avg_sessions_per_week < 3:
-                plan.append("⚙️ OPTIMIZATION: Consider increasing to 4-5 sessions/week for better adaptation")
+                plan.append("OPTIMIZATION: Consider increasing to 4-5 sessions/week for better adaptation")
         
         recommendations['key_insights'] = insights
         recommendations['specific_actions'] = actions
@@ -961,14 +961,14 @@ def train_regression_model_fast(df, use_early_stopping=True, use_saved_model=Tru
     # Use early stopping if requested
     if use_early_stopping:
         model = GradientBoostingRegressor(
-            n_estimators=1000,  # Large number for early stopping
+            n_estimators=1000, # Large number for early stopping
             learning_rate=0.05,
             max_depth=4,
             subsample=0.8,
             min_samples_split=10,
             min_samples_leaf=4,
             validation_fraction=0.1,
-            n_iter_no_change=10,  # Stop if no improvement for 10 iterations
+            n_iter_no_change=10, # Stop if no improvement for 10 iterations
             tol=1e-4,
             random_state=42
         )
@@ -1313,11 +1313,11 @@ def format_player_data_for_context(df_clean, player_name=None):
         speed_zone_cols = [col for col in player_data.columns if 'Speed Zone' in col and 'Distance' in col]
         if speed_zone_cols:
             stats_summary.append(f"\nSpeed Zone Distribution:")
-            for zone_col in speed_zone_cols[:5]:  # First 5 zones
+            for zone_col in speed_zone_cols[:5]: # First 5 zones
                 try:
                     total_distance = player_data[zone_col].sum()
                     avg_distance = player_data[zone_col].mean()
-                    stats_summary.append(f"  {zone_col}: Total={total_distance:.2f} miles, Avg={avg_distance:.2f} miles")
+                    stats_summary.append(f"{zone_col}: Total={total_distance:.2f} miles, Avg={avg_distance:.2f} miles")
                 except:
                     continue
         
@@ -1373,7 +1373,7 @@ def is_ollama_reachable() -> bool:
         base_url = get_ollama_base_url()
         # Use longer timeout for cloud deployments (Render free tier can be slow)
         is_cloud = not base_url.startswith("http://127.0.0.1") and not base_url.startswith("http://localhost")
-        timeout = 60 if is_cloud else 2  # 60 seconds for cloud, 2 for local
+        timeout = 60 if is_cloud else 2 # 60 seconds for cloud, 2 for local
         requests.get(f"{base_url}/api/tags", timeout=timeout)
         return True
     except Exception:
@@ -1422,8 +1422,20 @@ def check_model_status(model="llama3.2"):
             models = models_data.get('models', [])
             model_names = [m.get('name', '') for m in models]
             
-            # Check if our model is in the list
+            # Check if our model is in the list (support both "llama3.2" and "llama3.2:latest")
             model_found = model in model_names
+            # Also check if model with :latest suffix exists when searching without it
+            if not model_found and ':' not in model:
+                model_with_latest = f"{model}:latest"
+                if model_with_latest in model_names:
+                    model_found = True
+                    model = model_with_latest  # Use the full name with :latest
+            # Also check if model without :latest exists when searching with it
+            elif not model_found and model.endswith(':latest'):
+                base_model = model.replace(':latest', '')
+                if base_model in model_names:
+                    model_found = True
+                    model = base_model  # Use the base name without :latest
             
             if model_found:
                 # Get model details
@@ -1434,7 +1446,7 @@ def check_model_status(model="llama3.2"):
                 return {
                     "available": True,
                     "status": "installed",
-                    "message": f"✅ Model '{model}' is installed and ready",
+                    "message": f" Model '{model}' is installed and ready",
                     "models": model_names,
                     "size_mb": size_mb
                 }
@@ -1443,7 +1455,7 @@ def check_model_status(model="llama3.2"):
                 return {
                     "available": False,
                     "status": "missing",
-                    "message": f"⚠️ Model '{model}' is not installed. Available models: {', '.join(model_names[:3]) if model_names else 'None'}",
+                    "message": f" Model '{model}' is not installed. Available models: {', '.join(model_names[:3]) if model_names else 'None'}",
                     "models": model_names,
                     "download_available": True
                 }
@@ -1489,13 +1501,13 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
         if progress_container:
             progress_bar = progress_container.progress(0)
             status_text = progress_container.empty()
-            status_text.info("🔄 Initiating model download...")
+            status_text.info(" Initiating model download...")
             progress_bar.progress(0.05)
         
         # Wake up server first (especially important for free tier Render)
         if is_cloud:
             if status_text:
-                status_text.info("⏳ Connecting to server...")
+                status_text.info(" Connecting to server...")
                 progress_bar.progress(0.08) if progress_bar else None
             
             # Try to wake up the server with a simple health check
@@ -1519,7 +1531,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
             download_initiated = False
             try:
                 if status_text:
-                    status_text.info("🔄 Starting download...")
+                    status_text.info(" Starting download...")
                     progress_bar.progress(0.15) if progress_bar else None
                 
                 # Use longer timeout for cloud services
@@ -1528,7 +1540,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                 response = requests.post(
                     pull_url,
                     json={"name": model},
-                    timeout=download_timeout  # Much longer timeout for cloud services
+                    timeout=download_timeout # Much longer timeout for cloud services
                 )
                 
                 if response.status_code in [200, 201]:
@@ -1551,16 +1563,16 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                             if model in check_names:
                                 if status_text:
                                     progress_bar.progress(1.0) if progress_bar else None
-                                    status_text.success(f"✅ Model '{model}' is already available!")
+                                    status_text.success(f" Model '{model}' is already available!")
                                 return True, f"Model '{model}' is already available!"
                     except:
                         pass
             except (requests.exceptions.Timeout, requests.exceptions.ReadTimeout) as timeout_err:
                 # Timeout is OK - the download may still have started (especially for free tier Render)
-                download_initiated = True  # Assume it started
+                download_initiated = True # Assume it started
                 if status_text:
                     progress_bar.progress(0.2) if progress_bar else None
-                    status_text.warning("⏳ Timeout (normal for free tier). Download may have started. Wait 1-2 min then click 'Check Model Status'.")
+                    status_text.warning(" Timeout (normal for free tier). Download may have started. Wait 1-2 min then click 'Check Model Status'.")
                 
                 # Give it one more check after a short wait
                 time.sleep(5)
@@ -1572,7 +1584,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                         if model in final_names:
                             if status_text:
                                 progress_bar.progress(1.0) if progress_bar else None
-                                status_text.success(f"✅ Model '{model}' is available!")
+                                status_text.success(f" Model '{model}' is available!")
                             return True, f"Model '{model}' is available!"
                 except:
                     pass
@@ -1580,7 +1592,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
             except requests.exceptions.ConnectionError:
                 if status_text:
                     progress_bar.progress(0.5) if progress_bar else None
-                    status_text.error("❌ Cannot connect to server. Wait 30-60 sec (free tier) then try again.")
+                    status_text.error(" Cannot connect to server. Wait 30-60 sec (free tier) then try again.")
                 return False, "Cannot connect to server. Wait 30-60 seconds (free tier) then try again."
             except Exception as e:
                 error_msg = str(e)
@@ -1589,11 +1601,11 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                     download_initiated = True
                     if status_text:
                         progress_bar.progress(0.2) if progress_bar else None
-                        status_text.warning("⏳ Timeout (normal for free tier). Download may have started. Wait 1-2 min then check status.")
+                        status_text.warning(" Timeout (normal for free tier). Download may have started. Wait 1-2 min then check status.")
                 else:
                     if status_text:
                         progress_bar.progress(0.3) if progress_bar else None
-                        status_text.warning(f"⚠️ Error: {error_msg[:80]}...")
+                        status_text.warning(f" Error: {error_msg[:80]}...")
                     return False, f"Error: {error_msg[:100]}. Download may still have started - check status."
             
             # Monitor progress with polling (progress_bar and status_text already initialized above)
@@ -1604,11 +1616,11 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                 
                 # Poll for progress (every 5 seconds, up to 15 checks = ~75 seconds)
                 # After that, inform user to check manually (download continues in background)
-                max_polls = 15  # 15 * 5 = 75 seconds of active monitoring
+                max_polls = 15 # 15 * 5 = 75 seconds of active monitoring
                 poll_count = 0
                 
                 while poll_count < max_polls:
-                    time.sleep(5)  # Wait 5 seconds between checks
+                    time.sleep(5) # Wait 5 seconds between checks
                     poll_count += 1
                     
                     try:
@@ -1621,7 +1633,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                             if model in check_names:
                                 # Success!
                                 progress_bar.progress(1.0)
-                                status_text.success(f"✅ Model '{model}' is now available!")
+                                status_text.success(f" Model '{model}' is now available!")
                                 return True, f"Model '{model}' downloaded successfully!"
                             else:
                                 # Still downloading - update progress estimate
@@ -1629,7 +1641,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                                 estimated_progress = min(0.2 + (poll_count / max_polls) * 0.15, 0.35)
                                 progress_bar.progress(estimated_progress)
                                 elapsed_sec = poll_count * 5
-                                if poll_count % 3 == 0:  # Update every 15 seconds
+                                if poll_count % 3 == 0: # Update every 15 seconds
                                     status_text.info(f"📥 Downloading... ({elapsed_sec}s / ~5-10 min)")
                         else:
                             # Server issue, but continue checking
@@ -1640,7 +1652,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                         # Network issue, but continue
                         estimated_progress = min(0.15 + (poll_count / max_polls) * 0.20, 0.35)
                         progress_bar.progress(estimated_progress)
-                        if poll_count % 3 == 0:  # Show update every 15 seconds
+                        if poll_count % 3 == 0: # Show update every 15 seconds
                             status_text.warning(f"Checking download status... ({poll_count}/{max_polls} checks)")
                     
                     # Update progress bar every iteration to show activity
@@ -1648,7 +1660,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                     progress_bar.progress(estimated)
                 
                 # Final check after monitoring period
-                status_text.info("⏳ Monitoring complete. Checking final status...")
+                status_text.info(" Monitoring complete. Checking final status...")
                 progress_bar.progress(0.4)
                 
                 final_check = requests.get(f"{base_url}/api/tags", timeout=15)
@@ -1657,18 +1669,18 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                     final_names = [m.get('name', '') for m in final_models]
                     if model in final_names:
                         progress_bar.progress(1.0)
-                        status_text.success(f"✅ Model '{model}' is now available!")
+                        status_text.success(f" Model '{model}' is now available!")
                         return True, f"Model '{model}' downloaded successfully!"
                     else:
                         progress_bar.progress(0.5)
                         status_text.success("""
-                        ⏳ **Download is running in the background**
+                        **Download is running in the background**
                         
                         The model download has been initiated and continues even after monitoring stops.
                         
                         **What to do now:**
                         1. Wait 5-10 minutes for the download to complete (~2GB)
-                        2. Click '🔄 Check Model Status' periodically to verify
+                        2. Click ' Check Model Status' periodically to verify
                         3. The download continues even if you navigate away
                         
                         **Note:** This is normal behavior - large downloads take time, especially on free tier services.
@@ -1676,7 +1688,7 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                         return False, "Download in progress. Check status in 5-10 minutes."
                 else:
                     progress_bar.progress(0.4)
-                    status_text.warning("⏳ Download initiated. Use 'Check Model Status' to verify progress.")
+                    status_text.warning(" Download initiated. Use 'Check Model Status' to verify progress.")
                     return False, "Download started. Please check status in a few minutes."
                     
             else:
@@ -1707,7 +1719,7 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
         # Health check to ensure Ollama server is responsive
         base_url = get_ollama_base_url()
         is_cloud = not base_url.startswith("http://127.0.0.1") and not base_url.startswith("http://localhost")
-        health_timeout = 60 if is_cloud else 2  # Longer timeout for cloud services
+        health_timeout = 60 if is_cloud else 2 # Longer timeout for cloud services
         
         try:
             health_response = requests.get(f"{base_url}/api/tags", timeout=health_timeout)
@@ -1716,7 +1728,9 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
                 try:
                     models = health_response.json().get('models', [])
                     model_names = [m.get('name', '') for m in models]
-                    if model and model not in model_names:
+                    # Check if model exists with or without :latest suffix
+                    model_exists = model in model_names or (f"{model}:latest" in model_names if ':' not in model else model.replace(':latest', '') in model_names)
+                    if model and not model_exists:
                         # Model not found - try to download it automatically
                         logging.info(f"Model '{model}' not found, attempting to download...")
                         try:
@@ -1725,11 +1739,11 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
                             pull_response = requests.post(
                                 f"{base_url}/api/pull",
                                 json={"name": model},
-                                timeout=10  # Short timeout just to initiate the download
+                                timeout=10 # Short timeout just to initiate the download
                             )
                             if pull_response.status_code in [200, 201]:
                                 logging.info(f"Successfully initiated download of model '{model}'")
-                                return f"⏳ Model '{model}' download has been initiated (this may take 5-10 minutes).\n\n💡 **What to do:**\n1. Wait 5-10 minutes for the download to complete\n2. Check the '🔄 Check Model Status' button above to see progress\n3. Try your question again after a few minutes\n\n📊 You can also check download progress in Render logs: https://dashboard.render.com"
+                                return f" Model '{model}' download has been initiated (this may take 5-10 minutes).\n\n **What to do:**\n1. Wait 5-10 minutes for the download to complete\n2. Check the ' Check Model Status' button above to see progress\n3. Try your question again after a few minutes\n\n You can also check download progress in Render logs: https://dashboard.render.com"
                             else:
                                 # If pull fails immediately, try to check status again
                                 try:
@@ -1742,7 +1756,7 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
                                         recheck_names = [m.get('name', '') for m in recheck_models]
                                         if model in recheck_names:
                                             # Model appeared! Continue with the request
-                                            pass  # Will fall through to continue processing
+                                            pass # Will fall through to continue processing
                                         else:
                                             return f"Model '{model}' download may be in progress. Status code: {pull_response.status_code}. Please wait 5-10 minutes and try again, or check Render logs."
                                     else:
@@ -1751,7 +1765,7 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
                                     return f"Model '{model}' download initiated. Please wait 5-10 minutes and try again. Status: {pull_response.status_code}"
                         except requests.exceptions.Timeout:
                             # Timeout is OK - download may have started
-                            return f"⏳ Model '{model}' download initiated (timeout is normal - download continues in background).\n\nPlease wait 5-10 minutes, then:\n1. Click '🔄 Check Model Status' above to verify\n2. Try your question again\n\n📊 Check progress: https://dashboard.render.com → ollama-server → Logs"
+                            return f" Model '{model}' download initiated (timeout is normal - download continues in background).\n\nPlease wait 5-10 minutes, then:\n1. Click ' Check Model Status' above to verify\n2. Try your question again\n\n Check progress: https://dashboard.render.com → ollama-server → Logs"
                         except Exception as pull_error:
                             logging.warning(f"Failed to auto-download model: {str(pull_error)}")
                             # Check one more time if model magically appeared
@@ -1764,11 +1778,11 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
                                         # Model is there! Continue
                                         pass
                                     else:
-                                        return f"⚠️ Model '{model}' download error: {str(pull_error)}. The download may still be in progress. Please wait 5-10 minutes and try again. Check Render logs for details."
+                                        return f" Model '{model}' download error: {str(pull_error)}. The download may still be in progress. Please wait 5-10 minutes and try again. Check Render logs for details."
                             except:
-                                return f"⚠️ Model '{model}' download issue: {str(pull_error)}. Please wait a few minutes and try again, or check Render logs."
+                                return f" Model '{model}' download issue: {str(pull_error)}. Please wait a few minutes and try again, or check Render logs."
                 except:
-                    pass  # If parsing fails, continue anyway
+                    pass # If parsing fails, continue anyway
         except requests.exceptions.Timeout:
             return f"Ollama server at {base_url} is taking too long to respond. This is normal for free tier Render services (they spin down after inactivity). Please wait 30-60 seconds and try again."
         except Exception as e:
@@ -1809,14 +1823,24 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
         # Optimized direct call - allow longer responses (2000+ characters)
         # The ollama library automatically uses OLLAMA_HOST environment variable
         try:
-            # Use llama3.2 with increased token limit for detailed responses
+            # Detect available model name (support both llama3.2 and llama3.2:latest)
+            actual_model = model
+            if model_names:
+                if model in model_names:
+                    actual_model = model
+                elif f"{model}:latest" in model_names:
+                    actual_model = f"{model}:latest"
+                elif model.endswith(":latest") and model.replace(":latest", "") in model_names:
+                    actual_model = model.replace(":latest", "")
+            
+            # Use detected model with increased token limit for detailed responses
             # Note: ollama library handles timeouts internally, but cloud services may need patience
             resp = ollama.chat(
-                model="llama3.2",
+                model=actual_model,
                 messages=messages,
                 options={
                     'temperature': 0.7, 
-                    'num_predict': 512,  # Reduced for faster responses on cloud
+                    'num_predict': 512, # Reduced for faster responses on cloud
                     'top_k': 40,
                     'top_p': 0.9,
                     'repeat_penalty': 1.1
@@ -1835,10 +1859,11 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
             
             # Quick fallback - try with simpler message
             try:
+                # Use the same detected model name
                 resp = ollama.chat(
-                    model="llama3.2",
-                    messages=[messages[-1]],  # Just last message, no history for speed
-                    options={'num_predict': 256}  # Even shorter for fallback
+                    model=actual_model,
+                    messages=[messages[-1]], # Just last message, no history for speed
+                    options={'num_predict': 256} # Even shorter for fallback
                 )
                 if resp and 'message' in resp and 'content' in resp['message']:
                     return resp['message']['content'].strip()
@@ -2110,7 +2135,7 @@ if page == "Dashboard":
         
         # Alert Box for High Risk Players
         if st.session_state.classification_model is not None:
-            st.markdown("### 🚨 Injury Risk Overview")
+            st.markdown("### Injury Risk Overview")
             
             try:
                 df_clean = limpiar_datos_classification(df)
@@ -2150,9 +2175,9 @@ if page == "Dashboard":
                                     if mean_val <= 0.40:
                                         return 'Low'
                                     # Otherwise, use maximum risk to classify
-                                    elif max_val >= 2.0:  # High risk class
+                                    elif max_val >= 2.0: # High risk class
                                         return 'High'
-                                    elif max_val >= 1.0:  # Medium risk class
+                                    elif max_val >= 1.0: # Medium risk class
                                         return 'Medium'
                                     else:
                                         return 'Low'
@@ -2167,7 +2192,7 @@ if page == "Dashboard":
                                 with col1:
                                     st.markdown(f"""
                                     <div class="risk-card risk-card-high">
-                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🚨</div>
+                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;"></div>
                                         <h3 style='color:#DC3545; margin:0; font-size: 2.5rem; font-weight: 700;'>{high_risk_count}</h3>
                                         <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>High Risk Players</p>
                                         <span class="badge badge-danger">Attention Required</span>
@@ -2177,7 +2202,7 @@ if page == "Dashboard":
                                 with col2:
                                     st.markdown(f"""
                                     <div class="risk-card risk-card-medium">
-                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">⚡</div>
+                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;"></div>
                                         <h3 style='color:#FFC107; margin:0; font-size: 2.5rem; font-weight: 700;'>{medium_risk_count}</h3>
                                         <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>Medium Risk</p>
                                         <span class="badge badge-warning">Monitor</span>
@@ -2187,7 +2212,7 @@ if page == "Dashboard":
                                 with col3:
                                     st.markdown(f"""
                                     <div class="risk-card risk-card-low">
-                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">✅</div>
+                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;"></div>
                                         <h3 style='color:#28A745; margin:0; font-size: 2.5rem; font-weight: 700;'>{low_risk_count}</h3>
                                         <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>Low Risk</p>
                                         <span class="badge badge-success">Healthy</span>
@@ -2198,13 +2223,13 @@ if page == "Dashboard":
                                     high_risk_players = player_risk[player_risk['Risk_Category'] == 'High']['Player Name'].tolist()
                                     st.markdown(f"""
                                     <div class="danger-box">
-                                    <h4>⚠️ URGENT: {high_risk_count} High Risk Players Detected</h4>
+                                    <h4> URGENT: {high_risk_count} High Risk Players Detected</h4>
                                     <p><b>Players:</b> {', '.join(high_risk_players)}</p>
-                                    <p>Please visit the <b>🛡️ Injury Prevention</b> section for detailed analysis and recommendations.</p>
+                                    <p>Please visit the <b> Injury Prevention</b> section for detailed analysis and recommendations.</p>
                                     </div>
                                     """, unsafe_allow_html=True)
                                     
-                                    if st.button("🔍 View Detailed Analysis", type="primary"):
+                                    if st.button(" View Detailed Analysis", type="primary"):
                                         st.session_state.page_from_dashboard = "Injury Prevention"
                                         st.rerun()
                                 
@@ -2246,7 +2271,7 @@ elif page == "Data Audit":
         
         st.markdown(f"""
         <div class="success-box">
-            <h4 style="margin: 0 0 0.5rem 0;">✅ Dataset Successfully Loaded</h4>
+            <h4 style="margin: 0 0 0.5rem 0;"> Dataset Successfully Loaded</h4>
             <p style="margin: 0;"><strong>{df.shape[0]:,}</strong> rows • <strong>{df.shape[1]}</strong> columns</p>
         </div>
         """, unsafe_allow_html=True)
@@ -2288,7 +2313,7 @@ elif page == "Data Audit":
         with col2:
             st.markdown(f"""
             <div class="metric-card-enhanced" style="text-align: center;">
-                <div style="font-size: 2rem; color: #43A047; margin-bottom: 0.5rem;">📊</div>
+                <div style="font-size: 2rem; color: #43A047; margin-bottom: 0.5rem;"></div>
                 <div style="font-size: 1.75rem; font-weight: 700; color: #212529;">{df.shape[0]:,}</div>
                 <div style="font-size: 0.85rem; color: #6C757D;">Total Sessions</div>
             </div>
@@ -2296,16 +2321,16 @@ elif page == "Data Audit":
         with col3:
             st.markdown(f"""
             <div class="metric-card-enhanced" style="text-align: center;">
-                <div style="font-size: 2rem; color: #667eea; margin-bottom: 0.5rem;">📈</div>
+                <div style="font-size: 2rem; color: #667eea; margin-bottom: 0.5rem;"></div>
                 <div style="font-size: 1.75rem; font-weight: 700; color: #212529;">{df.shape[1]}</div>
                 <div style="font-size: 0.85rem; color: #6C757D;">Features</div>
             </div>
             """, unsafe_allow_html=True)
         
-        st.markdown("### 📋 Dataset Preview")
+        st.markdown("### Dataset Preview")
         st.dataframe(df.head(10), use_container_width=True, height=400)
         
-        st.markdown("### 📊 Data Quality Report")
+        st.markdown("### Data Quality Report")
         
         numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
         cat_cols = df.select_dtypes(include=['object']).columns.tolist()
@@ -2314,7 +2339,7 @@ elif page == "Data Audit":
         with col1:
             st.markdown(f"""
             <div class="info-box">
-                <strong>📊 Numeric Variables:</strong> <span class="badge badge-info">{len(numeric_cols)}</span>
+                <strong> Numeric Variables:</strong> <span class="badge badge-info">{len(numeric_cols)}</span>
             </div>
             <div class="info-box">
                 <strong>📝 Categorical Variables:</strong> <span class="badge badge-info">{len(cat_cols)}</span>
@@ -2326,18 +2351,18 @@ elif page == "Data Audit":
             if nulls.sum() > 0:
                 st.markdown(f"""
                 <div class="warning-box">
-                    <strong>⚠️ Missing Values:</strong> <span class="badge badge-warning">{nulls.sum():,} total</span>
+                    <strong> Missing Values:</strong> <span class="badge badge-warning">{nulls.sum():,} total</span>
                 </div>
                 """, unsafe_allow_html=True)
             else:
                 st.markdown("""
                 <div class="success-box">
-                    <strong>✅ No Missing Values</strong> <span class="badge badge-success">Perfect</span>
+                    <strong> No Missing Values</strong> <span class="badge badge-success">Perfect</span>
                 </div>
                 """, unsafe_allow_html=True)
         
         if 'Player Load' in df.columns:
-            st.markdown("### 📈 Player Load Distribution")
+            st.markdown("### Player Load Distribution")
             fig, ax = plt.subplots(figsize=(10, 4))
             sns.histplot(df['Player Load'], kde=True, color='#1E88E5', ax=ax)
             ax.set_title('Player Load Distribution', fontsize=14, fontweight='bold')
@@ -2369,10 +2394,10 @@ elif page == "Data Audit":
                     critical_cols = [col for col in numeric_cols if any(metric in col for metric in critical_metrics)]
                     
                     if not critical_cols:
-                        critical_cols = numeric_cols[:5]  # Use first 5 if no critical metrics found
+                        critical_cols = numeric_cols[:5] # Use first 5 if no critical metrics found
                     
-                    outlier_scores = pd.Series([0] * len(df_clean))  # Track how many columns flag a row as outlier
-                    zero_counts = pd.Series([0] * len(df_clean))     # Track how many critical metrics are zero per row
+                    outlier_scores = pd.Series([0] * len(df_clean)) # Track how many columns flag a row as outlier
+                    zero_counts = pd.Series([0] * len(df_clean)) # Track how many critical metrics are zero per row
                     
                     for col in critical_cols:
                         if col in df_clean.columns:
@@ -2382,17 +2407,17 @@ elif page == "Data Audit":
                                 
                                 # Method 1: Z-score - only VERY extreme outliers (beyond 4 standard deviations)
                                 col_data = df_clean[col].fillna(df_clean[col].median())
-                                if col_data.std() > 0:  # Avoid division by zero
+                                if col_data.std() > 0: # Avoid division by zero
                                     z_scores = np.abs(stats.zscore(col_data))
-                                    extreme_outliers = z_scores > 4.5  # Very conservative - only extreme outliers
+                                    extreme_outliers = z_scores > 4.5 # Very conservative - only extreme outliers
                                     outlier_scores += extreme_outliers.astype(int)
                                 
                                 # Method 2: IQR - only remove if beyond 4.5 * IQR (very conservative)
                                 Q1 = df_clean[col].quantile(0.25)
                                 Q3 = df_clean[col].quantile(0.75)
                                 IQR = Q3 - Q1
-                                if IQR > 0:  # Avoid division by zero
-                                    lower_bound = Q1 - 4.5 * IQR  # Very conservative
+                                if IQR > 0: # Avoid division by zero
+                                    lower_bound = Q1 - 4.5 * IQR # Very conservative
                                     upper_bound = Q3 + 4.5 * IQR
                                     iqr_extreme = ((df_clean[col] < lower_bound) | (df_clean[col] > upper_bound)).astype(int)
                                     outlier_scores += iqr_extreme
@@ -2417,7 +2442,7 @@ elif page == "Data Audit":
                     rows_removed = rows_before - len(df_clean)
                     
                     if rows_removed > 0:
-                        st.session_state.df = df_clean  # Update main dataframe
+                        st.session_state.df = df_clean # Update main dataframe
                         st.session_state.df_clean = df_clean
                         
                         st.success(f"Data cleaned successfully! Removed {rows_removed} extreme outlier rows ({rows_removed/rows_before*100:.1f}% of data).")
@@ -2437,11 +2462,11 @@ elif page == "Model Training":
     st.markdown('<h1 class="main-header">Advanced Model Training</h1>', unsafe_allow_html=True)
     
     if st.session_state.df is None:
-        st.warning("⚠️ Please upload data in the Data Audit section first.")
+        st.warning(" Please upload data in the Data Audit section first.")
     else:
         df = st.session_state.df
         
-        tab1, tab2 = st.tabs(["⚽ Player Load Prediction (Regression)", "🛡️ Injury Risk Classification"])
+        tab1, tab2 = st.tabs([" Player Load Prediction (Regression)", " Injury Risk Classification"])
         
         with tab1:
             st.markdown("### Train Player Load Prediction Model")
@@ -2452,9 +2477,9 @@ elif page == "Model Training":
                     model, metrics, features = train_regression_model_fast(df)
                     st.session_state.regression_model = model
                     
-                    st.success("✅ Model trained successfully!")
+                    st.success(" Model trained successfully!")
                     
-                    st.markdown("### 📊 Train vs Test Performance")
+                    st.markdown("### Train vs Test Performance")
                     
                     col1, col2 = st.columns(2)
                     train_r2 = metrics['train']['R2']
@@ -2518,19 +2543,19 @@ elif page == "Model Training":
                     diff = abs(train_r2 - test_r2)
                     st.metric("Generalization gap (|Train-Test|)", f"{diff:.4f}", delta=f"{(test_r2-train_r2):+.4f}")
                     if diff > 0.15:
-                        st.warning(f"⚠️ **Warning:** Potential overfitting! Train R² ({train_r2:.4f}) vs Test R² ({test_r2:.4f}) gap: {diff:.4f}")
+                        st.warning(f" **Warning:** Potential overfitting! Train R² ({train_r2:.4f}) vs Test R² ({test_r2:.4f}) gap: {diff:.4f}")
                     elif diff > 0.10:
-                        st.info(f"⚠️ **Moderate overfitting:** Gap: {diff:.4f}")
+                        st.info(f" **Moderate overfitting:** Gap: {diff:.4f}")
                     else:
-                        st.success(f"✅ **No overfitting!** Gap: {diff:.4f}")
+                        st.success(f" **No overfitting!** Gap: {diff:.4f}")
                     
                     # Balloons: celebrate either excellent test R² or very small gap with solid performance
                     if (metrics['test']['R2'] >= 0.90) or (diff <= 0.05 and metrics['test']['R2'] >= 0.80):
                         st.balloons()
-                        st.markdown('<div class="success-box">🎯 <b>Great Performance!</b> Strong generalization and high R²</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="success-box"> <b>Great Performance!</b> Strong generalization and high R²</div>', unsafe_allow_html=True)
                     
                     # Visualize overfitting with Plotly
-                    st.markdown("### 📊 Overfitting Visualization")
+                    st.markdown("### Overfitting Visualization")
                     fig_overfitting = plot_overfitting_metrics(metrics)
                     if fig_overfitting:
                         st.plotly_chart(fig_overfitting, use_container_width=True)
@@ -2559,7 +2584,7 @@ elif page == "Model Training":
                                 st.warning(f"SHAP analysis failed: {e}")
                     
                     # Feature importance visualization
-                    st.markdown("### 🔍 Feature Importance")
+                    st.markdown("### Feature Importance")
                     importance_df = plot_feature_importance(model, features)
                     if importance_df is not None and len(importance_df) > 0:
                         st.dataframe(importance_df, use_container_width=True)
@@ -2584,7 +2609,7 @@ elif page == "Model Training":
                     
                     # MLflow tracking status
                     if MLFLOW_AVAILABLE:
-                        st.success("✅ Model logged to MLflow for versioning and tracking")
+                        st.success(" Model logged to MLflow for versioning and tracking")
                     
                     st.markdown(f"**Features used:** {len(features)}")
                     with st.expander("View all features"):
@@ -2606,13 +2631,13 @@ elif page == "Model Training":
                     model, metrics, features = train_classification_model_fast(df)
                     st.session_state.classification_model = model
                     
-                    st.success("✅ Model trained successfully!")
+                    st.success(" Model trained successfully!")
                     
                     # Check for overfitting
                     train_acc = metrics['train']['Accuracy']
                     test_acc = metrics['test']['Accuracy']
                     
-                    st.markdown("### 📊 Train vs Test Performance")
+                    st.markdown("### Train vs Test Performance")
                     
                     # Create tabs for different metrics
                     metric_type = st.radio("Select Metric", ["Accuracy", "Precision", "Recall", "F1 Score"])
@@ -2636,15 +2661,15 @@ elif page == "Model Training":
                     # Overfitting warning
                     acc_diff = abs(train_acc - test_acc)
                     if acc_diff > 0.15:
-                        st.warning(f"⚠️ **Warning:** Potential overfitting! Train Acc ({train_acc:.4f}) vs Test Acc ({test_acc:.4f}) gap: {acc_diff:.4f}")
+                        st.warning(f" **Warning:** Potential overfitting! Train Acc ({train_acc:.4f}) vs Test Acc ({test_acc:.4f}) gap: {acc_diff:.4f}")
                     elif acc_diff > 0.10:
-                        st.info(f"⚠️ **Moderate overfitting:** Gap: {acc_diff:.4f}")
+                        st.info(f" **Moderate overfitting:** Gap: {acc_diff:.4f}")
                     else:
-                        st.success(f"✅ **No overfitting!** Gap: {acc_diff:.4f}")
+                        st.success(f" **No overfitting!** Gap: {acc_diff:.4f}")
                     
                     if metrics['test']['Accuracy'] >= 0.90:
                         st.balloons()
-                        st.markdown('<div class="success-box">🎯 <b>Excellent Performance!</b> Test Accuracy exceeds 0.90 threshold</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="success-box"> <b>Excellent Performance!</b> Test Accuracy exceeds 0.90 threshold</div>', unsafe_allow_html=True)
                     
                     st.markdown(f"**Features used:** {len(features)}")
                     with st.expander("View all features"):
@@ -2654,7 +2679,7 @@ elif page == "Player Load Analysis":
     st.markdown('<h1 class="main-header">Player Load Analysis</h1>', unsafe_allow_html=True)
     
     if st.session_state.df is None:
-        st.warning("⚠️ Please upload data in the Data Audit section first.")
+        st.warning(" Please upload data in the Data Audit section first.")
     else:
         df = st.session_state.df
         
@@ -2664,9 +2689,9 @@ elif page == "Player Load Analysis":
                 st.session_state.excluded_players = []
             
             # Player exclusion panel
-            with st.expander("⚙️ Player Management - Exclude Players from Analysis", expanded=False):
-                st.markdown("#### 🗑️ Select players to exclude from analysis")
-                st.info("💡 **Tip:** Exclude players who are no longer training, injured, or not part of current analysis")
+            with st.expander(" Player Management - Exclude Players from Analysis", expanded=False):
+                st.markdown("#### Select players to exclude from analysis")
+                st.info(" **Tip:** Exclude players who are no longer training, injured, or not part of current analysis")
                 
                 # Get list of all unique players
                 all_players = sorted(df['Player Name'].unique())
@@ -2688,7 +2713,7 @@ elif page == "Player Load Analysis":
                         st.session_state.excluded_players = players_to_exclude
                 
                 with col_right:
-                    st.markdown("#### 📊 Current Status")
+                    st.markdown("#### Current Status")
                     st.metric("Total Players", len(all_players))
                     st.metric("Excluded Players", len(st.session_state.excluded_players))
                     st.metric("Active Players", len(all_players) - len(st.session_state.excluded_players))
@@ -2697,17 +2722,17 @@ elif page == "Player Load Analysis":
                 if st.session_state.excluded_players:
                     st.markdown("**Currently excluded players:**")
                     for player in st.session_state.excluded_players:
-                        st.write(f"  • {player}")
+                        st.write(f" • {player}")
                     
                     # Button to clear all exclusions
-                    if st.button("🔄 Clear All Exclusions", type="secondary"):
+                    if st.button(" Clear All Exclusions", type="secondary"):
                         st.session_state.excluded_players = []
                         st.rerun()
             
             # Filter dataframe to exclude selected players
             if st.session_state.excluded_players:
                 df = df[~df['Player Name'].isin(st.session_state.excluded_players)]
-                st.info(f"📋 Analysis showing {len(df['Player Name'].unique())} active players (excluding {len(st.session_state.excluded_players)} players)")
+                st.info(f" Analysis showing {len(df['Player Name'].unique())} active players (excluding {len(st.session_state.excluded_players)} players)")
             
             st.markdown("---")
             # Separate training and matches
@@ -2718,12 +2743,12 @@ elif page == "Player Load Analysis":
             else:
                 df['Session Type'] = 'Training'
             
-            st.markdown("### 🏃 Average Player Load by Player")
+            st.markdown("### Average Player Load by Player")
             
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("#### 🏋️ Training Sessions")
+                st.markdown("#### 🏋 Training Sessions")
                 training_data = df[df['Session Type'] == 'Training'].groupby('Player Name')['Player Load'].mean().sort_values(ascending=False)
                 st.dataframe(training_data.head(10).reset_index().rename(columns={'Player Load': 'Avg Player Load'}), use_container_width=True)
                 
@@ -2734,7 +2759,7 @@ elif page == "Player Load Analysis":
                 st.pyplot(fig)
             
             with col2:
-                st.markdown("#### ⚽ Match Sessions")
+                st.markdown("#### Match Sessions")
                 match_data = df[df['Session Type'] == 'Match'].groupby('Player Name')['Player Load'].mean().sort_values(ascending=False)
                 
                 if len(match_data) > 0:
@@ -2748,14 +2773,14 @@ elif page == "Player Load Analysis":
                 else:
                     st.info("No match data available")
             
-            st.markdown("### 💡 Professional Recommendations for Coach")
+            st.markdown("### Professional Recommendations for Coach")
             
             top_training = training_data.head(3).index.tolist()
             top_match = match_data.head(3).index.tolist() if len(match_data) > 0 else []
             
             st.markdown(f"""
             <div class="success-box">
-            <h4>🎯 High Performance Athletes (Training)</h4>
+            <h4> High Performance Athletes (Training)</h4>
             <p><b>Top 3 Players:</b> {', '.join(top_training)}</p>
             <ul>
                 <li>These players consistently show high work capacity during training</li>
@@ -2769,7 +2794,7 @@ elif page == "Player Load Analysis":
             if len(top_match) > 0:
                 st.markdown(f"""
                 <div class="success-box">
-                <h4>⚽ Match Day Performers</h4>
+                <h4> Match Day Performers</h4>
                 <p><b>Top 3 Players:</b> {', '.join(top_match)}</p>
                 <ul>
                     <li>These players excel under competitive pressure</li>
@@ -2784,7 +2809,7 @@ elif page == "Player Load Analysis":
             
             st.markdown(f"""
             <div class="warning-box">
-            <h4>⚠️ Development Focus Areas</h4>
+            <h4> Development Focus Areas</h4>
             <p><b>Bottom 3 Players:</b> {', '.join(bottom_training)}</p>
             <ul>
                 <li>May benefit from individualized conditioning programs</li>
@@ -2799,9 +2824,9 @@ elif page == "Injury Prevention":
     st.markdown('<h1 class="main-header">Injury Risk Prevention System</h1>', unsafe_allow_html=True)
     
     if st.session_state.df is None:
-        st.warning("⚠️ Please upload data in the Data Audit section first.")
+        st.warning(" Please upload data in the Data Audit section first.")
     elif st.session_state.classification_model is None:
-        st.warning("⚠️ Please train the classification model first in Model Training section.")
+        st.warning(" Please train the classification model first in Model Training section.")
     else:
         df = st.session_state.df
         df_clean = limpiar_datos_classification(df)
@@ -2811,9 +2836,9 @@ elif page == "Injury Prevention":
             st.session_state.excluded_players_injury = []
         
         # Player exclusion panel
-        with st.expander("⚙️ Player Management - Exclude Players from Analysis", expanded=False):
-            st.markdown("#### 🗑️ Select players to exclude from risk analysis")
-            st.info("💡 **Tip:** Exclude players who are no longer training, injured, or not part of current analysis")
+        with st.expander(" Player Management - Exclude Players from Analysis", expanded=False):
+            st.markdown("#### Select players to exclude from risk analysis")
+            st.info(" **Tip:** Exclude players who are no longer training, injured, or not part of current analysis")
             
             # Get list of all unique players
             all_players = sorted(df_clean['Player Name'].unique()) if 'Player Name' in df_clean.columns else []
@@ -2836,7 +2861,7 @@ elif page == "Injury Prevention":
                         st.session_state.excluded_players_injury = players_to_exclude
                 
                 with col_right:
-                    st.markdown("#### 📊 Current Status")
+                    st.markdown("#### Current Status")
                     st.metric("Total Players", len(all_players))
                     st.metric("Excluded Players", len(st.session_state.excluded_players_injury))
                     st.metric("Active Players", len(all_players) - len(st.session_state.excluded_players_injury))
@@ -2845,17 +2870,17 @@ elif page == "Injury Prevention":
                 if st.session_state.excluded_players_injury:
                     st.markdown("**Currently excluded players:**")
                     for player in st.session_state.excluded_players_injury:
-                        st.write(f"  • {player}")
+                        st.write(f" • {player}")
                     
                     # Button to clear all exclusions
-                    if st.button("🔄 Clear All Exclusions", type="secondary"):
+                    if st.button(" Clear All Exclusions", type="secondary"):
                         st.session_state.excluded_players_injury = []
                         st.rerun()
                 
                 # Filter out excluded players
                 if st.session_state.excluded_players_injury:
                     df_clean = df_clean[~df_clean['Player Name'].isin(st.session_state.excluded_players_injury)]
-                    st.info(f"📋 Analysis showing {len(df_clean['Player Name'].unique())} active players")
+                    st.info(f" Analysis showing {len(df_clean['Player Name'].unique())} active players")
         
         # Get last 2 weeks of data
         if 'Date' in df_clean.columns:
@@ -2886,7 +2911,7 @@ elif page == "Injury Prevention":
                 
                 # If no recent data but we have valid dates, use last 30% or min 50 rows
                 if len(recent_data) == 0:
-                    st.warning("⚠️ No data in last 2 weeks, using most recent 30% instead")
+                    st.warning(" No data in last 2 weeks, using most recent 30% instead")
                     recent_data = df_clean.tail(max(50, int(len(df_clean) * 0.30)))
             else:
                 # No valid dates, use last portion of data
@@ -2897,10 +2922,10 @@ elif page == "Injury Prevention":
         
         # Final check - if still no data, use all available data
         if len(recent_data) == 0:
-            st.warning("⚠️ No recent data available, using all dataset")
+            st.warning(" No recent data available, using all dataset")
             recent_data = df_clean.copy()
         
-        st.info(f"📅 Analyzing {len(recent_data)} sessions (last 2 weeks)")
+        st.info(f" Analyzing {len(recent_data)} sessions (last 2 weeks)")
         
         # Calculate injury risk
         features = [
@@ -2915,14 +2940,14 @@ elif page == "Injury Prevention":
         
         # Check if we have enough features
         if len(features) == 0:
-            st.error("❌ **No required features found in dataset!**")
+            st.error(" **No required features found in dataset!**")
             st.stop()
         
         X_recent = recent_data[features]
         
         # Make sure we have data to predict
         if len(X_recent) == 0:
-            st.warning("⚠️ No data available for prediction. Please check your dataset.")
+            st.warning(" No data available for prediction. Please check your dataset.")
             st.stop()
         
         predictions = st.session_state.classification_model.predict(X_recent)
@@ -2941,9 +2966,9 @@ elif page == "Injury Prevention":
                 if mean_val <= 0.40:
                     return 'Low'
                 # Otherwise, use maximum risk to classify
-                elif max_val >= 2.0:  # High risk class
+                elif max_val >= 2.0: # High risk class
                     return 'High'
-                elif max_val >= 1.0:  # Medium risk class
+                elif max_val >= 1.0: # Medium risk class
                     return 'Medium'
                 else:
                     return 'Low'
@@ -2981,7 +3006,7 @@ elif page == "Injury Prevention":
                 </div>
                 """, unsafe_allow_html=True)
             
-            st.markdown("### 📋 Player Risk Assessment")
+            st.markdown("### Player Risk Assessment")
             
             # Export to Excel button
             col_export, col_space = st.columns([1, 5])
@@ -3010,7 +3035,7 @@ elif page == "Injury Prevention":
                             }
                             pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
                         
-                        st.success(f"✅ Exported to: {filename}")
+                        st.success(f" Exported to: {filename}")
                         st.info("📁 File saved in reports/ directory")
                         
                     except Exception as e:
@@ -3026,7 +3051,7 @@ elif page == "Injury Prevention":
             if len(high_risk_players) > 0:
                 st.markdown(f"""
                 <div class="danger-box">
-                <h4>🚨 URGENT: High Risk Players</h4>
+                <h4> URGENT: High Risk Players</h4>
                 <p><b>Players requiring immediate attention:</b> {', '.join(high_risk_players['Player Name'].tolist())}</p>
                 <h5>Immediate Actions Required:</h5>
                 <ul>
@@ -3045,7 +3070,7 @@ elif page == "Injury Prevention":
             if len(medium_risk_players) > 0:
                 st.markdown(f"""
                 <div class="warning-box">
-                <h4>⚠️ CAUTION: Medium Risk Players</h4>
+                <h4> CAUTION: Medium Risk Players</h4>
                 <p><b>Players requiring monitoring:</b> {', '.join(medium_risk_players['Player Name'].tolist())}</p>
                 <h5>Recommended Actions:</h5>
                 <ul>
@@ -3061,7 +3086,7 @@ elif page == "Injury Prevention":
             
             st.markdown("""
             <div class="success-box">
-            <h4>✅ General Injury Prevention Strategies</h4>
+            <h4> General Injury Prevention Strategies</h4>
             <ul>
                 <li><b>Periodization:</b> Implement proper training load periodization (hard days followed by easy days)</li>
                 <li><b>Acute:Chronic Workload Ratio:</b> Maintain ratio between 0.8-1.3 to minimize injury risk</li>
@@ -3076,12 +3101,12 @@ elif page == "Injury Prevention":
             
             # ==================== PERSONALIZED PLAYER RECOMMENDATIONS ====================
             st.markdown("---")
-            st.markdown("### 🎯 Personalized Player Analysis & Recommendations")
+            st.markdown("### Personalized Player Analysis & Recommendations")
             
             if 'Player Name' in recent_data.columns:
                 # Select player for detailed analysis
                 selected_player = st.selectbox(
-                    "👤 Select a player for detailed analysis:",
+                    " Select a player for detailed analysis:",
                     options=['Choose a player...'] + sorted(recent_data['Player Name'].unique()),
                     key="injury_player_selector"
                 )
@@ -3135,29 +3160,29 @@ elif page == "Injury Prevention":
                         
                         # Display intelligent insights if available
                         if intel_recs.get('comparison_to_team'):
-                            st.markdown("### 🔍 Smart Analysis")
+                            st.markdown("### Smart Analysis")
                             col1, col2 = st.columns(2)
                             with col1:
                                 if 'load_vs_team' in intel_recs['comparison_to_team']:
-                                    st.info(f"📊 Load: {intel_recs['comparison_to_team']['load_vs_team']}")
+                                    st.info(f" Load: {intel_recs['comparison_to_team']['load_vs_team']}")
                             with col2:
                                 if 'load_percentile' in intel_recs['comparison_to_team']:
-                                    st.info(f"📊 Percentile: Top {intel_recs['comparison_to_team']['load_percentile']}")
+                                    st.info(f" Percentile: Top {intel_recs['comparison_to_team']['load_percentile']}")
                         
                         # Display trends
                         if intel_recs.get('trends'):
                             for key, value in intel_recs['trends'].items():
                                 if key == 'load_trend':
                                     if 'INCREASING' in value:
-                                        st.warning(f"📈 {value}")
+                                        st.warning(f" {value}")
                                     elif 'DECREASING' in value:
-                                        st.success(f"📉 {value}")
+                                        st.success(f" {value}")
                                     else:
-                                        st.info(f"➡️ {value}")
+                                        st.info(f" {value}")
                         
                         # Display key insights
                         if intel_recs.get('key_insights'):
-                            st.markdown("### 💡 Key Insights")
+                            st.markdown("### Key Insights")
                             for insight in intel_recs['key_insights']:
                                 st.markdown(f"- {insight}")
                         
@@ -3165,17 +3190,17 @@ elif page == "Injury Prevention":
                         if player_risk_level == 'High':
                             st.markdown(f"""
                             <div class="danger-box">
-                            <h4>🚨 {selected_player} - HIGH RISK PROTOCOL</h4>
+                            <h4> {selected_player} - HIGH RISK PROTOCOL</h4>
                             <p><b>Current Risk Level:</b> HIGH - Immediate intervention required</p>
                             
-                            <h5>📊 Key Metrics:</h5>
+                            <h5> Key Metrics:</h5>
                             <ul>
                                 <li>Average Load: <b>{avg_load:.1f}</b> (Consider reducing to <b>{avg_load * 0.6:.1f}</b>)</li>
                                 <li>Maximum Load: <b>{max_load:.1f}</b> (Peak reached this period)</li>
                                 <li>Total Impacts: <b>{int(total_impacts)}</b> (Monitor for cumulative fatigue)</li>
                             </ul>
                             
-                            <h5>🎯 IMMEDIATE ACTIONS (Next 48-72 hours):</h5>
+                            <h5> IMMEDIATE ACTIONS (Next 48-72 hours):</h5>
                             <ol>
                                 <li><b>Load Reduction:</b> Cut training intensity by 40-50% immediately</li>
                                 <li><b>Recovery Priority:</b> Implement 2 full recovery days (pool/cycling/yoga only)</li>
@@ -3184,7 +3209,7 @@ elif page == "Injury Prevention":
                                 <li><b>Wellness Check:</b> Daily sleep quality (target 9+ hours) and hydration monitoring</li>
                             </ol>
                             
-                            <h5>📅 Weekly Management:</h5>
+                            <h5> Weekly Management:</h5>
                             <ul>
                                 <li>No high-intensity drills until load decreases by 30%</li>
                                 <li>Focus on technical/tactical work instead of physical load</li>
@@ -3197,30 +3222,30 @@ elif page == "Injury Prevention":
                             
                             # Display data-driven specific actions
                             if intel_recs.get('specific_actions'):
-                                st.markdown("### 📋 Data-Driven Specific Actions")
+                                st.markdown("### Data-Driven Specific Actions")
                                 for action in intel_recs['specific_actions']:
                                     st.markdown(f"- {action}")
                             
                             # Display personalized training plan
                             if intel_recs.get('personalized_plan'):
-                                st.markdown("### 📈 Personalized Training Plan")
+                                st.markdown("### Personalized Training Plan")
                                 for item in intel_recs['personalized_plan']:
                                     st.markdown(f"- {item}")
                         
                         elif player_risk_level == 'Medium':
                             st.markdown(f"""
                             <div class="warning-box">
-                            <h4>⚠️ {selected_player} - PREVENTIVE MANAGEMENT</h4>
+                            <h4> {selected_player} - PREVENTIVE MANAGEMENT</h4>
                             <p><b>Current Risk Level:</b> MEDIUM - Proactive monitoring recommended</p>
                             
-                            <h5>📊 Key Metrics:</h5>
+                            <h5> Key Metrics:</h5>
                             <ul>
                                 <li>Average Load: <b>{avg_load:.1f}</b> (Maintain or slightly reduce)</li>
                                 <li>Energy Expenditure: <b>{avg_energy:.0f} kcal</b> (Normal range)</li>
                                 <li>Average Distance: <b>{avg_distance:.2f} miles</b> per session</li>
                             </ul>
                             
-                            <h5>🎯 PREVENTIVE ACTIONS:</h5>
+                            <h5> PREVENTIVE ACTIONS:</h5>
                             <ol>
                                 <li><b>Load Management:</b> Reduce intensity by 20% for next 2 sessions</li>
                                 <li><b>Recovery:</b> Add 1 extra recovery day this week</li>
@@ -3229,7 +3254,7 @@ elif page == "Injury Prevention":
                                 <li><b>Rotation:</b> Consider limiting consecutive match minutes</li>
                             </ol>
                             
-                            <h5>📅 Training Modifications:</h5>
+                            <h5> Training Modifications:</h5>
                             <ul>
                                 <li>Replace 1 high-intensity session with technical/tactical work</li>
                                 <li>Implement active recovery between hard training days</li>
@@ -3241,29 +3266,29 @@ elif page == "Injury Prevention":
                             
                             # Display data-driven actions for medium risk
                             if intel_recs.get('specific_actions'):
-                                st.markdown("### 📋 Data-Driven Actions")
+                                st.markdown("### Data-Driven Actions")
                                 for action in intel_recs['specific_actions']:
                                     st.markdown(f"- {action}")
                             
                             if intel_recs.get('personalized_plan'):
-                                st.markdown("### 📈 Personalized Plan")
+                                st.markdown("### Personalized Plan")
                                 for item in intel_recs['personalized_plan']:
                                     st.markdown(f"- {item}")
                         
-                        else:  # Low risk
+                        else: # Low risk
                             st.markdown(f"""
                             <div class="success-box">
-                            <h4>✅ {selected_player} - OPTIMAL STATUS</h4>
+                            <h4> {selected_player} - OPTIMAL STATUS</h4>
                             <p><b>Current Risk Level:</b> LOW - Player in ideal condition</p>
                             
-                            <h5>📊 Key Metrics:</h5>
+                            <h5> Key Metrics:</h5>
                             <ul>
                                 <li>Average Load: <b>{avg_load:.1f}</b> (Optimal training zone)</li>
                                 <li>Energy Expenditure: <b>{avg_energy:.0f} kcal</b> (Efficient energy use)</li>
                                 <li>Max Speed: <b>{max_speed:.1f} mph</b> ({'Good' if max_speed > 15 else 'Can improve'})</li>
                             </ul>
                             
-                            <h5>🎯 MAINTAIN CURRENT PROTOCOL:</h5>
+                            <h5> MAINTAIN CURRENT PROTOCOL:</h5>
                             <ol>
                                 <li><b>Training Load:</b> Continue current intensity and volume</li>
                                 <li><b>Recovery:</b> Maintain standard recovery protocols (8+ hrs sleep)</li>
@@ -3272,7 +3297,7 @@ elif page == "Injury Prevention":
                                 <li><b>Monitoring:</b> Weekly wellness checks sufficient</li>
                             </ol>
                             
-                            <h5>📈 Development Opportunities:</h5>
+                            <h5> Development Opportunities:</h5>
                             <ul>
                                 <li>Consider adding explosive/sprint work if max speed < 18 mph</li>
                                 <li>Can experiment with new training stimuli</li>
@@ -3284,12 +3309,12 @@ elif page == "Injury Prevention":
                             
                             # Display intelligent recommendations for low risk players
                             if intel_recs.get('specific_actions'):
-                                st.markdown("### 📋 Data-Driven Actions")
+                                st.markdown("### Data-Driven Actions")
                                 for action in intel_recs['specific_actions']:
                                     st.markdown(f"- {action}")
                             
                             if intel_recs.get('personalized_plan'):
-                                st.markdown("### 📈 Personalized Development Plan")
+                                st.markdown("### Personalized Development Plan")
                                 for item in intel_recs['personalized_plan']:
                                     st.markdown(f"- {item}")
 
@@ -3297,7 +3322,7 @@ elif page == "Team Lineup Calculator":
     st.markdown('<h1 class="main-header">Optimal Team Lineup Calculator</h1>', unsafe_allow_html=True)
     
     if st.session_state.df is None:
-        st.warning("⚠️ Please upload data in the Data Audit section first.")
+        st.warning(" Please upload data in the Data Audit section first.")
     else:
         df = st.session_state.df
         df_clean = limpiar_datos_regression(df)
@@ -3306,12 +3331,12 @@ elif page == "Team Lineup Calculator":
         if 'excluded_players_lineup' not in st.session_state:
             st.session_state.excluded_players_lineup = []
         
-        st.markdown("### ⚙️ Configure Lineup Selection Criteria")
+        st.markdown("### Configure Lineup Selection Criteria")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### 🎯 Selection Method")
+            st.markdown("#### Selection Method")
             selection_method = st.selectbox(
                 "Choose optimization method",
                 ["Balanced Performance", "Maximum Energy Output", "Speed-Focused", "Endurance-Focused", "Custom Weights"]
@@ -3322,7 +3347,7 @@ elif page == "Team Lineup Calculator":
             team_size = st.slider("Number of players to select", min_value=5, max_value=20, value=11)
         
         # Player exclusion section
-        with st.expander("🗑️ Exclude Players from Lineup", expanded=False):
+        with st.expander(" Exclude Players from Lineup", expanded=False):
             st.markdown("#### Select players to exclude from optimal lineup calculation")
         
         if 'Player Name' in df_clean.columns:
@@ -3343,7 +3368,7 @@ elif page == "Team Lineup Calculator":
                         st.session_state.excluded_players_lineup = players_to_exclude_lineup
                 
                 with col_exclude2:
-                    st.markdown("#### 📊 Current Status")
+                    st.markdown("#### Current Status")
                     st.metric("Total Players", len(all_players_lineup))
                     st.metric("Excluded", len(st.session_state.excluded_players_lineup))
                     st.metric("Available", len(all_players_lineup) - len(st.session_state.excluded_players_lineup))
@@ -3351,9 +3376,9 @@ elif page == "Team Lineup Calculator":
                 if st.session_state.excluded_players_lineup:
                     st.markdown("**Excluded players:**")
                     for player in st.session_state.excluded_players_lineup:
-                        st.write(f"  • {player}")
+                        st.write(f" • {player}")
                     
-                    if st.button("🔄 Clear All Exclusions", type="secondary", key="clear_lineup_exclusions"):
+                    if st.button(" Clear All Exclusions", type="secondary", key="clear_lineup_exclusions"):
                         st.session_state.excluded_players_lineup = []
                         st.rerun()
         
@@ -3425,8 +3450,8 @@ elif page == "Team Lineup Calculator":
                     'Energy (kcal)_norm': 0.25,
                     'Hr Load_norm': 0.15
                 }
-            else:  # Custom Weights
-                st.markdown("#### 🎛️ Custom Weight Configuration")
+            else: # Custom Weights
+                st.markdown("#### 🎛 Custom Weight Configuration")
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     w_load = st.slider("Player Load", 0.0, 1.0, 0.25, 0.05)
@@ -3440,7 +3465,7 @@ elif page == "Team Lineup Calculator":
                 
                 total_weight = w_load + w_energy + w_speed + w_distance + w_sprint + w_power
                 if abs(total_weight - 1.0) > 0.01:
-                    st.warning(f"⚠️ Weights sum to {total_weight:.2f}. Normalizing to 1.0...")
+                    st.warning(f" Weights sum to {total_weight:.2f}. Normalizing to 1.0...")
                     w_load, w_energy, w_speed, w_distance, w_sprint, w_power = [w/total_weight for w in [w_load, w_energy, w_speed, w_distance, w_sprint, w_power]]
                 
                 weights = {
@@ -3476,7 +3501,7 @@ elif page == "Team Lineup Calculator":
             # Sort and select top players
             optimal_lineup = player_metrics.nlargest(team_size, 'Composite_Score')
             
-            st.markdown("### 🏆 Optimal Lineup")
+            st.markdown("### Optimal Lineup")
             
             col1, col2 = st.columns([2, 1])
             
@@ -3506,7 +3531,7 @@ elif page == "Team Lineup Calculator":
                 st.dataframe(display_lineup, use_container_width=True)
             
             with col2:
-                st.markdown("#### 📊 Team Statistics")
+                st.markdown("#### Team Statistics")
                 st.metric("Avg Composite Score", f"{optimal_lineup['Composite_Score'].mean():.1f}")
                 
                 # Only display metrics if they exist in the data
@@ -3518,7 +3543,7 @@ elif page == "Team Lineup Calculator":
                     st.metric("Max Speed (mph)", f"{optimal_lineup['Top Speed (mph)'].max():.1f}")
             
             # Visualization
-            st.markdown("### 📊 Lineup Composition Analysis")
+            st.markdown("### Lineup Composition Analysis")
             
             fig, axes = plt.subplots(1, 2, figsize=(14, 5))
             
@@ -3548,7 +3573,7 @@ elif page == "Team Lineup Calculator":
                 if col_name in optimal_lineup.columns:
                     valid_categories.append((cat_label, col_name))
             
-            if len(valid_categories) > 2:  # Need at least 3 categories for radar chart
+            if len(valid_categories) > 2: # Need at least 3 categories for radar chart
                 angles = [n / float(len(valid_categories)) * 2 * pi for n in range(len(valid_categories))]
                 angles += angles[:1]
                 
@@ -3613,28 +3638,28 @@ elif page == "Team Lineup Calculator":
             # Build top player metrics string
             top_metrics = ""
             if 'Player Load' in optimal_lineup.columns:
-                top_metrics += f" | Load: {optimal_lineup.iloc[0]['Player Load']:.1f}"
+                top_metrics += f"| Load: {optimal_lineup.iloc[0]['Player Load']:.1f}"
             if 'Energy (kcal)' in optimal_lineup.columns:
-                top_metrics += f" | Energy: {int(optimal_lineup.iloc[0]['Energy (kcal)'])} kcal"
+                top_metrics += f"| Energy: {int(optimal_lineup.iloc[0]['Energy (kcal)'])} kcal"
             
             st.markdown(f"""
             <div class="success-box">
-            <h4>💡 Detailed Lineup Analysis & Recommendations</h4>
+            <h4> Detailed Lineup Analysis & Recommendations</h4>
             
-            <h5>📊 Strategy Overview</h5>
+            <h5> Strategy Overview</h5>
             <p><b>Optimization Method:</b> <span style='color:#1E88E5'>{selection_method}</span></p>
             <p><b>Team Size:</b> {team_size} players selected</p>
             <p><b>Composite Score:</b> {team_composite_avg:.1f} avg (±{team_composite_std:.1f} standard deviation)</p>
             <p><b>Performance Consistency:</b> <span style='color:{consistency_color}'>{consistency_status}</span> (CV: {cv*100:.1f}%)</p>
             
-            <h5>🏆 Top Performers</h5>
+            <h5> Top Performers</h5>
             <ul>
                 <li><b>#1 Player:</b> {top_player} - Score: {top_score:.1f}{top_metrics}</li>
                 <li><b>Performance Gap:</b> {top_score - bottom_score:.1f} points difference between #1 and #{team_size}</li>
                 <li><b>Top 3 Average:</b> {optimal_lineup.head(3)['Composite_Score'].mean():.1f} vs Bottom 3: {optimal_lineup.tail(3)['Composite_Score'].mean():.1f}</li>
             </ul>
             
-            <h5>⚙️ Team Capabilities</h5>
+            <h5> Team Capabilities</h5>
             <ul>""", unsafe_allow_html=True)
             
             # Add team capabilities dynamically
@@ -3650,7 +3675,7 @@ elif page == "Team Lineup Calculator":
             
             st.markdown(f"""
             
-            <h5>🎯 Tactical Recommendations</h5>
+            <h5> Tactical Recommendations</h5>
             <ul>
                 <li><b>Starting XI Impact:</b> Top-ranked players should start for maximum impact</li>
                 <li><b>Substitution Strategy:</b> Players ranked 12-15 provide tactical flexibility (consider after 60-70 min)</li>
@@ -3658,7 +3683,7 @@ elif page == "Team Lineup Calculator":
                 <li><b>Balance Check:</b> {balance_msg}</li>
             </ul>
             
-            <h5>⚠️ Critical Considerations</h5>
+            <h5> Critical Considerations</h5>
             <ul>
                 <li><b>Recent Load:</b> Check injury prevention page for current load status of selected players</li>
                 <li><b>Fatigue Management:</b> High-scoring players may be fatigued - verify current status</li>
@@ -3666,7 +3691,7 @@ elif page == "Team Lineup Calculator":
                 <li><b>Player Availability:</b> Confirm all {team_size} players are match-ready</li>
             </ul>
             
-            <h5>📈 Performance Projection</h5>
+            <h5> Performance Projection</h5>
             """, unsafe_allow_html=True)
             
             # Determine performance message
@@ -3678,7 +3703,7 @@ elif page == "Performance Analytics":
     st.markdown('<h1 class="main-header">Advanced Performance Analytics</h1>', unsafe_allow_html=True)
     
     if st.session_state.df is None:
-        st.warning("⚠️ Please upload data in the Data Audit section first.")
+        st.warning(" Please upload data in the Data Audit section first.")
     else:
         df = st.session_state.df
         df_clean = limpiar_datos_regression(df)
@@ -3695,13 +3720,13 @@ elif page == "Performance Analytics":
                     if 'Player Name' in df_clean.columns:
                         # Always default to "All Players" to have team data available
                         if st.session_state.selected_chat_player is None:
-                            st.session_state.selected_chat_player = None  # Force to All Players
+                            st.session_state.selected_chat_player = None # Force to All Players
                         
                         chat_player = st.selectbox(
                             "Select a Player (Optional)",
                             ["All Players"] + sorted(list(df_clean['Player Name'].unique())),
                             key="chat_player_selector",
-                            index=0,  # Always default to "All Players"
+                            index=0, # Always default to "All Players"
                             help="Select a specific player to get personalized insights. 'All Players' provides team-wide context."
                         )
                         
@@ -3721,7 +3746,7 @@ elif page == "Performance Analytics":
                     if not is_local:
                         # Cloud deployment - AI Assistant not supported
                         st.info("""
-                        **🤖 AI Assistant (Local Only Feature)**
+                        ** AI Assistant (Local Only Feature)**
                         
                         The AI Coach Assistant is designed to work **only when running locally** on your machine.
                         
@@ -3733,7 +3758,7 @@ elif page == "Performance Analytics":
                         5. Run the app: `streamlit run app.py`
                         6. Download model: `ollama pull llama3.2`
                         
-                        **💡 The rest of the analytics work perfectly in the cloud without the AI Assistant!**
+                        ** The rest of the analytics work perfectly in the cloud without the AI Assistant!**
                         
                         All performance analytics, visualizations, and ML models are fully functional.
                         """)
@@ -3741,13 +3766,13 @@ elif page == "Performance Analytics":
                         st.info("""
                         **AI Assistant (Optional Feature)**
                         
-                        🤖 To enable the AI Coach Assistant locally:
+                        To enable the AI Coach Assistant locally:
                         1. Install: `pip install ollama`
                         2. Start server: `ollama serve`
                         3. Download model: `ollama pull llama3.2`
                         4. Refresh this page
                         
-                        **💡 The analytics work perfectly without it!**
+                        ** The analytics work perfectly without it!**
                         """)
                     else:
                         # Check if server is reachable (local only)
@@ -3760,21 +3785,21 @@ elif page == "Performance Analytics":
                             st.info(f"""
                             **AI Assistant (Local Setup Needed)**
                             
-                            ⚠️ Cannot connect to Ollama at `{base_url}`
+                            Cannot connect to Ollama at `{base_url}`
                             
                             **Setup steps:**
                             1. Start Ollama: Open terminal and run `ollama serve`
                             2. Download model: In another terminal, run `ollama pull llama3.2`
                             3. Refresh this page
                             
-                            **💡 The analytics work perfectly without the AI Assistant!**
+                            ** The analytics work perfectly without the AI Assistant!**
                             """)
                     
                     if ollama_ready and is_local:
                         # Status display with model check
                         model_status_info = check_model_status("llama3.2")
                         status_color = "#28a745" if model_status_info["available"] else "#ffc107" if model_status_info["status"] == "missing" else "#dc3545"
-                        status_icon = "✅" if model_status_info["available"] else "⚠️" if model_status_info["status"] == "missing" else "❌"
+                        status_icon = "" if model_status_info["available"] else "" if model_status_info["status"] == "missing" else ""
                         
                         st.markdown(f"""
                         <div style="font-size: 0.75rem; color: {status_color}; padding: 0.5rem; background: #F8F9FA; border-radius: 4px; margin-bottom: 0.5rem;">
@@ -3786,7 +3811,7 @@ elif page == "Performance Analytics":
                         col_btn1, col_btn2 = st.columns(2)
                         
                         with col_btn1:
-                            if st.button("🔄 Check Model Status", key="check_model_status_btn", help="Check if llama3.2 model is installed and ready", use_container_width=True):
+                            if st.button(" Check Model Status", key="check_model_status_btn", help="Check if llama3.2 model is installed and ready", use_container_width=True):
                                 model_status_info = check_model_status("llama3.2")
                                 
                                 if model_status_info["available"]:
@@ -3796,10 +3821,10 @@ elif page == "Performance Analytics":
                                 elif model_status_info["status"] == "missing":
                                     st.warning(model_status_info["message"])
                                     if model_status_info.get("download_available"):
-                                        st.info("💡 The model will be downloaded automatically when you make your first request, or you can check the Render logs for download progress.")
+                                        st.info(" The model will be downloaded automatically when you make your first request, or you can check the Render logs for download progress.")
                                         st.markdown("""
                                         <div style="font-size: 0.7rem; color: #6C757D; margin-top: 0.5rem;">
-                                            📊 <strong>To check download progress:</strong><br>
+                                            <strong>To check download progress:</strong><br>
                                             1. Go to <a href="https://dashboard.render.com" target="_blank">Render Dashboard</a><br>
                                             2. Open your <code>ollama-server</code> service<br>
                                             3. Click on "Logs" tab to see download progress<br>
@@ -3812,7 +3837,7 @@ elif page == "Performance Analytics":
                         with col_btn2:
                             # Download button - only show if model is not available
                             if not model_status_info["available"]:
-                                if st.button("⬇️ Download Model", key="download_model_btn", help="Download llama3.2 model with progress bar", type="primary", use_container_width=True):
+                                if st.button(" Download Model", key="download_model_btn", help="Download llama3.2 model with progress bar", type="primary", use_container_width=True):
                                     # Create progress container
                                     progress_container = st.container()
                                     
@@ -3821,14 +3846,14 @@ elif page == "Performance Analytics":
                                     
                                     if success:
                                         st.success(message)
-                                        st.balloons()  # Celebrate!
+                                        st.balloons() # Celebrate!
                                         # Refresh page after a moment to show updated status
                                         st.rerun()
                                     else:
                                         st.warning(message)
-                                        st.info("💡 The download may still be in progress in the background. Use 'Check Model Status' to verify.")
+                                        st.info("The download may still be in progress in the background. Use 'Check Model Status' to verify.")
                             else:
-                                st.info("✅ Model is ready!", help="Model is already installed")
+                                st.info("Model is ready!")
                 
                 # Chat interface
                 st.markdown("---")
@@ -3885,7 +3910,7 @@ elif page == "Performance Analytics":
                     st.session_state.chat_history.append({"role": "user", "content": user_input})
                     
                     # Always get team context first (All Players), then add specific player if selected
-                    player_context = format_player_data_for_context(df_clean, None)  # Team data
+                    player_context = format_player_data_for_context(df_clean, None) # Team data
                     
                     # Auto-detect player names mentioned in the user input
                     detected_players = []
@@ -3909,7 +3934,7 @@ elif page == "Performance Analytics":
                     # Add player contexts
                     if players_to_include:
                         player_contexts_parts = []
-                        for player_name in players_to_include[:5]:  # Limit to 5 players to avoid too much context
+                        for player_name in players_to_include[:5]: # Limit to 5 players to avoid too much context
                             specific_player_context = format_player_data_for_context(df_clean, player_name)
                             if specific_player_context and "NOT FOUND" not in specific_player_context:
                                 player_contexts_parts.append(f"\n\n---PLAYER: {player_name}---\n{specific_player_context[:800]}")
@@ -3922,7 +3947,7 @@ elif page == "Performance Analytics":
                         if specific_player_context:
                             # Check if player was not found
                             if "NOT FOUND" in specific_player_context:
-                                player_context = specific_player_context  # Use the "not found" message
+                                player_context = specific_player_context # Use the "not found" message
                             else:
                                 player_context = f"{player_context}\n\n---SPECIFIC PLAYER---\n{specific_player_context[:500]}"
                         else:
@@ -3936,7 +3961,7 @@ elif page == "Performance Analytics":
                         response = get_ollama_response(
                             user_input, 
                             player_context=player_context,
-                            chat_history=st.session_state.chat_history[:-1]  # Exclude the just-added user message
+                            chat_history=st.session_state.chat_history[:-1] # Exclude the just-added user message
                         )
                         
                         # Add assistant response to history
@@ -4024,7 +4049,7 @@ elif page == "Performance Analytics":
         
         # Correlation Analysis
         st.markdown("#### 🔗 Correlation Analysis")
-        st.info("💡 **Coach Insight:** This heatmap shows which metrics are strongly related. Strong positive correlations (red) indicate metrics that increase together.")
+        st.info(" **Coach Insight:** This heatmap shows which metrics are strongly related. Strong positive correlations (red) indicate metrics that increase together.")
         
         metrics_for_corr = [
             'Player Load', 'Energy (kcal)', 'Distance (miles)', 
@@ -4065,8 +4090,8 @@ elif page == "Performance Analytics":
         """)
         
         # Distribution Analysis
-        st.markdown("#### 📈 Performance Distribution Analysis")
-        st.info("💡 **Coach Insight:** These distributions show how your team performs across key metrics. Look for outliers and consistency.")
+        st.markdown("#### Performance Distribution Analysis")
+        st.info(" **Coach Insight:** These distributions show how your team performs across key metrics. Look for outliers and consistency.")
         
         metrics_to_plot = ['Player Load', 'Energy (kcal)', 'Top Speed (mph)', 'Distance (miles)']
         metrics_to_plot = [m for m in metrics_to_plot if m in df_clean.columns]
@@ -4094,8 +4119,8 @@ elif page == "Performance Analytics":
         
         # Time Series Analysis
         if 'Date' in df_clean.columns and 'Player Name' in df_clean.columns:
-            st.markdown("#### 📅 Temporal Performance Trends")
-            st.info("💡 **Coach Insight:** Track how player loads evolve over time. Identify fatigue accumulation or improvement trends.")
+            st.markdown("#### Temporal Performance Trends")
+            st.info(" **Coach Insight:** Track how player loads evolve over time. Identify fatigue accumulation or improvement trends.")
             
             df_clean['Date'] = pd.to_datetime(df_clean['Date'], format='%Y%m%d', errors='coerce')
             
@@ -4162,15 +4187,15 @@ elif page == "Performance Analytics":
                 """)
             
             # Speed Zones Analysis
-            st.markdown("#### ⚡ Speed Zone Distribution")
-            st.info("💡 **Coach Insight:** Understanding speed zones helps optimize training intensity and match preparation.")
+            st.markdown("#### Speed Zone Distribution")
+            st.info(" **Coach Insight:** Understanding speed zones helps optimize training intensity and match preparation.")
             
             speed_zones = [
-                'Distance in Speed Zone 1  (miles)',
-                'Distance in Speed Zone 2  (miles)',
-                'Distance in Speed Zone 3  (miles)',
-                'Distance in Speed Zone 4  (miles)',
-                'Distance in Speed Zone 5  (miles)'
+                'Distance in Speed Zone 1 (miles)',
+                'Distance in Speed Zone 2 (miles)',
+                'Distance in Speed Zone 3 (miles)',
+                'Distance in Speed Zone 4 (miles)',
+                'Distance in Speed Zone 5 (miles)'
             ]
             speed_zones = [sz for sz in speed_zones if sz in df_clean.columns]
             
@@ -4213,10 +4238,10 @@ elif page == "Performance Analytics":
                 # Calculate speed data
                 if selected_player_speed != 'All Team Average':
                     speed_data = df_filtered_speed[speed_zones].mean()
-                    title_suffix = f" - {selected_player_speed}{filter_suffix}"
+                    title_suffix = f"- {selected_player_speed}{filter_suffix}"
                 else:
                     speed_data = df_filtered_speed[speed_zones].mean()
-                    title_suffix = f" - Team Average{filter_suffix}"
+                    title_suffix = f"- Team Average{filter_suffix}"
                 
                 fig, ax = plt.subplots(figsize=(10, 6))
                 colors = ['#4CAF50', '#8BC34A', '#FFC107', '#FF9800', '#F44336']
@@ -4239,11 +4264,11 @@ elif page == "Performance Analytics":
                 zone_5_pct = (speed_data.iloc[-1] / speed_data.sum() * 100) if len(speed_data) > 0 and speed_data.sum() > 0 else 0
                 zone_5_insight = ""
                 if zone_5_pct < 5:
-                    zone_5_insight = "⚠️ Increase high-intensity work to build match fitness"
+                    zone_5_insight = " Increase high-intensity work to build match fitness"
                 elif zone_5_pct > 15:
-                    zone_5_insight = "⚠️ Consider recovery protocols - too much high intensity"
+                    zone_5_insight = " Consider recovery protocols - too much high intensity"
                 else:
-                    zone_5_insight = "✅ Maintain current intensity distribution"
+                    zone_5_insight = " Maintain current intensity distribution"
                 
                 st.markdown(f"""
                 **Speed Zone Insights{title_suffix}:**
@@ -4254,8 +4279,8 @@ elif page == "Performance Analytics":
             
             # Team Comparison
             if 'Player Name' in df_clean.columns:
-                st.markdown("#### 🏃 Player Comparison Matrix")
-                st.info("💡 **Coach Insight:** Quickly identify top performers and players needing development in each category.")
+                st.markdown("#### Player Comparison Matrix")
+                st.info(" **Coach Insight:** Quickly identify top performers and players needing development in each category.")
                 
                 player_summary = df_clean.groupby('Player Name').agg({
                     'Player Load': 'mean',
@@ -4301,7 +4326,7 @@ elif page == "Performance Analytics":
             
             st.markdown("""
             <div class="success-box">
-            <h4>🎯 Data-Driven Coaching Strategy</h4>
+            <h4> Data-Driven Coaching Strategy</h4>
             
             <h5>1. Training Load Management</h5>
             <ul>
@@ -4686,14 +4711,14 @@ elif page == "Load Prediction":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
-### ℹ️ About
+### About
 **Elite Sports Performance Analytics**
 
 Advanced analytics platform for optimizing player performance, preventing injuries, and maximizing team potential.
 
-**Version:** 1.0.0  
-**Developer:** Alvaro Martin-Pena  
+**Version:** 1.0.0 
+**Developer:** Alvaro Martin-Pena 
 **Powered by:** Machine Learning & Sports Science
 
-⚠️ **Ethical Note:** This system is designed to support coaching decisions, not replace professional judgment. Always combine data insights with coaching experience and medical expertise.
+**Ethical Note:** This system is designed to support coaching decisions, not replace professional judgment. Always combine data insights with coaching experience and medical expertise.
 """)
