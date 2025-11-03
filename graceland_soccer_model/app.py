@@ -75,6 +75,10 @@ except ImportError:
     logging.warning("Advanced ML extensions not available")
 
 # Ollama integration for AI Coach Assistant
+# Configure Ollama host from environment (supports cloud deployments)
+# Default to localhost if not set, but allow override via environment variable
+if "OLLAMA_HOST" not in os.environ:
+    os.environ["OLLAMA_HOST"] = "http://127.0.0.1:11434"
 try:
     import ollama
     OLLAMA_AVAILABLE = True
@@ -1144,34 +1148,66 @@ def find_player_in_dataframe(df_clean, player_name):
         return None
     
     # Clean input name
-    search_name = str(player_name).strip()
+    search_name = str(player_name).strip().lower()
+    if not search_name:
+        return None
     
     # Get all unique player names from dataframe
     available_players = df_clean['Player Name'].unique()
     
     # Try exact match (case-insensitive)
     for name in available_players:
-        if str(name).strip().lower() == search_name.lower():
+        if pd.isna(name):
+            continue
+        name_clean = str(name).strip().lower()
+        if name_clean == search_name:
             return str(name).strip()
     
-    # Try contains match (case-insensitive)
+    # Try contains match (case-insensitive) - both directions
     for name in available_players:
-        if search_name.lower() in str(name).strip().lower() or str(name).strip().lower() in search_name.lower():
+        if pd.isna(name):
+            continue
+        name_clean = str(name).strip().lower()
+        if search_name in name_clean or name_clean in search_name:
             return str(name).strip()
     
-    # Try fuzzy match - check if all words in search name are in player name
-    search_words = search_name.lower().split()
-    for name in available_players:
-        name_str = str(name).strip().lower()
-        # Check if all words from search are in the player name
-        if all(word in name_str for word in search_words if len(word) > 2):
-            return str(name).strip()
+    # Try word-by-word matching for multi-word names
+    search_words = [w.strip() for w in search_name.split() if len(w.strip()) > 1]
+    
+    # For two-word names, check if both words match (order-independent)
+    if len(search_words) == 2:
+        for name in available_players:
+            if pd.isna(name):
+                continue
+            name_str = str(name).strip().lower()
+            name_words = [w.strip() for w in name_str.split() if len(w.strip()) > 1]
+            if len(name_words) == 2:
+                # Both words from search must be in name (order doesn't matter)
+                if search_words[0] in name_words and search_words[1] in name_words:
+                    return str(name).strip()
+                # Or vice versa
+                if name_words[0] in search_words and name_words[1] in search_words:
+                    return str(name).strip()
+    
+    # Try fuzzy match - check if all significant words in search name are in player name
+    significant_words = [w for w in search_words if len(w) > 2]
+    if significant_words:
+        for name in available_players:
+            if pd.isna(name):
+                continue
+            name_str = str(name).strip().lower()
+            # Check if all significant words from search are in the player name
+            if all(word in name_str for word in significant_words):
+                return str(name).strip()
     
     # Try reverse - all words from player name are in search
     for name in available_players:
+        if pd.isna(name):
+            continue
         name_str = str(name).strip().lower()
-        name_words = name_str.split()
-        if all(word in search_name.lower() for word in name_words if len(word) > 2):
+        name_words = [w.strip() for w in name_str.split() if len(w.strip()) > 1]
+        significant_name_words = [w for w in name_words if len(w) > 2]
+        if significant_name_words and all(word in search_name for word in significant_name_words):
             return str(name).strip()
     
     return None
@@ -1187,27 +1223,37 @@ def extract_player_names_from_text(text, available_players):
     # Check for each available player name with multiple matching strategies
     for player in available_players:
         player_str = str(player).strip()
+        if not player_str or pd.isna(player):
+            continue
         player_lower = player_str.lower()
         
-        # Strategy 1: Exact match (case-insensitive)
+        # Strategy 1: Exact match (case-insensitive) - most reliable
         if player_lower in text_lower:
             found_players.append(player_str)
             continue
         
-        # Strategy 2: Match if all significant words from player name appear in text
-        player_words = [w for w in player_lower.split() if len(w) > 2]  # Words longer than 2 chars
-        if len(player_words) >= 2:
-            # For multi-word names, check if all significant words appear close together
-            words_found = sum(1 for word in player_words if word in text_lower)
-            # If most words match (at least 2 out of 3, or all if 2 words)
-            if words_found >= min(2, len(player_words)):
+        # Strategy 2: For two-word names, check if both words appear (order-independent)
+        player_words = [w.strip() for w in player_lower.split() if len(w.strip()) > 1]
+        if len(player_words) == 2:
+            # Both words must be in text (they can be separated)
+            word1_found = player_words[0] in text_lower
+            word2_found = player_words[1] in text_lower
+            if word1_found and word2_found:
                 found_players.append(player_str)
                 continue
         
-        # Strategy 3: For single-word or short names, check if it appears as a whole word
-        if len(player_words) == 1 and len(player_words[0]) > 4:
-            # Check if it appears as a standalone word (with word boundaries)
-            if re.search(r'\b' + re.escape(player_words[0]) + r'\b', text_lower):
+        # Strategy 3: For names with 3+ words, check if at least 2 words match
+        if len(player_words) >= 3:
+            words_found = sum(1 for word in player_words if word in text_lower)
+            if words_found >= 2:
+                found_players.append(player_str)
+                continue
+        
+        # Strategy 4: For single-word names, use word boundary matching
+        if len(player_words) == 1 and len(player_words[0]) > 3:
+            # Check if it appears as a whole word
+            pattern = r'\b' + re.escape(player_words[0]) + r'\b'
+            if re.search(pattern, text_lower):
                 found_players.append(player_str)
                 continue
     
@@ -1215,8 +1261,9 @@ def extract_player_names_from_text(text, available_players):
     seen = set()
     unique_players = []
     for player in found_players:
-        if player.lower() not in seen:
-            seen.add(player.lower())
+        player_lower_check = str(player).strip().lower()
+        if player_lower_check not in seen:
+            seen.add(player_lower_check)
             unique_players.append(player)
     
     return unique_players
@@ -1294,17 +1341,35 @@ def format_player_data_for_context(df_clean, player_name=None):
         logging.error(f"Error formatting player data: {str(e)}")
         return None
 
+# Ollama configuration - supports both local and cloud deployments
+def get_ollama_base_url() -> str:
+    """Get Ollama base URL from environment or default to localhost."""
+    return os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip('/')
+
+def is_ollama_reachable() -> bool:
+    """Check if Ollama server is reachable (supports both local and remote URLs)."""
+    if not OLLAMA_AVAILABLE:
+        return False
+    try:
+        # Try connecting to configured Ollama URL
+        base_url = get_ollama_base_url()
+        requests.get(f"{base_url}/api/tags", timeout=2)
+        return True
+    except Exception:
+        return False
+
 def get_ollama_response(user_message, player_context=None, chat_history=None, model="llama3.2"):
     """Get response from Ollama with player context, using timeouts to prevent blocking"""
     try:
         if not OLLAMA_AVAILABLE:
-            return "Ollama is not available. Please install it with: pip install ollama. Also make sure Ollama is running locally (ollama serve)."
+            return "Ollama library is not installed. Install it with: pip install ollama"
 
         # Quick health check to ensure Ollama server is responsive
+        base_url = get_ollama_base_url()
         try:
-            requests.get("http://127.0.0.1:11434/api/tags", timeout=2)
+            requests.get(f"{base_url}/api/tags", timeout=2)
         except Exception:
-            return "Cannot connect to Ollama at http://127.0.0.1:11434. Please make sure the server is running (ollama serve)."
+            return f"Cannot connect to Ollama at {base_url}. Please ensure Ollama is running. For cloud deployments, set OLLAMA_HOST environment variable to your Ollama service URL."
 
         # Build system prompt
         system_prompt = (
@@ -1339,6 +1404,7 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
         messages.append({"role": "user", "content": user_prompt})
 
         # Optimized direct call - allow longer responses (2000+ characters)
+        # The ollama library automatically uses OLLAMA_HOST environment variable
         try:
             # Use llama3.2 with increased token limit for detailed responses
             resp = ollama.chat(
@@ -1372,7 +1438,7 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
         return "Could not get a response. Please try again or check if Ollama is running."
     except Exception as e:
         logging.error(f"Error getting Ollama response: {str(e)}")
-        return f"An error occurred while generating the response: {str(e)}. Please try again."
+        return f"Assistant temporarily unavailable. {str(e)}"
 
 # Enhanced Sidebar Navigation
 st.sidebar.markdown("""
@@ -3207,205 +3273,208 @@ elif page == "Performance Analytics":
         df_clean = limpiar_datos_regression(df)
         
         # AI Coach Assistant - Interactive Chat with Ollama
+        # Always show assistant UI - it will handle connection status internally
         with st.expander("AI Coach Assistant - Understand Your Analytics", expanded=True):
-            st.markdown("### Ask Your AI Assistant About Performance Analytics")
-            
-            # Player selection for context with search
-            col_player, col_info = st.columns([2, 3])
-            
-            with col_player:
-                if 'Player Name' in df_clean.columns:
-                    # Always default to "All Players" to have team data available
-                    if st.session_state.selected_chat_player is None:
-                        st.session_state.selected_chat_player = None  # Force to All Players
-                    
-                    chat_player = st.selectbox(
-                        "Select a Player (Optional)",
-                        ["All Players"] + sorted(list(df_clean['Player Name'].unique())),
-                        key="chat_player_selector",
-                        index=0,  # Always default to "All Players"
-                        help="Select a specific player to get personalized insights. 'All Players' provides team-wide context."
-                    )
-                    
-                    if chat_player != "All Players":
-                        st.session_state.selected_chat_player = chat_player
+                st.markdown("### Ask Your AI Assistant About Performance Analytics")
+                
+                # Player selection for context with search
+                col_player, col_info = st.columns([2, 3])
+                
+                with col_player:
+                    if 'Player Name' in df_clean.columns:
+                        # Always default to "All Players" to have team data available
+                        if st.session_state.selected_chat_player is None:
+                            st.session_state.selected_chat_player = None  # Force to All Players
+                        
+                        chat_player = st.selectbox(
+                            "Select a Player (Optional)",
+                            ["All Players"] + sorted(list(df_clean['Player Name'].unique())),
+                            key="chat_player_selector",
+                            index=0,  # Always default to "All Players"
+                            help="Select a specific player to get personalized insights. 'All Players' provides team-wide context."
+                        )
+                        
+                        if chat_player != "All Players":
+                            st.session_state.selected_chat_player = chat_player
+                        else:
+                            st.session_state.selected_chat_player = None
                     else:
                         st.session_state.selected_chat_player = None
-                else:
-                    st.session_state.selected_chat_player = None
-            
-            with col_info:
-                if not OLLAMA_AVAILABLE:
-                    st.warning("Ollama is not installed. Install it with: `pip install ollama`")
-                    st.info("You also need to have Ollama running locally. Run `ollama serve` in your terminal.")
-                else:
-                    st.markdown("""
-                    <div style="font-size: 0.75rem; color: #6C757D; padding: 0.5rem; background: #F8F9FA; border-radius: 4px;">
-                        Status: Ollama connected
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            # Chat interface
-            st.markdown("---")
-            st.markdown("#### Conversation")
-            
-            # Initialize chat history if needed
-            if 'chat_history' not in st.session_state:
-                st.session_state.chat_history = []
-            
-            # Display chat history with enhanced bubbles
-            chat_container = st.container()
-            with chat_container:
-                if len(st.session_state.chat_history) == 0:
-                    st.markdown("""
-                    <div class="info-box" style="text-align: center; padding: 2rem;">
-                        <h4 style="color: #2196F3; margin-bottom: 1rem;">Hi! I'm your sports analytics assistant</h4>
-                        <p style="color: #6C757D; margin-bottom: 1.5rem;">You can ask me about:</p>
-                        <div style="text-align: left; max-width: 500px; margin: 0 auto;">
-                            <p style="margin: 0.5rem 0;"><b>Specific player performance</b> - Analyze individual player metrics and trends</p>
-                            <p style="margin: 0.5rem 0;"><b>Metric explanations</b> - Learn about Player Load, Energy, Speed Zones, etc.</p>
-                            <p style="margin: 0.5rem 0;"><b>Player comparisons</b> - Compare performance across different players</p>
-                            <p style="margin: 0.5rem 0;"><b>Trends and data analysis</b> - Understand patterns and performance trajectories</p>
-                            <p style="margin: 0.5rem 0;"><b>Training recommendations</b> - Get personalized coaching insights</p>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    for i, msg in enumerate(st.session_state.chat_history):
-                        if msg['role'] == 'user':
-                            st.markdown(f"""
-                            <div class="chat-bubble-user">
-                                <strong>You:</strong><br>{msg['content']}
-                            </div>
-                            """, unsafe_allow_html=True)
-                        elif msg['role'] == 'assistant':
-                            st.markdown(f"""
-                            <div class="chat-bubble-assistant">
-                                <strong>Assistant:</strong><br>{msg['content']}
-                            </div>
-                            """, unsafe_allow_html=True)
-            
-            # Chat input
-            user_input = st.chat_input("Ask your question here...")
-            
-            if user_input:
-                # Add user message to history
-                st.session_state.chat_history.append({"role": "user", "content": user_input})
                 
-                # Always get team context first (All Players), then add specific player if selected
-                player_context = format_player_data_for_context(df_clean, None)  # Team data
-                
-                # Auto-detect player names mentioned in the user input
-                detected_players = []
-                if 'Player Name' in df_clean.columns:
-                    available_players = sorted(list(df_clean['Player Name'].unique()))
-                    detected_players = extract_player_names_from_text(user_input, available_players)
-                
-                # Build context with detected players and selected player
-                players_to_include = []
-                if st.session_state.selected_chat_player:
-                    matched_name = find_player_in_dataframe(df_clean, st.session_state.selected_chat_player)
-                    if matched_name:
-                        players_to_include.append(matched_name)
-                
-                # Add detected players from text
-                for detected_player in detected_players:
-                    matched_name = find_player_in_dataframe(df_clean, detected_player)
-                    if matched_name and matched_name not in players_to_include:
-                        players_to_include.append(matched_name)
-                
-                # Add player contexts
-                if players_to_include:
-                    player_contexts_parts = []
-                    for player_name in players_to_include[:5]:  # Limit to 5 players to avoid too much context
-                        specific_player_context = format_player_data_for_context(df_clean, player_name)
-                        if specific_player_context and "NOT FOUND" not in specific_player_context:
-                            player_contexts_parts.append(f"\n\n---PLAYER: {player_name}---\n{specific_player_context[:800]}")
-                    
-                    if player_contexts_parts:
-                        player_context = f"{player_context}\n\n{' '.join(player_contexts_parts)}"
-                elif st.session_state.selected_chat_player:
-                    # Fallback to selected player if no auto-detection worked
-                    specific_player_context = format_player_data_for_context(df_clean, st.session_state.selected_chat_player)
-                    if specific_player_context:
-                        # Check if player was not found
-                        if "NOT FOUND" in specific_player_context:
-                            player_context = specific_player_context  # Use the "not found" message
-                        else:
-                            player_context = f"{player_context}\n\n---SPECIFIC PLAYER---\n{specific_player_context[:500]}"
+                with col_info:
+                    if not OLLAMA_AVAILABLE:
+                        st.warning("Ollama is not installed. Install it with: `pip install ollama`")
+                    elif not is_ollama_reachable():
+                        ollama_url = get_ollama_base_url()
+                        st.warning(f"Cannot connect to Ollama at {ollama_url}. Set OLLAMA_HOST environment variable if using a remote server.")
                     else:
-                        # If no context returned, player doesn't exist
-                        available_players = sorted(list(df_clean['Player Name'].unique())) if 'Player Name' in df_clean.columns else []
-                        player_context = f"REQUESTED_PLAYER: {st.session_state.selected_chat_player} NOT FOUND in dataset.\nAVAILABLE_PLAYERS: {', '.join(available_players[:20])}{' (and more)' if len(available_players) > 20 else ''}"
+                        st.markdown("""
+                        <div style="font-size: 0.75rem; color: #6C757D; padding: 0.5rem; background: #F8F9FA; border-radius: 4px;">
+                            Status: Ollama connected
+                        </div>
+                        """, unsafe_allow_html=True)
                 
-                # Show loading
-                with st.spinner("🤔 Thinking..."):
-                    # Get response from Ollama
-                    response = get_ollama_response(
-                        user_input, 
-                        player_context=player_context,
-                        chat_history=st.session_state.chat_history[:-1]  # Exclude the just-added user message
-                    )
+                # Chat interface
+                st.markdown("---")
+                st.markdown("#### Conversation")
+                
+                # Initialize chat history if needed
+                if 'chat_history' not in st.session_state:
+                    st.session_state.chat_history = []
+                
+                # Display chat history with enhanced bubbles
+                chat_container = st.container()
+                with chat_container:
+                    if len(st.session_state.chat_history) == 0:
+                        st.markdown("""
+                        <div class="info-box" style="text-align: center; padding: 2rem;">
+                            <h4 style="color: #2196F3; margin-bottom: 1rem;">Hi! I'm your sports analytics assistant</h4>
+                            <p style="color: #6C757D; margin-bottom: 1.5rem;">You can ask me about:</p>
+                            <div style="text-align: left; max-width: 500px; margin: 0 auto;">
+                                <p style="margin: 0.5rem 0;"><b>Specific player performance</b> - Analyze individual player metrics and trends</p>
+                                <p style="margin: 0.5rem 0;"><b>Metric explanations</b> - Learn about Player Load, Energy, Speed Zones, etc.</p>
+                                <p style="margin: 0.5rem 0;"><b>Player comparisons</b> - Compare performance across different players</p>
+                                <p style="margin: 0.5rem 0;"><b>Trends and data analysis</b> - Understand patterns and performance trajectories</p>
+                                <p style="margin: 0.5rem 0;"><b>Training recommendations</b> - Get personalized coaching insights</p>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        for i, msg in enumerate(st.session_state.chat_history):
+                            if msg['role'] == 'user':
+                                st.markdown(f"""
+                                <div class="chat-bubble-user">
+                                    <strong>You:</strong><br>{msg['content']}
+                                </div>
+                                """, unsafe_allow_html=True)
+                            elif msg['role'] == 'assistant':
+                                st.markdown(f"""
+                                <div class="chat-bubble-assistant">
+                                    <strong>Assistant:</strong><br>{msg['content']}
+                                </div>
+                                """, unsafe_allow_html=True)
+                
+                # Chat input
+                user_input = st.chat_input("Ask your question here...")
+                
+                if user_input:
+                    # Add user message to history
+                    st.session_state.chat_history.append({"role": "user", "content": user_input})
                     
-                    # Add assistant response to history
-                    st.session_state.chat_history.append({"role": "assistant", "content": response})
+                    # Always get team context first (All Players), then add specific player if selected
+                    player_context = format_player_data_for_context(df_clean, None)  # Team data
                     
-                    # Rerun to show new messages
-                    st.rerun()
-            
-            # Chat actions with suggestions
-            if len(st.session_state.chat_history) == 0:
-                st.markdown("**Quick Questions:**")
-                col_q1, col_q2, col_q3 = st.columns(3)
-                with col_q1:
-                    if st.button("What is Player Load?", key="q1"):
-                        user_input = "What is Player Load?"
-                        st.session_state.chat_history.append({"role": "user", "content": user_input})
-                        player_context = format_player_data_for_context(df_clean, None)
-                        if st.session_state.selected_chat_player:
-                            specific_player_context = format_player_data_for_context(df_clean, st.session_state.selected_chat_player)
-                            if specific_player_context:
+                    # Auto-detect player names mentioned in the user input
+                    detected_players = []
+                    if 'Player Name' in df_clean.columns:
+                        available_players = sorted(list(df_clean['Player Name'].unique()))
+                        detected_players = extract_player_names_from_text(user_input, available_players)
+                    
+                    # Build context with detected players and selected player
+                    players_to_include = []
+                    if st.session_state.selected_chat_player:
+                        matched_name = find_player_in_dataframe(df_clean, st.session_state.selected_chat_player)
+                        if matched_name:
+                            players_to_include.append(matched_name)
+                    
+                    # Add detected players from text
+                    for detected_player in detected_players:
+                        matched_name = find_player_in_dataframe(df_clean, detected_player)
+                        if matched_name and matched_name not in players_to_include:
+                            players_to_include.append(matched_name)
+                    
+                    # Add player contexts
+                    if players_to_include:
+                        player_contexts_parts = []
+                        for player_name in players_to_include[:5]:  # Limit to 5 players to avoid too much context
+                            specific_player_context = format_player_data_for_context(df_clean, player_name)
+                            if specific_player_context and "NOT FOUND" not in specific_player_context:
+                                player_contexts_parts.append(f"\n\n---PLAYER: {player_name}---\n{specific_player_context[:800]}")
+                        
+                        if player_contexts_parts:
+                            player_context = f"{player_context}\n\n{' '.join(player_contexts_parts)}"
+                    elif st.session_state.selected_chat_player:
+                        # Fallback to selected player if no auto-detection worked
+                        specific_player_context = format_player_data_for_context(df_clean, st.session_state.selected_chat_player)
+                        if specific_player_context:
+                            # Check if player was not found
+                            if "NOT FOUND" in specific_player_context:
+                                player_context = specific_player_context  # Use the "not found" message
+                            else:
                                 player_context = f"{player_context}\n\n---SPECIFIC PLAYER---\n{specific_player_context[:500]}"
-                        with st.spinner("Thinking..."):
-                            response = get_ollama_response(user_input, player_context=player_context, chat_history=[])
-                            st.session_state.chat_history.append({"role": "assistant", "content": response})
+                        else:
+                            # If no context returned, player doesn't exist
+                            available_players = sorted(list(df_clean['Player Name'].unique())) if 'Player Name' in df_clean.columns else []
+                            player_context = f"REQUESTED_PLAYER: {st.session_state.selected_chat_player} NOT FOUND in dataset.\nAVAILABLE_PLAYERS: {', '.join(available_players[:20])}{' (and more)' if len(available_players) > 20 else ''}"
+                    
+                    # Show loading
+                    with st.spinner("🤔 Thinking..."):
+                        # Get response from Ollama
+                        response = get_ollama_response(
+                            user_input, 
+                            player_context=player_context,
+                            chat_history=st.session_state.chat_history[:-1]  # Exclude the just-added user message
+                        )
+                        
+                        # Add assistant response to history
+                        st.session_state.chat_history.append({"role": "assistant", "content": response})
+                        
+                        # Rerun to show new messages
                         st.rerun()
-                with col_q2:
-                    if st.button("Compare top players", key="q2"):
-                        user_input = "Compare the top performing players"
-                        st.session_state.chat_history.append({"role": "user", "content": user_input})
-                        player_context = format_player_data_for_context(df_clean, None)
-                        with st.spinner("Thinking..."):
-                            response = get_ollama_response(user_input, player_context=player_context, chat_history=[])
-                            st.session_state.chat_history.append({"role": "assistant", "content": response})
-                        st.rerun()
-                with col_q3:
-                    if st.button("Training recommendations", key="q3"):
-                        user_input = "What are some training recommendations based on the data?"
-                        st.session_state.chat_history.append({"role": "user", "content": user_input})
-                        player_context = format_player_data_for_context(df_clean, None)
-                        with st.spinner("Thinking..."):
-                            response = get_ollama_response(user_input, player_context=player_context, chat_history=[])
-                            st.session_state.chat_history.append({"role": "assistant", "content": response})
-                        st.rerun()
-            
-            if len(st.session_state.chat_history) > 0:
-                col_clear, col_export, col_spacer = st.columns([1, 1, 3])
-                with col_clear:
-                    if st.button("Clear", type="secondary", use_container_width=True):
-                        st.session_state.chat_history = []
-                        st.rerun()
-                with col_export:
-                    # Export conversation
-                    chat_text = "\n\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in st.session_state.chat_history])
-                    st.download_button(
-                        label="Export",
-                        data=chat_text,
-                        file_name=f"chat_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                        mime="text/plain",
-                        key="export_chat",
-                        use_container_width=True
-                    )
+                
+                # Chat actions with suggestions
+                if len(st.session_state.chat_history) == 0:
+                    st.markdown("**Quick Questions:**")
+                    col_q1, col_q2, col_q3 = st.columns(3)
+                    with col_q1:
+                        if st.button("What is Player Load?", key="q1"):
+                            user_input = "What is Player Load?"
+                            st.session_state.chat_history.append({"role": "user", "content": user_input})
+                            player_context = format_player_data_for_context(df_clean, None)
+                            if st.session_state.selected_chat_player:
+                                specific_player_context = format_player_data_for_context(df_clean, st.session_state.selected_chat_player)
+                                if specific_player_context:
+                                    player_context = f"{player_context}\n\n---SPECIFIC PLAYER---\n{specific_player_context[:500]}"
+                                with st.spinner("Thinking..."):
+                                    response = get_ollama_response(user_input, player_context=player_context, chat_history=[])
+                                    st.session_state.chat_history.append({"role": "assistant", "content": response})
+                                st.rerun()
+                    with col_q2:
+                        if st.button("Compare top players", key="q2"):
+                            user_input = "Compare the top performing players"
+                            st.session_state.chat_history.append({"role": "user", "content": user_input})
+                            player_context = format_player_data_for_context(df_clean, None)
+                            with st.spinner("Thinking..."):
+                                response = get_ollama_response(user_input, player_context=player_context, chat_history=[])
+                                st.session_state.chat_history.append({"role": "assistant", "content": response})
+                            st.rerun()
+                    with col_q3:
+                        if st.button("Training recommendations", key="q3"):
+                            user_input = "What are some training recommendations based on the data?"
+                            st.session_state.chat_history.append({"role": "user", "content": user_input})
+                            player_context = format_player_data_for_context(df_clean, None)
+                            with st.spinner("Thinking..."):
+                                response = get_ollama_response(user_input, player_context=player_context, chat_history=[])
+                                st.session_state.chat_history.append({"role": "assistant", "content": response})
+                            st.rerun()
+                
+                if len(st.session_state.chat_history) > 0:
+                    col_clear, col_export, col_spacer = st.columns([1, 1, 3])
+                    with col_clear:
+                        if st.button("Clear", type="secondary", use_container_width=True):
+                            st.session_state.chat_history = []
+                            st.rerun()
+                    with col_export:
+                        # Export conversation
+                        chat_text = "\n\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in st.session_state.chat_history])
+                        st.download_button(
+                            label="Export",
+                            data=chat_text,
+                            file_name=f"chat_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                            mime="text/plain",
+                            key="export_chat",
+                            use_container_width=True
+                        )
         
         st.markdown("---")
         st.markdown("### Comprehensive Performance Dashboard")
@@ -3562,192 +3631,198 @@ elif page == "Performance Analytics":
             trend = "increasing" if recent_avg > overall_avg else "decreasing"
             
             st.markdown(f"""
-            **Trend Analysis for {selected_player}:**
-            - Recent 5-session average: **{recent_avg:.1f}**
-            - Overall average: **{overall_avg:.1f}**
-            - Trend: **{trend.upper()}** ({((recent_avg - overall_avg) / overall_avg * 100):.1f}% change)
-            - **Recommendation:** {"Monitor closely for overtraining" if trend == "increasing" and recent_avg > overall_avg * 1.15 else "Performance is stable"}
-            """)
-        
-        # Speed Zones Analysis
-        st.markdown("#### ⚡ Speed Zone Distribution")
-        st.info("💡 **Coach Insight:** Understanding speed zones helps optimize training intensity and match preparation.")
-        
-        speed_zones = [
-            'Distance in Speed Zone 1  (miles)',
-            'Distance in Speed Zone 2  (miles)',
-            'Distance in Speed Zone 3  (miles)',
-            'Distance in Speed Zone 4  (miles)',
-            'Distance in Speed Zone 5  (miles)'
-        ]
-        speed_zones = [sz for sz in speed_zones if sz in df_clean.columns]
-        
-        if speed_zones:
-            # Check if Tags column exists for session type filtering
-            has_tags = 'Tags' in df_clean.columns
+                **Trend Analysis for {selected_player}:**
+                - Recent 5-session average: **{recent_avg:.1f}**
+                - Overall average: **{overall_avg:.1f}**
+                - Trend: **{trend.upper()}** ({((recent_avg - overall_avg) / overall_avg * 100):.1f}% change)
+                - **Recommendation:** {"Monitor closely for overtraining" if trend == "increasing" and recent_avg > overall_avg * 1.15 else "Performance is stable"}
+                """)
             
-            if has_tags:
-                session_type = st.selectbox("Session Type", ["All Sessions", "Training Only", "Games Only"], key='speed_session_filter')
+            # Speed Zones Analysis
+            st.markdown("#### ⚡ Speed Zone Distribution")
+            st.info("💡 **Coach Insight:** Understanding speed zones helps optimize training intensity and match preparation.")
             
-            # Player selection for speed zones
-            if 'Player Name' in df_clean.columns:
-                selected_player_speed = st.selectbox(
-                    "Select Player for Speed Zone Analysis",
-                    ['All Team Average'] + list(df_clean['Player Name'].unique()),
-                    key='speed_player_selector'
-                )
+            speed_zones = [
+                'Distance in Speed Zone 1  (miles)',
+                'Distance in Speed Zone 2  (miles)',
+                'Distance in Speed Zone 3  (miles)',
+                'Distance in Speed Zone 4  (miles)',
+                'Distance in Speed Zone 5  (miles)'
+            ]
+            speed_zones = [sz for sz in speed_zones if sz in df_clean.columns]
+            
+            if speed_zones:
+                # Check if Tags column exists for session type filtering
+                has_tags = 'Tags' in df_clean.columns
                 
-                if selected_player_speed != 'All Team Average':
-                    df_filtered_speed = df_clean[df_clean['Player Name'] == selected_player_speed].copy()
+                if has_tags:
+                    session_type = st.selectbox("Session Type", ["All Sessions", "Training Only", "Games Only"], key='speed_session_filter')
+                
+                # Player selection for speed zones
+                if 'Player Name' in df_clean.columns:
+                    selected_player_speed = st.selectbox(
+                        "Select Player for Speed Zone Analysis",
+                        ['All Team Average'] + list(df_clean['Player Name'].unique()),
+                        key='speed_player_selector'
+                    )
+                    
+                    if selected_player_speed != 'All Team Average':
+                        df_filtered_speed = df_clean[df_clean['Player Name'] == selected_player_speed].copy()
+                    else:
+                        df_filtered_speed = df_clean.copy()
                 else:
                     df_filtered_speed = df_clean.copy()
-            else:
-                df_filtered_speed = df_clean.copy()
-                selected_player_speed = None
-            
-            # Apply session type filter
-            if has_tags:
-                if session_type == "Training Only":
-                    df_filtered_speed = df_filtered_speed[df_filtered_speed['Tags'].str.contains('training', case=False, na=False)]
-                    filter_suffix = " (Training)"
-                elif session_type == "Games Only":
-                    df_filtered_speed = df_filtered_speed[df_filtered_speed['Tags'].str.contains('game', case=False, na=False)]
-                    filter_suffix = " (Games)"
+                    selected_player_speed = None
+                
+                # Apply session type filter
+                if has_tags:
+                    if session_type == "Training Only":
+                        df_filtered_speed = df_filtered_speed[df_filtered_speed['Tags'].str.contains('training', case=False, na=False)]
+                        filter_suffix = " (Training)"
+                    elif session_type == "Games Only":
+                        df_filtered_speed = df_filtered_speed[df_filtered_speed['Tags'].str.contains('game', case=False, na=False)]
+                        filter_suffix = " (Games)"
+                    else:
+                        filter_suffix = " (All Sessions)"
                 else:
-                    filter_suffix = " (All Sessions)"
-            else:
-                filter_suffix = ""
+                    filter_suffix = ""
+                
+                # Calculate speed data
+                if selected_player_speed != 'All Team Average':
+                    speed_data = df_filtered_speed[speed_zones].mean()
+                    title_suffix = f" - {selected_player_speed}{filter_suffix}"
+                else:
+                    speed_data = df_filtered_speed[speed_zones].mean()
+                    title_suffix = f" - Team Average{filter_suffix}"
+                
+                fig, ax = plt.subplots(figsize=(10, 6))
+                colors = ['#4CAF50', '#8BC34A', '#FFC107', '#FF9800', '#F44336']
+                bars = ax.bar(range(len(speed_data)), speed_data.values, color=colors, edgecolor='black', linewidth=1.5)
+                ax.set_xticks(range(len(speed_data)))
+                ax.set_xticklabels(['Zone 1\n(Low)', 'Zone 2\n(Light)', 'Zone 3\n(Moderate)', 'Zone 4\n(High)', 'Zone 5\n(Sprint)'])
+                ax.set_ylabel('Average Distance (miles)', fontweight='bold')
+                ax.set_title(f'Speed Zone Distribution{title_suffix}', fontsize=14, fontweight='bold', pad=20)
+                ax.grid(axis='y', alpha=0.3)
+                
+                # Add value labels on bars
+                for bar in bars:
+                    height = bar.get_height()
+                    ax.text(bar.get_x() + bar.get_width()/2., height,
+                           f'{height:.2f}',
+                           ha='center', va='bottom', fontweight='bold')
+                
+                st.pyplot(fig)
+                
+                zone_5_pct = (speed_data.iloc[-1] / speed_data.sum() * 100) if len(speed_data) > 0 and speed_data.sum() > 0 else 0
+                zone_5_insight = ""
+                if zone_5_pct < 5:
+                    zone_5_insight = "⚠️ Increase high-intensity work to build match fitness"
+                elif zone_5_pct > 15:
+                    zone_5_insight = "⚠️ Consider recovery protocols - too much high intensity"
+                else:
+                    zone_5_insight = "✅ Maintain current intensity distribution"
+                
+                st.markdown(f"""
+                **Speed Zone Insights{title_suffix}:**
+                - **Zone 5 (Sprint)** represents **{zone_5_pct:.1f}%** of total distance
+                - **Optimal range:** 5-15% for match preparation
+                - **Action:** {zone_5_insight}
+                """)
             
-            # Calculate speed data
-            if selected_player_speed != 'All Team Average':
-                speed_data = df_filtered_speed[speed_zones].mean()
-                title_suffix = f" - {selected_player_speed}{filter_suffix}"
-            else:
-                speed_data = df_filtered_speed[speed_zones].mean()
-                title_suffix = f" - Team Average{filter_suffix}"
+            # Team Comparison
+            if 'Player Name' in df_clean.columns:
+                st.markdown("#### 🏃 Player Comparison Matrix")
+                st.info("💡 **Coach Insight:** Quickly identify top performers and players needing development in each category.")
+                
+                player_summary = df_clean.groupby('Player Name').agg({
+                    'Player Load': 'mean',
+                    'Distance (miles)': 'mean',
+                    'Top Speed (mph)': 'max',
+                    'Energy (kcal)': 'mean',
+                    'Sprint Distance (yards)': 'mean'
+                }).reset_index()
+                
+                fig, ax = plt.subplots(figsize=(14, 8))
+                
+                # Normalize data for heatmap
+                player_summary_norm = player_summary.copy()
+                for col in player_summary.columns[1:]:
+                    player_summary_norm[col] = (player_summary[col] - player_summary[col].min()) / (player_summary[col].max() - player_summary[col].min())
+                
+                sns.heatmap(
+                    player_summary_norm.set_index('Player Name'),
+                    annot=True,
+                    fmt='.2f',
+                    cmap='RdYlGn',
+                    center=0.5,
+                    linewidths=0.5,
+                    cbar_kws={"shrink": 0.8, "label": "Normalized Performance (0-1)"},
+                    ax=ax
+                )
+                ax.set_title('Player Performance Heatmap (Normalized)', fontsize=14, fontweight='bold', pad=20)
+                ax.set_xlabel('Performance Metrics', fontweight='bold')
+                ax.set_ylabel('Player Name', fontweight='bold')
+                
+                st.pyplot(fig)
+                
+                st.markdown("""
+                **Heatmap Guide:**
+                - **Green (high values):** Player excels in this metric
+                - **Yellow (moderate):** Average performance
+                - **Red (low values):** Area for improvement
+                - Use this to create individualized training programs
+                """)
             
-            fig, ax = plt.subplots(figsize=(10, 6))
-            colors = ['#4CAF50', '#8BC34A', '#FFC107', '#FF9800', '#F44336']
-            bars = ax.bar(range(len(speed_data)), speed_data.values, color=colors, edgecolor='black', linewidth=1.5)
-            ax.set_xticks(range(len(speed_data)))
-            ax.set_xticklabels(['Zone 1\n(Low)', 'Zone 2\n(Light)', 'Zone 3\n(Moderate)', 'Zone 4\n(High)', 'Zone 5\n(Sprint)'])
-            ax.set_ylabel('Average Distance (miles)', fontweight='bold')
-            ax.set_title(f'Speed Zone Distribution{title_suffix}', fontsize=14, fontweight='bold', pad=20)
-            ax.grid(axis='y', alpha=0.3)
-            
-            # Add value labels on bars
-            for bar in bars:
-                height = bar.get_height()
-                ax.text(bar.get_x() + bar.get_width()/2., height,
-                       f'{height:.2f}',
-                       ha='center', va='bottom', fontweight='bold')
-            
-            st.pyplot(fig)
-            
-            zone_5_pct = (speed_data.iloc[-1] / speed_data.sum() * 100) if len(speed_data) > 0 and speed_data.sum() > 0 else 0
-            zone_5_insight = ""
-            if zone_5_pct < 5:
-                zone_5_insight = "⚠️ Increase high-intensity work to build match fitness"
-            elif zone_5_pct > 15:
-                zone_5_insight = "⚠️ Consider recovery protocols - too much high intensity"
-            else:
-                zone_5_insight = "✅ Maintain current intensity distribution"
-            
-            st.markdown(f"""
-            **Speed Zone Insights{title_suffix}:**
-            - **Zone 5 (Sprint)** represents **{zone_5_pct:.1f}%** of total distance
-            - **Optimal range:** 5-15% for match preparation
-            - **Action:** {zone_5_insight}
-            """)
-        
-        # Team Comparison
-        if 'Player Name' in df_clean.columns:
-            st.markdown("#### 🏃 Player Comparison Matrix")
-            st.info("💡 **Coach Insight:** Quickly identify top performers and players needing development in each category.")
-            
-            player_summary = df_clean.groupby('Player Name').agg({
-                'Player Load': 'mean',
-                'Distance (miles)': 'mean',
-                'Top Speed (mph)': 'max',
-                'Energy (kcal)': 'mean',
-                'Sprint Distance (yards)': 'mean'
-            }).reset_index()
-            
-            fig, ax = plt.subplots(figsize=(14, 8))
-            
-            # Normalize data for heatmap
-            player_summary_norm = player_summary.copy()
-            for col in player_summary.columns[1:]:
-                player_summary_norm[col] = (player_summary[col] - player_summary[col].min()) / (player_summary[col].max() - player_summary[col].min())
-            
-            sns.heatmap(
-                player_summary_norm.set_index('Player Name'),
-                annot=True,
-                fmt='.2f',
-                cmap='RdYlGn',
-                center=0.5,
-                linewidths=0.5,
-                cbar_kws={"shrink": 0.8, "label": "Normalized Performance (0-1)"},
-                ax=ax
-            )
-            ax.set_title('Player Performance Heatmap (Normalized)', fontsize=14, fontweight='bold', pad=20)
-            ax.set_xlabel('Performance Metrics', fontweight='bold')
-            ax.set_ylabel('Player Name', fontweight='bold')
-            
-            st.pyplot(fig)
+            # Final Recommendations
+            st.markdown("### 📝 Comprehensive Coaching Recommendations")
             
             st.markdown("""
-            **Heatmap Guide:**
-            - **Green (high values):** Player excels in this metric
-            - **Yellow (moderate):** Average performance
-            - **Red (low values):** Area for improvement
-            - Use this to create individualized training programs
-            """)
-        
-        # Final Recommendations
-        st.markdown("### 📝 Comprehensive Coaching Recommendations")
-        
-        st.markdown("""
-        <div class="success-box">
-        <h4>🎯 Data-Driven Coaching Strategy</h4>
-        
-        <h5>1. Training Load Management</h5>
-        <ul>
-            <li>Monitor weekly load accumulation to prevent spikes > 20% week-over-week</li>
-            <li>Implement 3:1 or 4:1 work-to-recovery ratio (3-4 hard days, 1 easy day)</li>
-            <li>Use Player Load as primary metric for overall workload tracking</li>
-        </ul>
-        
-        <h5>2. Individualization</h5>
-        <ul>
-            <li>Players in bottom 25% for specific metrics need targeted development plans</li>
-            <li>High performers (top 10%) can handle advanced training protocols</li>
-            <li>Mid-range players benefit from progressive overload strategies</li>
-        </ul>
-        
-        <h5>3. Match Preparation</h5>
-        <ul>
-            <li>Peak speed work should occur 48-72 hours before matches</li>
-            <li>Taper training load by 30-40% in 24 hours pre-match</li>
-            <li>Focus on tactical work rather than physical loading close to games</li>
-        </ul>
-        
-        <h5>4. Recovery Protocols</h5>
-        <ul>
-            <li>Players with HR Load > team mean + 1 SD need extra recovery day</li>
-            <li>High Impact zones (>20G) correlate with muscle damage - monitor closely</li>
-            <li>Red Zone time > 15 min indicates need for enhanced recovery strategies</li>
-        </ul>
-        
-        <h5>5. Performance Benchmarks</h5>
-        <ul>
-            <li><b>Elite Player Load:</b> 350-450 per session</li>
-            <li><b>Target Distance:</b> 4-7 miles per training session</li>
-            <li><b>Sprint Work:</b> 200-400 yards high-speed running per session</li>
-            <li><b>Energy Expenditure:</b> 600-900 kcal per hour of activity</li>
-        </ul>
-        </div>
-        """, unsafe_allow_html=True)
+            <div class="success-box">
+            <h4>🎯 Data-Driven Coaching Strategy</h4>
+            
+            <h5>1. Training Load Management</h5>
+            <ul>
+                <li>Monitor weekly load accumulation to prevent spikes > 20% week-over-week</li>
+                <li>Implement 3:1 or 4:1 work-to-recovery ratio (3-4 hard days, 1 easy day)</li>
+                <li>Use Player Load as primary metric for overall workload tracking</li>
+            </ul>
+            
+            <h5>2. Individualization</h5>
+            <ul>
+                <li>Players in bottom 25% for specific metrics need targeted development plans</li>
+                <li>High performers (top 10%) can handle advanced training protocols</li>
+                <li>Mid-range players benefit from progressive overload strategies</li>
+            </ul>
+            
+            <h5>3. Match Preparation</h5>
+            <ul>
+                <li>Peak speed work should occur 48-72 hours before matches</li>
+                <li>Taper training load by 30-40% in 24 hours pre-match</li>
+                <li>Focus on tactical work rather than physical loading close to games</li>
+            </ul>
+            
+            <h5>4. Recovery Protocols</h5>
+            <ul>
+                <li>Players with HR Load > team mean + 1 SD need extra recovery day</li>
+                <li>High Impact zones (>20G) correlate with muscle damage - monitor closely</li>
+                <li>Red Zone time > 15 min indicates need for enhanced recovery strategies</li>
+            </ul>
+            
+            <h5>5. Performance Benchmarks</h5>
+            <ul>
+                <li><b>Elite Player Load:</b> 350-450 per session</li>
+                <li><b>Target Distance:</b> 4-7 miles per training session</li>
+                <li><b>Sprint Work:</b> 200-400 yards high-speed running per session</li>
+                <li><b>Energy Expenditure:</b> 600-900 kcal per hour of activity</li>
+            </ul>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            # Show a subtle, non-blocking info only (no warning/errors on cloud)
+            st.markdown(
+                "<div style=\"font-size: 0.85rem; color: #6C757D;\">AI Assistant is disabled on this deployment. To use it, run the app locally with Ollama running.</div>",
+                unsafe_allow_html=True,
+            )
 
 elif page == "Load Prediction":
     st.markdown('<h1 class="main-header">Predict Next Session Player Load</h1>', unsafe_allow_html=True)
