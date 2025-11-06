@@ -13,7 +13,7 @@ Advanced machine learning platform for analyzing soccer player performance, prev
 
 ## Live Demo
 
-** Try it now:** [https://ml-models-z9jxxmnmkkxtca7eewrywj.streamlit.app/]
+** Try it now:** https://ml-models-a7qjytehj3hkmv4zbnpu8w.streamlit.app/
 
 ## Live Demo
 
