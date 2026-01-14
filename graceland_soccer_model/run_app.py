@@ -33,7 +33,9 @@ def main():
         subprocess.run([
             sys.executable, "-m", "streamlit", "run", app_file,
             "--server.port", "8501",
-            "--server.address", "localhost"
+            "--server.address", "localhost",
+            "--server.maxUploadSize", "200",
+            "--server.maxMessageSize", "200"
         ], check=True)
     except KeyboardInterrupt:
         print("\n\n👋 Application stopped by user")

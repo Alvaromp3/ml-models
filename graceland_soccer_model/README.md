@@ -50,13 +50,13 @@ Advanced machine learning platform for analyzing soccer player performance, prev
 ### 2. **Model Training**
 
 - **Player Load Prediction (Regression)**: Predict player load based on performance metrics
- - High-performance GradientBoosting model
- - R² score typically > 0.90
- - Real-time predictions
+- High-performance GradientBoosting model
+- R² score typically > 0.90
+- Real-time predictions
 - **Injury Risk Classification**: Classify players into low/medium/high injury risk categories
- - LGBM Classifier with SMOTE for balanced data
- - Accuracy typically > 0.90
- - Comprehensive risk assessment
+- LGBM Classifier with SMOTE for balanced data
+- Accuracy typically > 0.90
+- Comprehensive risk assessment
 
 ### 3. **Player Load Analysis**
 
@@ -75,11 +75,11 @@ Advanced machine learning platform for analyzing soccer player performance, prev
 ### 5. **Team Lineup Calculator**
 
 - Optimized lineup selection based on multiple strategies:
- - Balanced Performance
- - Maximum Energy Output
- - Speed-Focused
- - Endurance-Focused
- - Custom Weight Configuration
+- Balanced Performance
+- Maximum Energy Output
+- Speed-Focused
+- Endurance-Focused
+- Custom Weight Configuration
 - Radar charts for player comparison
 - Composite scoring system
 
@@ -111,6 +111,7 @@ ollama serve # ensure it's running on 127.0.0.1:11434
 Models: defaults to `llama3.2` or `llama3.2:latest` (auto-detected).
 
 Notes:
+
 - The UI shows a subtle status “Ollama connected”.
 - Player names are matched robustly (case-insensitive, partial/fuzzy).
 
@@ -232,8 +233,10 @@ The application works best with the following Catapult metrics included in your 
 
 1. Navigate to ** Data Audit** page
 2. Click "Upload your CSV file"
- - **For testing**: Use `sample_catapult_data.csv` included in the project
- - **For real data**: Upload your Catapult export CSV file
+
+- **For testing**: Use `sample_catapult_data.csv` included in the project
+- **For real data**: Upload your Catapult export CSV file
+
 3. Review the data quality report
 4. Click "🧹 Clean Data & Remove Outliers" button
 
@@ -270,10 +273,10 @@ The application works best with the following Catapult metrics included in your 
 ### Data Preprocessing
 
 - **Outlier Handling**: Conservative cleaning
- - Removes only very extreme outliers (Z > 4.5 or beyond 4.5×IQR)
- - Drops rows only if flagged in multiple critical metrics
- - Also filters rows with many zeros across critical metrics (thresholded)
- - Safety guard prevents removal of >20% of data in one action
+- Removes only very extreme outliers (Z > 4.5 or beyond 4.5×IQR)
+- Drops rows only if flagged in multiple critical metrics
+- Also filters rows with many zeros across critical metrics (thresholded)
+- Safety guard prevents removal of >20% of data in one action
 - **Missing Values**: Imputed using mode (categorical) and median (numeric)
 - **Feature Scaling**: StandardScaler for normalization
 - **Feature Selection**: SelectKBest / SelectFromModel
@@ -319,6 +322,6 @@ This project is developed for sports performance analytics purposes.
 
 ## Version
 
-**Version**: 1.0.0 
-**Last Updated**: 2024 
+**Version**: 1.0.0
+**Last Updated**: 2024
 **Powered by**: Machine Learning & Sports Science

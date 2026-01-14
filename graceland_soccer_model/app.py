@@ -16,7 +16,6 @@ import plotly.express as px
 from datetime import datetime, timedelta
 warnings.filterwarnings('ignore')
 
-# PDF generation imports
 try:
     from reportlab.lib.pagesizes import letter, A4
     from reportlab.lib import colors
@@ -57,7 +56,6 @@ from xgboost import XGBClassifier, XGBRegressor
 from lightgbm import LGBMClassifier, LGBMRegressor
 from catboost import CatBoostClassifier, CatBoostRegressor
 
-# Advanced ML extensions
 try:
     from advanced_ml_extensions import (
         compute_cross_validation_metrics,
@@ -74,9 +72,6 @@ except ImportError:
     MLFLOW_AVAILABLE = False
     logging.warning("Advanced ML extensions not available")
 
-# Ollama integration for AI Coach Assistant
-# OLLAMA_HOST will be read from secrets or environment when needed
-# Default to localhost if not set
 if "OLLAMA_HOST" not in os.environ:
     os.environ["OLLAMA_HOST"] = "http://127.0.0.1:11434"
 
@@ -87,7 +82,6 @@ except ImportError:
     OLLAMA_AVAILABLE = False
     logging.warning("Ollama not available. Install with: pip install ollama")
 
-# Set page config
 st.set_page_config(
     page_title="Elite Sports Performance Analytics | Alvaro Martin-Pena",
     page_icon="",
@@ -95,7 +89,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Enhanced Custom CSS - Modern UI Design System
+if 'maxUploadSize' not in st.session_state:
+    st.session_state.maxUploadSize = 200  # 200MB
+
 st.markdown("""
 <style>
     /* ===== Color Palette & Variables ===== */
@@ -468,7 +464,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
 if 'df' not in st.session_state:
     st.session_state.df = None
 if 'df_clean' not in st.session_state:
@@ -485,12 +480,24 @@ if 'regression_features' not in st.session_state:
     st.session_state.regression_features = None
 if 'classification_features' not in st.session_state:
     st.session_state.classification_features = None
+    # Try to load model and features if model file exists but not loaded yet
+    if st.session_state.classification_model is None:
+        try:
+            pipe, metrics, features = load_model('classification')
+            if pipe is not None:
+                st.session_state.classification_model = pipe
+                if metrics is not None:
+                    st.session_state.classification_metrics = metrics
+                if features is not None:
+                    st.session_state.classification_features = features
+        except Exception as e:
+            logging.debug(f"Could not auto-load classification model: {e}")
+            pass
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 if 'selected_chat_player' not in st.session_state:
     st.session_state.selected_chat_player = None
 
-# Setup logging and directories
 os.makedirs('logs', exist_ok=True)
 os.makedirs('models', exist_ok=True)
 os.makedirs('reports', exist_ok=True)
@@ -502,7 +509,6 @@ logging.basicConfig(
     filemode='a'
 )
 
-# Helper Functions for Model Persistence
 def save_model(model, model_type, metrics=None, features=None):
     """Save trained model to disk"""
     try:
@@ -527,11 +533,436 @@ def load_model(model_type):
         if os.path.exists(model_path):
             with open(model_path, 'rb') as f:
                 data = pickle.load(f)
+            
+            model = data['model']
+            
+            if model_type == 'classification' and hasattr(model, 'steps'):
+                last_step = model.steps[-1][1] if hasattr(model, 'steps') else None
+                if last_step is not None:
+                    model_class_name = type(last_step).__name__
+                    if 'LGBM' in model_class_name or 'LightGBM' in model_class_name:
+                        if hasattr(last_step, 'booster_') and last_step.booster_ is not None:
+                            try:
+                                _ = last_step.booster_.__dict__
+                            except (AttributeError, TypeError) as e:
+                                logging.warning(f"LightGBM booster issue detected: {e}. Model will need retraining.")
+                                return None, None, None
+            
             logging.info(f"Model loaded: {model_path}")
-            return data['model'], data.get('metrics'), data.get('features')
+            return model, data.get('metrics'), data.get('features')
     except Exception as e:
         logging.error(f"Error loading model: {str(e)}")
+        if 'handle' in str(e) or 'Booster' in str(e):
+            logging.warning("LightGBM compatibility issue detected. Model will be retrained.")
     return None, None, None
+
+def validate_data_robust(df):
+    """Comprehensive data validation with detailed reporting"""
+    validation_results = {
+        'is_valid': True,
+        'warnings': [],
+        'errors': [],
+        'recommendations': [],
+        'data_quality_score': 100.0,
+        'issues_found': {}
+    }
+    
+    required_cols = ['Player Name', 'Player Load', 'Date']
+    missing_required = [col for col in required_cols if col not in df.columns]
+    if missing_required:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append(f"Columnas requeridas faltantes: {', '.join(missing_required)}")
+        validation_results['issues_found']['missing_required_columns'] = missing_required
+    
+    if 'Player Load' in df.columns:
+        if not pd.api.types.is_numeric_dtype(df['Player Load']):
+            validation_results['warnings'].append("'Player Load' debería ser numérico")
+            validation_results['issues_found']['invalid_player_load_type'] = True
+    
+    if 'Date' in df.columns:
+        try:
+            pd.to_datetime(df['Date'], errors='raise')
+        except:
+            validation_results['warnings'].append("La columna 'Date' tiene formatos de fecha inválidos")
+            validation_results['issues_found']['invalid_date_format'] = True
+    
+    critical_cols = ['Player Name', 'Player Load']
+    for col in critical_cols:
+        if col in df.columns:
+            missing_pct = df[col].isna().sum() / len(df) * 100
+            if missing_pct > 5:
+                validation_results['warnings'].append(f"{col}: {missing_pct:.1f}% de valores faltantes")
+                validation_results['issues_found'][f'missing_{col}'] = missing_pct
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    outlier_issues = {}
+    for col in numeric_cols:
+        if col in ['Player Load', 'Energy (kcal)', 'Distance (miles)', 'Top Speed (mph)']:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            if IQR > 0:
+                lower_bound = Q1 - 3 * IQR
+                upper_bound = Q3 + 3 * IQR
+                outliers = ((df[col] < lower_bound) | (df[col] > upper_bound)).sum()
+                if outliers > 0:
+                    outlier_pct = outliers / len(df) * 100
+                    if outlier_pct > 10:
+                        validation_results['warnings'].append(f"{col}: {outlier_pct:.1f}% de valores atípicos detectados")
+                        outlier_issues[col] = outlier_pct
+    
+    if outlier_issues:
+        validation_results['issues_found']['outliers'] = outlier_issues
+    
+    range_checks = {
+        'Player Load': (0, 1000),
+        'Top Speed (mph)': (0, 30),
+        'Energy (kcal)': (0, 2000),
+        'Distance (miles)': (0, 15)
+    }
+    
+    for col, (min_val, max_val) in range_checks.items():
+        if col in df.columns:
+            out_of_range = ((df[col] < min_val) | (df[col] > max_val)).sum()
+            if out_of_range > 0:
+                validation_results['warnings'].append(f"{col}: {out_of_range} valores fuera del rango esperado ({min_val}-{max_val})")
+    
+    duplicates = df.duplicated().sum()
+    if duplicates > 0:
+        validation_results['warnings'].append(f"{duplicates} filas duplicadas encontradas")
+        validation_results['issues_found']['duplicates'] = duplicates
+    
+    if 'Date' in df.columns:
+        try:
+            dates = pd.to_datetime(df['Date'], errors='coerce')
+            if dates.notna().sum() > 0:
+                date_range = dates.max() - dates.min()
+                if date_range.days > 365 * 2:
+                    validation_results['warnings'].append(f"Rango de fechas muy amplio: {date_range.days} días")
+                
+                future_dates = (dates > pd.Timestamp.now()).sum()
+                if future_dates > 0:
+                    validation_results['warnings'].append(f"{future_dates} fechas futuras detectadas")
+        except:
+            pass
+    
+    score = 100.0
+    score -= len(validation_results['errors']) * 20
+    score -= len(validation_results['warnings']) * 5
+    score = max(0, score)
+    validation_results['data_quality_score'] = score
+    if validation_results['warnings']:
+        validation_results['recommendations'].append("Revisa y corrige los valores atípicos usando la herramienta de limpieza")
+    if validation_results['issues_found'].get('duplicates'):
+        validation_results['recommendations'].append("Considera eliminar filas duplicadas")
+    if validation_results['issues_found'].get('outliers'):
+        validation_results['recommendations'].append("Usa la función 'Remove Extreme Outliers' para limpiar datos extremos")
+    
+    return validation_results
+
+def analyze_temporal_trends(df, player_name=None, metric='Player Load', days=30):
+    """Analyze temporal trends for a specific player or all players"""
+    if 'Date' not in df.columns or metric not in df.columns:
+        return None
+    
+    try:
+        df_analysis = df.copy()
+        df_analysis['Date'] = pd.to_datetime(df_analysis['Date'], errors='coerce')
+        df_analysis = df_analysis.dropna(subset=['Date', metric])
+        
+        if player_name:
+            df_analysis = df_analysis[df_analysis['Player Name'] == player_name]
+        
+        if len(df_analysis) == 0:
+            return None
+        
+        max_date = df_analysis['Date'].max()
+        cutoff_date = max_date - timedelta(days=days)
+        df_recent = df_analysis[df_analysis['Date'] >= cutoff_date].copy()
+        
+        if len(df_recent) < 3:
+            return None
+        
+        df_recent = df_recent.sort_values('Date')
+        df_recent['day_index'] = range(len(df_recent))
+        
+        from sklearn.linear_model import LinearRegression
+        X = df_recent[['day_index']].values
+        y = df_recent[metric].values
+        
+        reg = LinearRegression()
+        reg.fit(X, y)
+        slope = reg.coef_[0]
+        
+        first_half = df_recent.head(len(df_recent)//2)[metric].mean()
+        second_half = df_recent.tail(len(df_recent)//2)[metric].mean()
+        pct_change = ((second_half - first_half) / first_half * 100) if first_half > 0 else 0
+        
+        mean_val = df_recent[metric].mean()
+        std_val = df_recent[metric].std()
+        cv = std_val / mean_val if mean_val > 0 else 0
+        
+        trend_direction = 'increasing' if slope > 0 else 'decreasing' if slope < 0 else 'stable'
+        volatility = 'high' if cv > 0.3 else 'medium' if cv > 0.15 else 'low'
+        
+        return {
+            'trend_direction': trend_direction,
+            'slope': slope,
+            'pct_change': pct_change,
+            'volatility': volatility,
+            'mean': mean_val,
+            'std': std_val,
+            'cv': cv,
+            'data_points': len(df_recent),
+            'first_date': df_recent['Date'].min(),
+            'last_date': df_recent['Date'].max()
+        }
+    except Exception as e:
+        logging.error(f"Error in temporal trend analysis: {e}")
+        return None
+
+def detect_anomalies_temporal(df, player_name, metric='Player Load', window=7):
+    """Detect anomalies in temporal data using moving average"""
+    if 'Date' not in df.columns or metric not in df.columns:
+        return []
+    
+    try:
+        df_player = df[df['Player Name'] == player_name].copy()
+        df_player['Date'] = pd.to_datetime(df_player['Date'], errors='coerce')
+        df_player = df_player.sort_values('Date')
+        
+        if len(df_player) < window * 2:
+            return []
+        
+        df_player['ma'] = df_player[metric].rolling(window=window, center=True).mean()
+        df_player['std'] = df_player[metric].rolling(window=window, center=True).std()
+        
+        df_player['anomaly'] = abs(df_player[metric] - df_player['ma']) > (2 * df_player['std'])
+        anomalies = df_player[df_player['anomaly']].copy()
+        
+        return anomalies[['Date', metric, 'ma']].to_dict('records') if len(anomalies) > 0 else []
+    except:
+        return []
+
+def generate_personalized_training_plan(player_name, df, recent_days=14):
+    """Generate personalized training plan based on player's recent performance"""
+    if 'Date' not in df.columns or 'Player Name' not in df.columns:
+        return None
+    
+    try:
+        df_player = df[df['Player Name'] == player_name].copy()
+        df_player['Date'] = pd.to_datetime(df_player['Date'], errors='coerce')
+        df_player = df_player.sort_values('Date')
+        
+        max_date = df_player['Date'].max()
+        cutoff = max_date - timedelta(days=recent_days)
+        recent_data = df_player[df_player['Date'] >= cutoff]
+        
+        if len(recent_data) == 0:
+            return None
+        
+        plan = {
+            'player_name': player_name,
+            'analysis_period': f"Últimos {recent_days} días",
+            'recommendations': [],
+            'training_schedule': [],
+            'recovery_days': [],
+            'target_metrics': {}
+        }
+        
+        avg_load = recent_data['Player Load'].mean() if 'Player Load' in recent_data.columns else 0
+        max_load = recent_data['Player Load'].max() if 'Player Load' in recent_data.columns else 0
+        
+        training_days = recent_data['Date'].nunique()
+        sessions_per_week = (training_days / recent_days) * 7
+        if avg_load > 400:
+            plan['recommendations'].append({
+                'type': 'load_reduction',
+                'priority': 'high',
+                'message': f"Carga promedio alta ({avg_load:.0f}). Recomendamos reducir intensidad en próximos 2-3 días.",
+                'action': f"Target load: {avg_load * 0.7:.0f} (reducción del 30%)"
+            })
+            plan['recovery_days'].append("Próximos 2 días: Sesión ligera o descanso activo")
+        
+        if sessions_per_week > 5:
+            plan['recommendations'].append({
+                'type': 'frequency_reduction',
+                'priority': 'medium',
+                'message': f"Alta frecuencia de entrenamiento ({sessions_per_week:.1f} sesiones/semana). Considera más días de recuperación.",
+                'action': "Target: 4-5 sesiones/semana con 2 días de descanso"
+            })
+        
+        if 'Energy (kcal)' in recent_data.columns:
+            avg_energy = recent_data['Energy (kcal)'].mean()
+            if avg_energy > 800:
+                plan['recommendations'].append({
+                    'type': 'energy_management',
+                    'priority': 'medium',
+                    'message': f"Gasto energético alto ({avg_energy:.0f} kcal/sesión). Asegura nutrición adecuada.",
+                    'action': "Consulta con nutricionista para optimizar recuperación"
+                })
+        
+        if len(recent_data) >= 7:
+            plan['training_schedule'] = [
+                {'day': 'Lunes', 'type': 'Moderate', 'target_load': avg_load * 0.8},
+                {'day': 'Martes', 'type': 'High', 'target_load': avg_load * 1.1},
+                {'day': 'Miércoles', 'type': 'Recovery', 'target_load': avg_load * 0.5},
+                {'day': 'Jueves', 'type': 'Moderate', 'target_load': avg_load * 0.8},
+                {'day': 'Viernes', 'type': 'High', 'target_load': avg_load * 1.1},
+                {'day': 'Sábado', 'type': 'Recovery', 'target_load': avg_load * 0.5},
+                {'day': 'Domingo', 'type': 'Rest', 'target_load': 0}
+            ]
+        
+        plan['target_metrics'] = {
+            'weekly_load': avg_load * 4,
+            'max_session_load': avg_load * 1.2,
+            'recovery_threshold': avg_load * 0.6
+        }
+        
+        return plan
+    except Exception as e:
+        logging.error(f"Error generating training plan: {e}")
+        return None
+
+def generate_player_pdf_report(player_name, df, model_metrics=None, output_path=None):
+    """Generate comprehensive PDF report for a player"""
+    if not PDF_AVAILABLE:
+        return None
+    
+    try:
+        if output_path is None:
+            os.makedirs('reports', exist_ok=True)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_path = f"reports/{player_name.replace(' ', '_')}_{timestamp}.pdf"
+        
+        df_player = df[df['Player Name'] == player_name].copy()
+        if len(df_player) == 0:
+            return None
+        
+        doc = SimpleDocTemplate(output_path, pagesize=A4)
+        story = []
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#1E88E5'),
+            spaceAfter=30
+        )
+        story.append(Paragraph(f"Reporte de Rendimiento: {player_name}", title_style))
+        story.append(Spacer(1, 12))
+        
+        date_style = ParagraphStyle(
+            'CustomDate',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#6C757D')
+        )
+        story.append(Paragraph(f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M')}", date_style))
+        story.append(Spacer(1, 20))
+        
+        if 'Player Load' in df_player.columns:
+            avg_load = df_player['Player Load'].mean()
+            max_load = df_player['Player Load'].max()
+            min_load = df_player['Player Load'].min()
+            
+            summary_data = [
+                ['Métrica', 'Valor'],
+                ['Carga Promedio', f"{avg_load:.2f}"],
+                ['Carga Máxima', f"{max_load:.2f}"],
+                ['Carga Mínima', f"{min_load:.2f}"],
+                ['Total Sesiones', str(len(df_player))]
+            ]
+            
+            summary_table = Table(summary_data)
+            summary_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E88E5')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(summary_table)
+            story.append(Spacer(1, 20))
+        
+        if model_metrics:
+            story.append(Paragraph("Métricas del Modelo", styles['Heading2']))
+            metrics_data = [['Métrica', 'Valor']]
+            for key, value in model_metrics.items():
+                if isinstance(value, dict):
+                    for k, v in value.items():
+                        metrics_data.append([f"{key} - {k}", f"{v:.4f}"])
+                else:
+                    metrics_data.append([key, str(value)])
+            
+            metrics_table = Table(metrics_data)
+            metrics_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#43A047')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(metrics_table)
+            story.append(Spacer(1, 20))
+        
+        doc.build(story)
+        return output_path
+    except Exception as e:
+        logging.error(f"Error generating PDF report: {e}")
+        return None
+
+def list_saved_models():
+    """List all saved models with metadata"""
+    models = []
+    if os.path.exists('models'):
+        for filename in os.listdir('models'):
+            if filename.endswith('_model.pkl'):
+                model_path = os.path.join('models', filename)
+                try:
+                    with open(model_path, 'rb') as f:
+                        data = pickle.load(f)
+                    model_type = filename.replace('_model.pkl', '')
+                    models.append({
+                        'type': model_type,
+                        'path': model_path,
+                        'timestamp': data.get('timestamp', 'Unknown'),
+                        'metrics': data.get('metrics'),
+                        'features': data.get('features')
+                    })
+                except:
+                    pass
+    return models
+
+def compare_models(model1_path, model2_path):
+    """Compare two models side by side"""
+    try:
+        with open(model1_path, 'rb') as f:
+            model1_data = pickle.load(f)
+        with open(model2_path, 'rb') as f:
+            model2_data = pickle.load(f)
+        
+        comparison = {
+            'model1': {
+                'timestamp': model1_data.get('timestamp'),
+                'metrics': model1_data.get('metrics'),
+                'features_count': len(model1_data.get('features', []))
+            },
+            'model2': {
+                'timestamp': model2_data.get('timestamp'),
+                'metrics': model2_data.get('metrics'),
+                'features_count': len(model2_data.get('features', []))
+            }
+        }
+        
+        return comparison
+    except Exception as e:
+        logging.error(f"Error comparing models: {e}")
+        return None
 
 def log_training_results(model_type, metrics, hyperparams=None):
     """Log model training results"""
@@ -641,6 +1072,8 @@ def safe_get_metric(value, default=0, format_str="{:.1f}"):
 def limpiar_datos_regression(df):
     """Clean data for regression"""
     df_clean = df.copy()
+    # Normalize column names (strip whitespace)
+    df_clean.columns = df_clean.columns.str.strip()
     numeric_cols = df_clean.select_dtypes(include=['float64', 'int64']).columns.tolist()
     cat_cols = df_clean.select_dtypes(include=['object']).columns.tolist()
     
@@ -666,6 +1099,8 @@ def limpiar_datos_regression(df):
 def limpiar_datos_classification(df):
     """Clean data for classification with improved risk calculation"""
     df_clean = df.copy()
+    # Normalize column names (strip whitespace)
+    df_clean.columns = df_clean.columns.str.strip()
     numeric_cols = df_clean.select_dtypes(include=['float64', 'int64']).columns.tolist()
     
     for col in numeric_cols:
@@ -1047,8 +1482,32 @@ def train_classification_model_fast(df, use_saved_model=True):
     if use_saved_model:
         pipe, loaded_metrics, loaded_features = load_model('classification')
         if pipe is not None:
-            logging.info("Using saved classification model")
-            return pipe, loaded_metrics, loaded_features
+            # Test if the model works (check for LightGBM compatibility issues)
+            try:
+                # Create a dummy test to verify the model works
+                test_features = loaded_features if loaded_features else []
+                if len(test_features) > 0 and len(df) > 0:
+                    # Try a simple prediction to verify compatibility
+                    test_df = df.head(1)
+                    available_features = [f for f in test_features if f in test_df.columns]
+                    if len(available_features) > 0:
+                        test_X = test_df[available_features].fillna(0)
+                        _ = pipe.predict(test_X)
+            except (AttributeError, TypeError) as e:
+                if 'handle' in str(e) or 'Booster' in str(e):
+                    logging.warning("Loaded model has LightGBM compatibility issues. Will retrain.")
+                    pipe = None  # Force retraining
+            
+            if pipe is not None:
+                logging.info("Using saved classification model")
+                # Store in session state for use in predictions
+                if 'classification_model' not in st.session_state or st.session_state.classification_model is None:
+                    st.session_state.classification_model = pipe
+                if loaded_metrics is not None:
+                    st.session_state.classification_metrics = loaded_metrics
+                if loaded_features is not None:
+                    st.session_state.classification_features = loaded_features
+                return pipe, loaded_metrics, loaded_features
     
     df_clean = limpiar_datos_classification(df)
     
@@ -1548,6 +2007,17 @@ def download_model_with_progress(model="llama3.2", progress_container=None):
                     download_initiated = True
                     if status_text:
                         progress_bar.progress(0.15) if progress_bar else None
+                elif response.status_code == 400:
+                    # Bad Request - usually means invalid model name or request format
+                    error_msg = f"Bad Request (400): Invalid model name or request format"
+                    try:
+                        error_detail = response.json().get('error', 'Unknown error')
+                        error_msg += f" - {error_detail}"
+                    except:
+                        pass
+                    if status_text:
+                        status_text.error(f" {error_msg}")
+                    return False, error_msg
                 else:
                     # Status code not 200/201, but download might have started anyway
                     if status_text:
@@ -1741,7 +2211,14 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
                                 json={"name": model},
                                 timeout=10 # Short timeout just to initiate the download
                             )
-                            if pull_response.status_code in [200, 201]:
+                            if pull_response.status_code == 400:
+                                # Bad Request - invalid model name
+                                try:
+                                    error_detail = pull_response.json().get('error', 'Invalid model name or request')
+                                    return f"Error 400: {error_detail}. Verifica que el nombre del modelo sea correcto (ej: 'llama3.2')."
+                                except:
+                                    return f"Error 400: Solicitud inválida. Verifica que el modelo '{model}' sea válido."
+                            elif pull_response.status_code in [200, 201]:
                                 logging.info(f"Successfully initiated download of model '{model}'")
                                 return f" Model '{model}' download has been initiated (this may take 5-10 minutes).\n\n **What to do:**\n1. Wait 5-10 minutes for the download to complete\n2. Check the ' Check Model Status' button above to see progress\n3. Try your question again after a few minutes\n\n You can also check download progress in Render logs: https://dashboard.render.com"
                             else:
@@ -1876,7 +2353,6 @@ def get_ollama_response(user_message, player_context=None, chat_history=None, mo
         logging.error(f"Error getting Ollama response: {str(e)}")
         return f"Assistant temporarily unavailable. {str(e)}"
 
-# Enhanced Sidebar Navigation
 st.sidebar.markdown("""
 <div style="text-align: center; padding: 1.5rem 0;">
     <h1 style="font-size: 1.5rem; font-weight: 700; color: #1E88E5; margin: 0;">Elite Sports Analytics</h1>
@@ -1887,16 +2363,39 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
-# Group navigation items
 st.sidebar.markdown("**Main Sections**")
-page = st.sidebar.radio(
-    "Navigation",
-    ["Dashboard", "Data Audit", "Model Training", "Player Load Analysis", 
-     "Injury Prevention", "Team Lineup Calculator", "Performance Analytics", "Load Prediction"],
-    label_visibility="collapsed"
-)
 
-# Add status indicators and interactive filters in sidebar if data is loaded
+# Initialize page_from_dashboard if not exists
+if 'page_from_dashboard' not in st.session_state:
+    st.session_state.page_from_dashboard = None
+
+# Page options
+page_options = ["Dashboard", "Data Audit", "Model Training", "Player Load Analysis", 
+                "Injury Prevention", "Team Lineup Calculator", "Performance Analytics", "Load Prediction"]
+
+# Determine which page to show
+if st.session_state.page_from_dashboard and st.session_state.page_from_dashboard in page_options:
+    # Use the page from dashboard button
+    target_page = st.session_state.page_from_dashboard
+    page_index = page_options.index(target_page)
+    page = st.sidebar.radio(
+        "Navigation",
+        page_options,
+        index=page_index,
+        label_visibility="collapsed",
+        key="main_navigation"
+    )
+    # Clear the flag after navigation
+    st.session_state.page_from_dashboard = None
+else:
+    # Normal navigation
+    page = st.sidebar.radio(
+        "Navigation",
+        page_options,
+        label_visibility="collapsed",
+        key="main_navigation"
+    )
+
 if st.session_state.df is not None:
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Data Status**")
@@ -1918,10 +2417,9 @@ if st.session_state.df is not None:
     
 
 
-# Main Content
 if page == "Dashboard":
-    st.markdown('<h1 class="main-header">Dashboard - Quick Overview</h1>', unsafe_allow_html=True)
-    st.markdown("**Welcome to Elite Sports Performance Analytics | Developed by Alvaro Martin-Pena**")
+    st.markdown('<h1 class="main-header">Performance Dashboard</h1>', unsafe_allow_html=True)
+    st.markdown("**Elite Sports Performance Analytics | Developed by Alvaro Martin-Pena**")
     st.markdown("---")
     
     if st.session_state.df is None:
@@ -1951,8 +2449,9 @@ if page == "Dashboard":
         df = st.session_state.df
         df_filtered = df.copy()
         
-        # Interactive Filter Section
-        with st.expander("Advanced Filters & Settings", expanded=False):
+        # Interactive Filter Section - Enhanced
+        st.markdown("### Filters & Analysis Settings")
+        with st.expander("Advanced Filters", expanded=False):
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -2006,6 +2505,7 @@ if page == "Dashboard":
                 pass
         
         # Key Metrics Dashboard - Enhanced with cards
+        st.markdown("---")
         st.markdown("### Key Performance Indicators")
         
         col1, col2, col3, col4 = st.columns(4)
@@ -2093,43 +2593,192 @@ if page == "Dashboard":
             
             with col_viz1:
                 # Metric distribution - Interactive Plotly
-                fig_dist = px.histogram(
-                    df_filtered, 
-                    x=primary_metric, 
-                    nbins=30,
-                    title=f'{primary_metric} Distribution',
-                    labels={primary_metric: primary_metric, 'count': 'Frequency'},
-                    color_discrete_sequence=['#1E88E5']
-                )
-                fig_dist.update_layout(
-                    hovermode='x unified',
-                    showlegend=False,
-                    height=400
-                )
-                st.plotly_chart(fig_dist, use_container_width=True)
+                # Ensure we have valid data
+                df_hist = df_filtered[[primary_metric]].dropna()
+                if len(df_hist) > 0:
+                    # Calculate optimal number of bins
+                    unique_values = df_hist[primary_metric].nunique()
+                    optimal_bins = min(30, max(10, unique_values // 2)) if unique_values > 1 else 10
+                    
+                    fig_dist = px.histogram(
+                        df_hist, 
+                        x=primary_metric, 
+                        nbins=optimal_bins,
+                        title=f'{primary_metric} Distribution',
+                        labels={primary_metric: primary_metric, 'count': 'Frequency'},
+                        color_discrete_sequence=['#1E88E5']
+                    )
+                    fig_dist.update_layout(
+                        hovermode='x unified',
+                        showlegend=False,
+                        height=450,
+                        xaxis_title=primary_metric,
+                        yaxis_title='Frequency',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        bargap=0.1
+                    )
+                    st.plotly_chart(fig_dist, use_container_width=True)
+                else:
+                    st.info(f"No valid data available for {primary_metric} distribution")
             
             with col_viz2:
                 # Player comparison if selected - Interactive Plotly
                 if show_comparison and 'Player Name' in df_filtered.columns and df_filtered['Player Name'].nunique() > 1:
-                    player_avg = df_filtered.groupby('Player Name')[primary_metric].mean().sort_values(ascending=False).head(10)
-                    player_avg_df = player_avg.reset_index()
-                    
-                    fig_comp = px.bar(
-                        player_avg_df,
-                        x=primary_metric,
-                        y='Player Name',
-                        orientation='h',
-                        title=f'Top Players - Avg {primary_metric}',
-                        labels={primary_metric: primary_metric},
-                        color=primary_metric,
-                        color_continuous_scale='Greens'
-                    )
-                    fig_comp.update_layout(
-                        yaxis={'categoryorder': 'total ascending'},
-                        height=400,
-                        hovermode='y unified'
-                    )
-                    st.plotly_chart(fig_comp, use_container_width=True)
+                    # Ensure we have valid data
+                    df_comp = df_filtered[['Player Name', primary_metric]].dropna()
+                    if len(df_comp) > 0:
+                        player_avg = df_comp.groupby('Player Name')[primary_metric].mean().sort_values(ascending=False).head(10)
+                        player_avg_df = player_avg.reset_index()
+                        
+                        if len(player_avg_df) > 0:
+                            fig_comp = px.bar(
+                                player_avg_df,
+                                x=primary_metric,
+                                y='Player Name',
+                                orientation='h',
+                                title=f'Top Players - Average {primary_metric}',
+                                labels={primary_metric: primary_metric, 'Player Name': 'Player'},
+                                color=primary_metric,
+                                color_continuous_scale='Greens'
+                            )
+                            fig_comp.update_layout(
+                                yaxis={'categoryorder': 'total ascending'},
+                                height=450,
+                                hovermode='y unified',
+                                xaxis_title=primary_metric,
+                                yaxis_title='Player',
+                                plot_bgcolor='rgba(0,0,0,0)',
+                                paper_bgcolor='rgba(0,0,0,0)'
+                            )
+                            st.plotly_chart(fig_comp, use_container_width=True)
+                        else:
+                            st.info("No player comparison data available")
+                    else:
+                        st.info("No valid data for player comparison")
+                else:
+                    # Show time series if available
+                    if 'Date' in df_filtered.columns and len(df_filtered) > 0:
+                        df_time = df_filtered[['Date', primary_metric]].copy()
+                        df_time['Date'] = pd.to_datetime(df_time['Date'], errors='coerce')
+                        df_time = df_time.dropna(subset=['Date', primary_metric])
+                        df_time = df_time.sort_values('Date')
+                        
+                        if len(df_time) > 0:
+                            # Aggregate by date if multiple entries per date
+                            if df_time['Date'].duplicated().any():
+                                df_time = df_time.groupby(df_time['Date'].dt.date)[primary_metric].mean().reset_index()
+                                df_time['Date'] = pd.to_datetime(df_time['Date'])
+                            
+                            fig_time = px.line(
+                                df_time,
+                                x='Date',
+                                y=primary_metric,
+                                title=f'{primary_metric} Over Time',
+                                labels={primary_metric: primary_metric, 'Date': 'Date'},
+                                color_discrete_sequence=['#43A047']
+                            )
+                            fig_time.update_layout(
+                                height=450,
+                                hovermode='x unified',
+                                xaxis_title="Date",
+                                yaxis_title=primary_metric,
+                                plot_bgcolor='rgba(0,0,0,0)',
+                                paper_bgcolor='rgba(0,0,0,0)'
+                            )
+                            fig_time.update_traces(line_width=2, marker_size=6)
+                            st.plotly_chart(fig_time, use_container_width=True)
+            
+            # Temporal Trend Analysis Section
+            if 'Date' in df_filtered.columns and primary_metric:
+                st.markdown("---")
+                st.markdown("### Temporal Trend Analysis")
+                
+                trend_player = selected_player_filter if selected_player_filter != "All Players" else None
+                if trend_player and trend_player in df_filtered['Player Name'].values:
+                    trend_analysis = analyze_temporal_trends(df_filtered, trend_player, primary_metric, days=30)
+                    if trend_analysis:
+                        col_trend1, col_trend2, col_trend3 = st.columns(3)
+                        
+                        with col_trend1:
+                            trend_direction_display = trend_analysis['trend_direction'].replace('increasing', 'Increasing').replace('decreasing', 'Decreasing').replace('stable', 'Stable')
+                            st.metric(
+                                "Trend Direction",
+                                trend_direction_display,
+                                delta=f"{trend_analysis['pct_change']:+.1f}%",
+                                delta_color="normal" if abs(trend_analysis['pct_change']) < 10 else "inverse" if trend_analysis['pct_change'] < 0 else "normal"
+                            )
+                        
+                        with col_trend2:
+                            volatility_display = trend_analysis['volatility'].replace('high', 'High').replace('medium', 'Medium').replace('low', 'Low')
+                            st.metric("Volatility", volatility_display, delta=f"CV: {trend_analysis['cv']:.2f}")
+                        
+                        with col_trend3:
+                            st.metric("Average", f"{trend_analysis['mean']:.1f}", delta=f"±{trend_analysis['std']:.1f}")
+                        
+                        # Temporal line chart with improved styling
+                        if 'Date' in df_filtered.columns:
+                            df_temporal = df_filtered[df_filtered['Player Name'] == trend_player].copy()
+                            df_temporal['Date'] = pd.to_datetime(df_temporal['Date'], errors='coerce')
+                            df_temporal = df_temporal.dropna(subset=['Date', primary_metric])
+                            df_temporal = df_temporal.sort_values('Date')
+                            
+                            if len(df_temporal) > 0:
+                                fig_trend = px.line(
+                                    df_temporal,
+                                    x='Date',
+                                    y=primary_metric,
+                                    title=f'Temporal Trend - {trend_player}',
+                                    markers=True,
+                                    labels={primary_metric: primary_metric, 'Date': 'Date'},
+                                    color_discrete_sequence=['#1E88E5']
+                                )
+                                fig_trend.update_layout(
+                                    height=450,
+                                    hovermode='x unified',
+                                    xaxis_title="Date",
+                                    yaxis_title=primary_metric,
+                                    plot_bgcolor='rgba(0,0,0,0)',
+                                    paper_bgcolor='rgba(0,0,0,0)'
+                                )
+                                fig_trend.update_traces(line_width=2, marker_size=6)
+                                st.plotly_chart(fig_trend, use_container_width=True)
+                                
+                                # Detect anomalies
+                                anomalies = detect_anomalies_temporal(df_filtered, trend_player, primary_metric)
+                                if anomalies:
+                                    st.warning(f"Detected {len(anomalies)} anomalous values in recent data")
+                else:
+                    # Show overall team trend if no specific player selected
+                    if 'Date' in df_filtered.columns and len(df_filtered) > 0:
+                        df_temporal_all = df_filtered.copy()
+                        df_temporal_all['Date'] = pd.to_datetime(df_temporal_all['Date'], errors='coerce')
+                        df_temporal_all = df_temporal_all.dropna(subset=['Date', primary_metric])
+                        df_temporal_all = df_temporal_all.sort_values('Date')
+                        
+                        if len(df_temporal_all) > 0:
+                            # Aggregate by date
+                            daily_avg = df_temporal_all.groupby(df_temporal_all['Date'].dt.date)[primary_metric].mean().reset_index()
+                            daily_avg['Date'] = pd.to_datetime(daily_avg['Date'])
+                            
+                            fig_team_trend = px.line(
+                                daily_avg,
+                                x='Date',
+                                y=primary_metric,
+                                title=f'Team Average {primary_metric} Over Time',
+                                labels={primary_metric: f'Avg {primary_metric}', 'Date': 'Date'},
+                                color_discrete_sequence=['#43A047']
+                            )
+                            fig_team_trend.update_layout(
+                                height=450,
+                                hovermode='x unified',
+                                xaxis_title="Date",
+                                yaxis_title=f'Average {primary_metric}',
+                                plot_bgcolor='rgba(0,0,0,0)',
+                                paper_bgcolor='rgba(0,0,0,0)'
+                            )
+                            fig_team_trend.update_traces(line_width=2, marker_size=6)
+                            st.plotly_chart(fig_team_trend, use_container_width=True)
         
         st.markdown("---")
         
@@ -2154,87 +2803,167 @@ if page == "Dashboard":
                 
                 # Calculate risk if we have data
                 if len(recent_data) > 0 and 'Player Name' in recent_data.columns:
-                    features = [f for f in ['Work Ratio', 'Energy (kcal)', 'Distance (miles)', 'Sprint Distance (yards)',
-                        'Top Speed (mph)', 'Hr Load', 'Impacts'] if f in recent_data.columns]
+                    # Use model's expected features if available, otherwise use default list
+                    if st.session_state.classification_features:
+                        model_features = st.session_state.classification_features
+                    else:
+                        # Default features list
+                        model_features = ['Work Ratio', 'Energy (kcal)', 'Distance (miles)', 'Sprint Distance (yards)',
+                            'Top Speed (mph)', 'Max Acceleration (yd/s/s)', 'Max Deceleration (yd/s/s)',
+                            'Distance Per Min (yd/min)', 'Hr Load', 'Hr Max (bpm)', 'Time In Red Zone (min)',
+                            'Impacts', 'Impact Zones: > 20 G (Impacts)', 'Impact Zones: 15 - 20 G (Impacts)',
+                            'Power Plays', 'Power Score (w/kg)', 'Distance in Speed Zone 4 (miles)',
+                            'Distance in Speed Zone 5 (miles)', 'Time in HR Load Zone 85% - 96% Max HR (secs)']
                     
-                    if len(features) > 0:
-                        X_recent = recent_data[features]
-                        if len(X_recent) > 0:
-                            try:
-                                predictions = st.session_state.classification_model.predict(X_recent)
-                                recent_data['Predicted_Risk'] = predictions
-                                
-                                # Group by player (using mean and max)
-                                player_risk = recent_data.groupby('Player Name')['Predicted_Risk'].agg(['mean', 'max']).reset_index()
-                                # Risk classification: Low if avg_risk <= 0.40
-                                risk_mapping = {0: 'Low', 1: 'Medium', 2: 'High'}
-                                def classify_risk(row):
-                                    mean_val = float(row['mean'])
-                                    max_val = float(row['max'])
-                                    # Low Risk: Average risk <= 0.40
-                                    if mean_val <= 0.40:
-                                        return 'Low'
-                                    # Otherwise, use maximum risk to classify
-                                    elif max_val >= 2.0: # High risk class
-                                        return 'High'
-                                    elif max_val >= 1.0: # Medium risk class
-                                        return 'Medium'
-                                    else:
-                                        return 'Low'
-                                player_risk['Risk_Category'] = player_risk.apply(classify_risk, axis=1)
-                                
-                                high_risk_count = len(player_risk[player_risk['Risk_Category'] == 'High'])
-                                medium_risk_count = len(player_risk[player_risk['Risk_Category'] == 'Medium'])
-                                low_risk_count = len(player_risk[player_risk['Risk_Category'] == 'Low'])
-                                
-                                col1, col2, col3 = st.columns(3)
-                                
-                                with col1:
-                                    st.markdown(f"""
-                                    <div class="risk-card risk-card-high">
-                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;"></div>
-                                        <h3 style='color:#DC3545; margin:0; font-size: 2.5rem; font-weight: 700;'>{high_risk_count}</h3>
-                                        <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>High Risk Players</p>
-                                        <span class="badge badge-danger">Attention Required</span>
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                
+                    # Get available features from data
+                    available_features = [f for f in model_features if f in recent_data.columns]
+                    missing_features = [f for f in model_features if f not in recent_data.columns]
+                    
+                    if len(available_features) == 0:
+                        st.warning("No features available for prediction. Please ensure your CSV contains the required columns.")
+                    else:
+                        # Show which features are being used
+                        with st.expander("Model Features Used", expanded=False):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.markdown("**Available Columns:**")
+                                for feat in available_features:
+                                    st.write(f"  • {feat}")
+                                st.success(f"Total: {len(available_features)} columns")
+                            
+                            if len(missing_features) > 0:
                                 with col2:
-                                    st.markdown(f"""
-                                    <div class="risk-card risk-card-medium">
-                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;"></div>
-                                        <h3 style='color:#FFC107; margin:0; font-size: 2.5rem; font-weight: 700;'>{medium_risk_count}</h3>
-                                        <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>Medium Risk</p>
-                                        <span class="badge badge-warning">Monitor</span>
-                                    </div>
-                                    """, unsafe_allow_html=True)
+                                    st.markdown("**Missing Columns (filled with 0):**")
+                                    for feat in missing_features:
+                                        st.write(f"  • {feat}")
+                                    st.warning(f"Total: {len(missing_features)} missing")
+                            else:
+                                with col2:
+                                    st.markdown("**All Required Columns Available**")
+                                    st.success("Model has all required columns")
+                        
+                        # Prepare features for prediction
+                        if len(missing_features) > 0:
+                            # Some features are missing - fill with default values
+                            st.info(f"Using {len(available_features)}/{len(model_features)} columns. {len(missing_features)} missing columns will be filled with default values (0).")
+                            X_recent = recent_data[available_features].copy()
+                            # Fill missing features with 0 (or could use mean/median)
+                            for feat in missing_features:
+                                X_recent[feat] = 0
+                            # Reorder columns to match model's expected order
+                            X_recent = X_recent[model_features]
+                        else:
+                            # All features available
+                            X_recent = recent_data[model_features]
+                    
+                    if len(X_recent) > 0:
+                        try:
+                            # Safe prediction with error handling for LightGBM compatibility
+                            predictions = st.session_state.classification_model.predict(X_recent)
+                            recent_data['Predicted_Risk'] = predictions
+                        except (AttributeError, TypeError) as e:
+                            if 'handle' in str(e) or 'Booster' in str(e):
+                                st.error("LightGBM model compatibility error.")
+                                st.warning("""
+                                **The model needs to be retrained due to a compatibility issue.**
                                 
-                                with col3:
-                                    st.markdown(f"""
-                                    <div class="risk-card risk-card-low">
-                                        <div style="font-size: 3rem; margin-bottom: 0.5rem;"></div>
-                                        <h3 style='color:#28A745; margin:0; font-size: 2.5rem; font-weight: 700;'>{low_risk_count}</h3>
-                                        <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>Low Risk</p>
-                                        <span class="badge badge-success">Healthy</span>
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                
-                                if high_risk_count > 0:
-                                    high_risk_players = player_risk[player_risk['Risk_Category'] == 'High']['Player Name'].tolist()
-                                    st.markdown(f"""
-                                    <div class="danger-box">
-                                    <h4> URGENT: {high_risk_count} High Risk Players Detected</h4>
-                                    <p><b>Players:</b> {', '.join(high_risk_players)}</p>
-                                    <p>Please visit the <b> Injury Prevention</b> section for detailed analysis and recommendations.</p>
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                    
-                                    if st.button(" View Detailed Analysis", type="primary"):
-                                        st.session_state.page_from_dashboard = "Injury Prevention"
-                                        st.rerun()
-                                
-                            except Exception as e:
+                                Please:
+                                1. Go to **Model Training** section
+                                2. Retrain the classification model
+                                3. Return to this section
+                                """)
+                                st.session_state.classification_model = None
+                                st.stop()
+                            else:
+                                raise e
+                        except KeyError as e:
+                            # Handle missing columns error
+                            error_msg = str(e)
+                            if 'columns are missing' in error_msg.lower() or 'not in index' in error_msg.lower():
+                                missing_cols = [f for f in model_features if f not in recent_data.columns]
+                                st.warning(f"Could not calculate risk: columns are missing: {set(missing_cols)}")
+                            else:
+                                st.warning(f"Could not calculate risk: {error_msg}")
+                            raise e
+                        except Exception as e:
+                            error_msg = str(e)
+                            # Check if it's a column-related error
+                            if 'columns are missing' in error_msg.lower() or 'not in index' in error_msg.lower() or 'KeyError' in str(type(e)):
+                                missing_cols = [f for f in model_features if f not in recent_data.columns]
+                                st.warning(f"Could not calculate risk: columns are missing: {set(missing_cols)}")
+                            else:
                                 st.warning(f"Could not calculate risk: {str(e)}")
+                            raise e
+                        
+                        # Group by player (using mean and max) - only if prediction was successful
+                        if 'Predicted_Risk' in recent_data.columns:
+                            player_risk = recent_data.groupby('Player Name')['Predicted_Risk'].agg(['mean', 'max']).reset_index()
+                            # Risk classification: Low if avg_risk <= 0.40
+                            risk_mapping = {0: 'Low', 1: 'Medium', 2: 'High'}
+                            def classify_risk(row):
+                                mean_val = float(row['mean'])
+                                max_val = float(row['max'])
+                                # Low Risk: Average risk <= 0.40
+                                if mean_val <= 0.40:
+                                    return 'Low'
+                                # Otherwise, use maximum risk to classify
+                                elif max_val >= 2.0: # High risk class
+                                    return 'High'
+                                elif max_val >= 1.0: # Medium risk class
+                                    return 'Medium'
+                                else:
+                                    return 'Low'
+                            player_risk['Risk_Category'] = player_risk.apply(classify_risk, axis=1)
+                            
+                            high_risk_count = len(player_risk[player_risk['Risk_Category'] == 'High'])
+                            medium_risk_count = len(player_risk[player_risk['Risk_Category'] == 'Medium'])
+                            low_risk_count = len(player_risk[player_risk['Risk_Category'] == 'Low'])
+                            
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                st.markdown(f"""
+                                <div class="risk-card risk-card-high">
+                                    <div style="font-size: 3rem; margin-bottom: 0.5rem;"></div>
+                                    <h3 style='color:#DC3545; margin:0; font-size: 2.5rem; font-weight: 700;'>{high_risk_count}</h3>
+                                    <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>High Risk Players</p>
+                                    <span class="badge badge-danger">Attention Required</span>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            with col2:
+                                st.markdown(f"""
+                                <div class="risk-card risk-card-medium">
+                                    <div style="font-size: 3rem; margin-bottom: 0.5rem;"></div>
+                                    <h3 style='color:#FFC107; margin:0; font-size: 2.5rem; font-weight: 700;'>{medium_risk_count}</h3>
+                                    <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>Medium Risk</p>
+                                    <span class="badge badge-warning">Monitor</span>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            with col3:
+                                st.markdown(f"""
+                                <div class="risk-card risk-card-low">
+                                    <div style="font-size: 3rem; margin-bottom: 0.5rem;"></div>
+                                    <h3 style='color:#28A745; margin:0; font-size: 2.5rem; font-weight: 700;'>{low_risk_count}</h3>
+                                    <p style='margin:0.5rem 0; font-weight: 600; color: #212529;'>Low Risk</p>
+                                    <span class="badge badge-success">Healthy</span>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            if high_risk_count > 0:
+                                high_risk_players = player_risk[player_risk['Risk_Category'] == 'High']['Player Name'].tolist()
+                                st.markdown(f"""
+                                <div class="danger-box">
+                                <h4> URGENT: {high_risk_count} High Risk Players Detected</h4>
+                                <p><b>Players:</b> {', '.join(high_risk_players)}</p>
+                                <p>Please visit the <b> Injury Prevention</b> section for detailed analysis and recommendations.</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                if st.button(" View Detailed Analysis", type="primary"):
+                                    st.session_state.page_from_dashboard = "Injury Prevention"
+                                    st.rerun()
             
             except Exception as e:
                 st.warning(f"Could not load injury risk data: {str(e)}")
@@ -2243,40 +2972,432 @@ if page == "Dashboard":
         st.markdown("---")
         st.markdown("### Quick Actions")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            if st.button("View Player Loads", use_container_width=True, type="primary"):
+            if st.button("Player Loads", use_container_width=True, type="primary", key="quick_player_loads"):
                 st.session_state.page_from_dashboard = "Player Load Analysis"
                 st.rerun()
         
         with col2:
-            if st.button("Team Lineup", use_container_width=True, type="primary"):
+            if st.button("Team Lineup", use_container_width=True, type="primary", key="quick_team_lineup"):
                 st.session_state.page_from_dashboard = "Team Lineup Calculator"
                 st.rerun()
         
         with col3:
-            if st.button("Analytics", use_container_width=True, type="primary"):
+            if st.button("Analytics", use_container_width=True, type="primary", key="quick_analytics"):
                 st.session_state.page_from_dashboard = "Performance Analytics"
+                st.rerun()
+        
+        with col4:
+            if st.button("Injury Prevention", use_container_width=True, type="primary", key="quick_injury"):
+                st.session_state.page_from_dashboard = "Injury Prevention"
                 st.rerun()
 
 elif page == "Data Audit":
     st.markdown('<h1 class="main-header">Data Audit & Quality Control</h1>', unsafe_allow_html=True)
     
-    uploaded_file = st.file_uploader("Upload your CSV file", type=['csv'])
+    # Add info about file upload
+    st.info("""
+    **📤 Instrucciones para cargar archivos:**
+    - Formato: CSV exportado de Catapult Sports
+    - Tamaño máximo: 200 MB
+    - Si encuentras errores, intenta guardar el CSV con codificación UTF-8
+    - Si el archivo es muy grande (>100MB), considera dividirlo en partes más pequeñas
+    """)
+    
+    # Check if there's a file in session state from a previous upload attempt
+    if 'upload_error' in st.session_state:
+        st.error(f"❌ Error anterior: {st.session_state.upload_error}")
+        if st.button("🔄 Limpiar error y reintentar"):
+            del st.session_state.upload_error
+            st.rerun()
+    
+    # Alternative: Load from file path (for very large files)
+    st.markdown("---")
+    st.markdown("### 🔄 Alternativa: Cargar desde ruta local")
+    st.info("""
+    **Si el uploader da error 400, puedes cargar el archivo desde una ruta local:**
+    1. Coloca el archivo CSV en la carpeta del proyecto
+    2. Escribe la ruta relativa (ej: `Catapult-Export-1760557787075.csv`)
+    3. O la ruta absoluta completa
+    """)
+    
+    file_path_input = st.text_input(
+        "Ruta del archivo CSV (opcional)",
+        placeholder="ej: Catapult-Export-1760557787075.csv o /ruta/completa/al/archivo.csv",
+        help="Usa esto si el uploader da error 400"
+    )
+    
+    uploaded_file = None
+    
+    # Try loading from file path first
+    if file_path_input:
+        file_path = file_path_input.strip()
+        if os.path.exists(file_path):
+            try:
+                # Open file and create a file-like object
+                with open(file_path, 'rb') as f:
+                    file_content = f.read()
+                    # Create a BytesIO object to simulate uploaded_file
+                    import io
+                    uploaded_file = io.BytesIO(file_content)
+                    uploaded_file.name = os.path.basename(file_path)
+                    st.success(f"✅ Archivo cargado desde: {file_path}")
+            except Exception as e:
+                st.error(f"❌ Error al leer archivo desde ruta: {str(e)}")
+        else:
+            st.warning(f"⚠️ Archivo no encontrado en: {file_path}")
+            st.info("Verifica que la ruta sea correcta y que el archivo exista.")
+    
+    # If no file path, try the uploader
+    if uploaded_file is None:
+        try:
+            uploaded_file = st.file_uploader(
+                "Upload your CSV file", 
+                type=['csv'],
+                help="Sube un archivo CSV exportado de Catapult Sports. Límite: 200MB",
+                key="csv_uploader"
+            )
+        except Exception as e:
+            error_str = str(e)
+            if '400' in error_str or 'axios' in error_str.lower() or 'request failed' in error_str.lower():
+                st.error("❌ Error 400: El servidor rechazó el archivo")
+                st.warning("""
+                **Este error ocurre cuando el archivo es demasiado grande o hay un problema de configuración.**
+                
+                **Soluciones inmediatas:**
+                1. **Reduce el tamaño del archivo**: 
+                   - Abre el CSV en Excel
+                   - Elimina filas innecesarias (deja solo las últimas semanas/meses)
+                   - Guarda como nuevo CSV
+                
+                2. **Divide el archivo**:
+                   - Si tienes datos de múltiples temporadas, divide por temporada
+                   - Carga cada parte por separado
+                
+                3. **Comprime el CSV**:
+                   - Elimina columnas innecesarias antes de cargar
+                   - Usa solo las columnas esenciales para el análisis
+                
+                4. **Recarga la aplicación**:
+                   - Presiona F5 o Cmd+R para recargar completamente
+                   - Cierra y vuelve a abrir el navegador si persiste
+                """)
+                st.session_state.upload_error = error_str
+            else:
+                st.error(f"❌ Error al inicializar el cargador de archivos: {str(e)}")
+                st.info("""
+                **Posibles soluciones:**
+                1. Recarga la página (F5 o Cmd+R)
+                2. Verifica que el navegador esté actualizado
+                3. Intenta con un archivo más pequeño primero
+                """)
+            st.stop()
     
     if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
-        st.session_state.df = df
+        try:
+            # Show file info - use seek/tell for large files to avoid loading entire file
+            file_name = uploaded_file.name
+            
+            # Get file size efficiently without loading entire file into memory
+            try:
+                uploaded_file.seek(0, 2)  # Seek to end
+                file_size = uploaded_file.tell()
+                uploaded_file.seek(0)  # Reset to beginning
+            except (AttributeError, OSError):
+                # Fallback to getvalue() if seek doesn't work
+                file_size = len(uploaded_file.getvalue())
+                uploaded_file.seek(0)
+            
+            file_size_mb = file_size / (1024 * 1024)
+            
+            st.success(f"📄 Archivo recibido: **{file_name}** ({file_size_mb:.2f} MB)")
+            
+            # Check file size (200MB limit)
+            max_size = 200 * 1024 * 1024  # 200MB in bytes
+            
+            if file_size > max_size:
+                st.error(f"❌ El archivo es demasiado grande ({file_size_mb:.2f} MB). El límite es 200 MB.")
+                st.info("Por favor, divide el archivo en partes más pequeñas o comprime los datos.")
+                st.stop()
+            
+            if file_size == 0:
+                st.error("❌ El archivo está vacío. Por favor, sube un archivo válido.")
+                st.stop()
+            
+            # Reset file pointer to beginning
+            uploaded_file.seek(0)
+            
+            # Try different encodings in case of encoding issues
+            df = None
+            encoding_used = None
+            last_error = None
+            
+            # Expanded list of encodings to try
+            encodings_to_try = [
+                'utf-8', 
+                'utf-8-sig',  # UTF-8 with BOM
+                'latin-1', 
+                'iso-8859-1', 
+                'cp1252',  # Windows-1252
+                'windows-1252',
+                'mac-roman',  # Mac encoding
+                'cp437',  # DOS encoding
+                'utf-16',  # UTF-16
+                'utf-16le',  # UTF-16 Little Endian
+                'utf-16be',  # UTF-16 Big Endian
+            ]
+            
+            with st.spinner(f"Leyendo archivo CSV ({file_size_mb:.2f} MB). Esto puede tardar unos segundos..."):
+                for encoding in encodings_to_try:
+                    try:
+                        uploaded_file.seek(0)  # Reset pointer for each attempt
+                        
+                        # First try with standard pandas read_csv
+                        try:
+                            df = pd.read_csv(
+                                uploaded_file, 
+                                encoding=encoding, 
+                                on_bad_lines='skip',  # Skip problematic lines
+                                engine='python'  # More robust parser
+                            )
+                            # Verify we got a valid dataframe
+                            if df is not None and not df.empty and df.shape[1] > 0:
+                                encoding_used = encoding
+                                break
+                        except (UnicodeDecodeError, UnicodeError) as e:
+                            last_error = f"Encoding {encoding}: {str(e)}"
+                            continue
+                        except pd.errors.ParserError as e:
+                            # Try with different separators
+                            for sep in [',', ';', '\t', '|', None]:
+                                try:
+                                    uploaded_file.seek(0)
+                                    df = pd.read_csv(
+                                        uploaded_file, 
+                                        encoding=encoding, 
+                                        on_bad_lines='skip',
+                                        engine='python',
+                                        sep=sep  # Try different separators
+                                    )
+                                    if df is not None and not df.empty and df.shape[1] > 0:
+                                        encoding_used = encoding
+                                        break
+                                except:
+                                    continue
+                            if encoding_used:
+                                break
+                            last_error = f"Encoding {encoding}: ParserError - {str(e)}"
+                            continue
+                        except Exception as e:
+                            last_error = f"Encoding {encoding}: {str(e)}"
+                            # If it's not an encoding error, try next encoding anyway
+                            if 'codec' not in str(e).lower() and 'decode' not in str(e).lower():
+                                continue
+                            else:
+                                continue
+                    except Exception as e:
+                        last_error = f"Encoding {encoding}: {str(e)}"
+                        continue
+            
+            # If still no success, try reading as binary and detecting encoding
+            if df is None or df.empty or (df.shape[1] == 0):
+                try:
+                    uploaded_file.seek(0)
+                    # Try reading first few bytes to detect encoding
+                    sample_bytes = uploaded_file.read(10000)
+                    uploaded_file.seek(0)
+                    
+                    # Try chardet if available
+                    try:
+                        import chardet
+                        detected = chardet.detect(sample_bytes)
+                        if detected and detected['encoding'] and detected['confidence'] > 0.5:
+                            detected_encoding = detected['encoding']
+                            st.info(f"🔍 Codificación detectada automáticamente: {detected_encoding} (confianza: {detected['confidence']:.2%})")
+                            uploaded_file.seek(0)
+                            df = pd.read_csv(
+                                uploaded_file,
+                                encoding=detected_encoding,
+                                on_bad_lines='skip',
+                                engine='python'
+                            )
+                            if df is not None and not df.empty and df.shape[1] > 0:
+                                encoding_used = detected_encoding
+                    except ImportError:
+                        st.info("💡 Tip: Instala 'chardet' para detección automática de codificación: pip install chardet")
+                    except Exception as e:
+                        st.warning(f"⚠️ Error en detección automática: {str(e)}")
+                except Exception as e:
+                    st.warning(f"⚠️ No se pudo leer muestra del archivo: {str(e)}")
+            
+            # Final check - if still no success, provide detailed error
+            if df is None or df.empty or (df.shape[1] == 0):
+                error_msg = "No se pudo leer el archivo con ninguna codificación estándar"
+                if last_error:
+                    error_msg += f"\n\nÚltimo error intentado: {last_error}"
+                
+                # Provide helpful suggestions
+                st.error(f"❌ {error_msg}")
+                st.warning("""
+                **Posibles causas y soluciones:**
+                
+                1. **El archivo no es un CSV válido**:
+                   - Abre el archivo en Excel o un editor de texto
+                   - Verifica que tenga columnas separadas por comas, punto y coma o tabulaciones
+                   - Guarda como CSV UTF-8 desde Excel
+                
+                2. **El archivo está corrupto o vacío**:
+                   - Verifica que el archivo tenga contenido
+                   - Intenta abrirlo en Excel primero
+                
+                3. **Formato no estándar**:
+                   - El archivo podría tener un formato especial
+                   - Intenta exportarlo nuevamente desde Catapult Sports
+                
+                4. **Problemas de codificación**:
+                   - Abre el archivo en un editor de texto (TextEdit, Notepad++)
+                   - Guarda como UTF-8
+                   - Vuelve a intentar cargarlo
+                """)
+                
+                with st.expander("🔍 Información técnica del error"):
+                    st.code(f"Tamaño del archivo: {file_size_mb:.2f} MB\nÚltimo error: {last_error if last_error else 'N/A'}")
+                
+                raise ValueError(error_msg)
+            
+            # Reset file pointer for potential re-reads
+            uploaded_file.seek(0)
+            
+            # Basic validation
+            if df.empty:
+                st.error("❌ El archivo CSV está vacío. Por favor, sube un archivo con datos.")
+                st.stop()
+            
+            if df.shape[0] == 0:
+                st.error("❌ El archivo CSV no tiene filas de datos.")
+                st.stop()
+            
+            if df.shape[1] == 0:
+                st.error("❌ El archivo CSV no tiene columnas.")
+                st.stop()
+            
+            # Normalize column names (strip whitespace) to avoid matching issues
+            df.columns = df.columns.str.strip()
+            
+            # Store in session state
+            st.session_state.df = df
+            if encoding_used:
+                st.session_state.csv_encoding = encoding_used
+            
+            st.success(f"File loaded successfully with encoding: **{encoding_used}**")
+            
+            # Enhanced data validation
+            with st.spinner("Validating data quality..."):
+                validation_results = validate_data_robust(df)
+            
+            # Display validation results
+            st.markdown("### Data Quality Validation")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                score_status = "Excellent" if validation_results['data_quality_score'] >= 80 else "Good" if validation_results['data_quality_score'] >= 60 else "Poor"
+                st.metric("Data Quality Score", f"{validation_results['data_quality_score']:.1f}/100", delta=score_status)
+            
+            with col2:
+                errors_count = len(validation_results['errors'])
+                st.metric("Errors", errors_count, delta="Critical" if errors_count > 0 else "None")
+            
+            with col3:
+                warnings_count = len(validation_results['warnings'])
+                st.metric("Warnings", warnings_count, delta="Review" if warnings_count > 0 else "None")
+            
+            # Show errors if any
+            if validation_results['errors']:
+                st.error("**Errors Found:**")
+                for error in validation_results['errors']:
+                    st.write(f"  • {error}")
+            
+            # Show warnings if any
+            if validation_results['warnings']:
+                with st.expander(f"View {len(validation_results['warnings'])} warnings", expanded=False):
+                    for warning in validation_results['warnings']:
+                        st.warning(warning)
+            
+            # Show recommendations
+            if validation_results['recommendations']:
+                st.info("**Recommendations:**")
+                for rec in validation_results['recommendations']:
+                    st.write(f"  • {rec}")
+            
+            # Quality score indicator
+            if validation_results['data_quality_score'] >= 80:
+                st.success("Data quality is excellent. You can proceed with the analysis.")
+            elif validation_results['data_quality_score'] >= 60:
+                st.warning("Data quality is acceptable, but consider reviewing the warnings.")
+            else:
+                st.error("Data quality is low. Please fix the errors before continuing.")
+            
+        except pd.errors.EmptyDataError:
+            st.error("❌ Error: El archivo CSV está vacío o no tiene datos válidos.")
+            st.info("Por favor, verifica que el archivo contenga datos y vuelve a intentarlo.")
+            st.stop()
+        except pd.errors.ParserError as e:
+            st.error(f"❌ Error al leer el CSV: {str(e)}")
+            st.info("""
+            **Posibles soluciones:**
+            1. Verifica que el archivo sea un CSV válido
+            2. Asegúrate de que el archivo no esté corrupto
+            3. Intenta abrir el archivo en Excel y guardarlo como CSV nuevamente
+            4. Verifica que no haya caracteres especiales problemáticos
+            """)
+            st.stop()
+        except UnicodeDecodeError as e:
+            st.error(f"❌ Error de codificación: {str(e)}")
+            st.info("El archivo tiene caracteres que no se pueden leer. Intenta guardar el CSV con codificación UTF-8.")
+            st.stop()
+        except Exception as e:
+            error_msg = str(e).lower()
+            
+            # Check for HTTP/Axios errors
+            if '400' in error_msg or 'axios' in error_msg or 'request failed' in error_msg or 'status code 400' in error_msg:
+                st.error("❌ Error 400: Problema al cargar el archivo")
+                st.warning("""
+                **Este error generalmente ocurre cuando:**
+                1. El archivo es demasiado grande para el servidor
+                2. El formato del archivo no es compatible
+                3. Hay un problema de conexión durante la carga
+                
+                **Soluciones:**
+                1. **Reduce el tamaño del archivo**: Divide el CSV en partes más pequeñas (máximo 50-100 MB)
+                2. **Verifica el formato**: Asegúrate de que sea un CSV válido
+                3. **Recarga la página**: Presiona F5 o Cmd+R y vuelve a intentar
+                4. **Guarda el CSV con UTF-8**: Abre en Excel y guarda como "CSV UTF-8"
+                5. **Intenta con un archivo más pequeño primero**: Para verificar que la aplicación funciona
+                """)
+                st.info("💡 **Tip**: Si el archivo es muy grande, considera usar solo una muestra de los datos para pruebas.")
+            else:
+                st.error(f"❌ Error inesperado al cargar el archivo: {str(e)}")
+                st.info("Por favor, verifica el archivo e intenta nuevamente.")
+            
+            with st.expander("🔍 Detalles técnicos del error (para debugging)"):
+                st.exception(e)
+                st.code(f"Tipo de error: {type(e).__name__}\nMensaje: {str(e)}")
+            st.stop()
         
+        # If we get here, the file loaded successfully
         st.markdown(f"""
         <div class="success-box">
-            <h4 style="margin: 0 0 0.5rem 0;"> Dataset Successfully Loaded</h4>
+            <h4 style="margin: 0 0 0.5rem 0;">Dataset Successfully Loaded</h4>
             <p style="margin: 0;"><strong>{df.shape[0]:,}</strong> rows • <strong>{df.shape[1]}</strong> columns</p>
         </div>
         """, unsafe_allow_html=True)
 
         # Validate required columns for Injury Risk calculations
+        # Normalize column names (strip whitespace) for comparison
+        df.columns = df.columns.str.strip()
+        
         required_columns = {
             'Time in HR Load Zone 85% - 96% Max HR (secs)',
             'Hr Max (bpm)',
@@ -2289,14 +3410,43 @@ elif page == "Data Audit":
             'Distance Per Min (yd/min)',
             'Time In Red Zone (min)'
         }
-        df_columns_set = set(df.columns)
-        missing_required = sorted(list(required_columns - df_columns_set))
+        
+        # Normalize required columns too (strip whitespace)
+        required_columns_normalized = {col.strip() for col in required_columns}
+        df_columns_set = set(df.columns.str.strip())
+        
+        # Find missing columns using normalized names
+        missing_required = sorted(list(required_columns_normalized - df_columns_set))
+        
         if missing_required:
-            st.error(
-                "Missing required columns for Injury Risk calculations: " + ", ".join(missing_required)
-            )
-            st.info(
-                "Please upload a CSV that includes these fields. The current file will still load, but Injury Risk cannot be computed until the missing columns are provided."
+            # Show detailed comparison
+            st.error(f"Missing columns for Injury Risk calculations: {len(missing_required)}")
+            
+            with st.expander("Column Details", expanded=False):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**Missing Columns:**")
+                    for col in missing_required:
+                        st.write(f"- `{col}`")
+                
+                with col2:
+                    st.markdown("**Available Columns:**")
+                    found_cols = sorted(list(required_columns_normalized & df_columns_set))
+                    for col in found_cols:
+                        st.write(f"- `{col}`")
+                    
+                    # Show similar column names that might be matches
+                    st.markdown("**Similar Columns in CSV:**")
+                    for missing_col in missing_required[:5]:  # Show first 5
+                        # Find similar column names
+                        similar = [c for c in df.columns if missing_col.lower().replace(' ', '') in c.lower().replace(' ', '') or c.lower().replace(' ', '') in missing_col.lower().replace(' ', '')]
+                        if similar:
+                            st.write(f"Para `{missing_col}`:")
+                            for sim in similar[:3]:
+                                st.write(f"  - `{sim}`")
+            
+            st.warning(
+                "The file will load, but Injury Risk calculations will not be available until the missing columns are provided."
             )
         
         col1, col2, col3 = st.columns(3)
@@ -2460,12 +3610,67 @@ elif page == "Data Audit":
 
 elif page == "Model Training":
     st.markdown('<h1 class="main-header">Advanced Model Training</h1>', unsafe_allow_html=True)
-    
+
     if st.session_state.df is None:
         st.warning(" Please upload data in the Data Audit section first.")
     else:
         df = st.session_state.df
         
+        # Model Management Section
+        with st.expander("Model Management", expanded=False):
+            saved_models = list_saved_models()
+            if saved_models:
+                st.markdown("#### Modelos Disponibles")
+                model_df = pd.DataFrame([
+                    {
+                        'Tipo': m['type'],
+                        'Fecha': m['timestamp'][:10] if len(m['timestamp']) > 10 else m['timestamp'],
+                        'Features': len(m.get('features', [])),
+                        'R² (Test)': f"{m['metrics']['test']['R2']:.4f}" if m.get('metrics') and 'test' in m.get('metrics', {}) and 'R2' in m.get('metrics', {}).get('test', {}) else "N/A",
+                        'Accuracy (Test)': f"{m['metrics']['test']['Accuracy']:.4f}" if m.get('metrics') and 'test' in m.get('metrics', {}) and 'Accuracy' in m.get('metrics', {}).get('test', {}) else "N/A"
+                    }
+                    for m in saved_models
+                ])
+                st.dataframe(model_df, use_container_width=True, hide_index=True)
+                
+                # Model comparison
+                if len(saved_models) >= 2:
+                    st.markdown("#### Compare Models")
+                    col_comp1, col_comp2 = st.columns(2)
+                    with col_comp1:
+                        model1_select = st.selectbox("Modelo 1", [m['type'] for m in saved_models], key="compare_model1")
+                    with col_comp2:
+                        model2_select = st.selectbox("Modelo 2", [m['type'] for m in saved_models], key="compare_model2")
+                    
+                    if model1_select != model2_select:
+                        model1_path = next(m['path'] for m in saved_models if m['type'] == model1_select)
+                        model2_path = next(m['path'] for m in saved_models if m['type'] == model2_select)
+                        comparison = compare_models(model1_path, model2_path)
+                        
+                        if comparison:
+                            st.markdown("##### Metrics Comparison")
+                            comp_col1, comp_col2 = st.columns(2)
+                            with comp_col1:
+                                st.markdown(f"**{model1_select}**")
+                                if comparison['model1'].get('metrics'):
+                                    for key, value in comparison['model1']['metrics'].items():
+                                        if isinstance(value, dict):
+                                            st.write(f"- {key}:")
+                                            for k, v in value.items():
+                                                st.write(f"  - {k}: {v:.4f}")
+                            with comp_col2:
+                                st.markdown(f"**{model2_select}**")
+                                if comparison['model2'].get('metrics'):
+                                    for key, value in comparison['model2']['metrics'].items():
+                                        if isinstance(value, dict):
+                                            st.write(f"- {key}:")
+                                            for k, v in value.items():
+                                                st.write(f"  - {k}: {v:.4f}")
+            else:
+                st.info("No hay modelos guardados. Entrena un modelo para guardarlo automáticamente.")
+        
+        st.markdown("---")
+
         tab1, tab2 = st.tabs([" Player Load Prediction (Regression)", " Injury Risk Classification"])
         
         with tab1:
@@ -2631,6 +3836,8 @@ elif page == "Model Training":
                 with st.spinner("Training model... This may take a moment"):
                     model, metrics, features = train_classification_model_fast(df)
                     st.session_state.classification_model = model
+                    st.session_state.classification_metrics = metrics
+                    st.session_state.classification_features = features
                     
                     st.success(" Model trained successfully!")
                     
@@ -2928,30 +4135,133 @@ elif page == "Injury Prevention":
         
         st.info(f" Analyzing {len(recent_data)} sessions (last 2 weeks)")
         
-        # Calculate injury risk
-        features = [
-            'Work Ratio', 'Energy (kcal)', 'Distance (miles)', 'Sprint Distance (yards)',
-            'Top Speed (mph)', 'Max Acceleration (yd/s/s)', 'Max Deceleration (yd/s/s)',
-            'Distance Per Min (yd/min)', 'Hr Load', 'Hr Max (bpm)', 'Time In Red Zone (min)',
-            'Impacts', 'Impact Zones: > 20 G (Impacts)', 'Impact Zones: 15 - 20 G (Impacts)',
-            'Power Plays', 'Power Score (w/kg)', 'Distance in Speed Zone 4 (miles)',
-            'Distance in Speed Zone 5 (miles)', 'Time in HR Load Zone 85% - 96% Max HR (secs)'
-        ]
-        features = [f for f in features if f in recent_data.columns]
+        # Calculate injury risk - use model's expected features if available
+        if st.session_state.classification_features:
+            model_features = st.session_state.classification_features
+        else:
+            # Default features list
+            model_features = [
+                'Work Ratio', 'Energy (kcal)', 'Distance (miles)', 'Sprint Distance (yards)',
+                'Top Speed (mph)', 'Max Acceleration (yd/s/s)', 'Max Deceleration (yd/s/s)',
+                'Distance Per Min (yd/min)', 'Hr Load', 'Hr Max (bpm)', 'Time In Red Zone (min)',
+                'Impacts', 'Impact Zones: > 20 G (Impacts)', 'Impact Zones: 15 - 20 G (Impacts)',
+                'Power Plays', 'Power Score (w/kg)', 'Distance in Speed Zone 4 (miles)',
+                'Distance in Speed Zone 5 (miles)', 'Time in HR Load Zone 85% - 96% Max HR (secs)'
+            ]
+        
+        # Get available features from data
+        available_features = [f for f in model_features if f in recent_data.columns]
+        missing_features = [f for f in model_features if f not in recent_data.columns]
         
         # Check if we have enough features
-        if len(features) == 0:
+        if len(available_features) == 0:
             st.error(" **No required features found in dataset!**")
+            st.info(f"El modelo espera estas features: {', '.join(model_features[:5])}...")
             st.stop()
         
-        X_recent = recent_data[features]
+        # Show which features are being used
+        with st.expander("Model Features Used", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("**Available Columns:**")
+                for feat in available_features:
+                    st.write(f"  • {feat}")
+                st.success(f"Total: {len(available_features)} columns")
+            
+            if len(missing_features) > 0:
+                with col2:
+                    st.markdown("**Missing Columns (filled with 0):**")
+                    for feat in missing_features:
+                        st.write(f"  • {feat}")
+                    st.warning(f"Total: {len(missing_features)} missing")
+            else:
+                with col2:
+                    st.markdown("**All Required Columns Available**")
+                    st.success("Model has all required columns")
+        
+        # Prepare features for prediction
+        if len(missing_features) > 0:
+            # Some features are missing - fill with default values
+            st.info(f"Using {len(available_features)}/{len(model_features)} columns. {len(missing_features)} missing columns will be filled with default values (0).")
+            X_recent = recent_data[available_features].copy()
+            # Fill missing features with 0
+            for feat in missing_features:
+                X_recent[feat] = 0
+            # Reorder columns to match model's expected order
+            X_recent = X_recent[model_features]
+        else:
+            # All features available
+            X_recent = recent_data[model_features]
         
         # Make sure we have data to predict
         if len(X_recent) == 0:
             st.warning(" No data available for prediction. Please check your dataset.")
             st.stop()
         
-        predictions = st.session_state.classification_model.predict(X_recent)
+        # Safe prediction with error handling for LightGBM compatibility
+        try:
+            predictions = st.session_state.classification_model.predict(X_recent)
+        except (AttributeError, TypeError) as e:
+            if 'handle' in str(e) or 'Booster' in str(e):
+                st.error("❌ Error de compatibilidad con el modelo LightGBM guardado.")
+                st.warning("""
+                **El modelo necesita ser reentrenado debido a un problema de compatibilidad.**
+                
+                Por favor:
+                1. Ve a la sección **Model Training**
+                2. Entrena el modelo de clasificación nuevamente
+                3. Luego vuelve a esta sección
+                """)
+                # Clear the broken model from session state
+                st.session_state.classification_model = None
+                st.stop()
+            else:
+                raise e
+        except KeyError as e:
+            # Handle missing columns error
+            error_msg = str(e)
+            required_features = [
+                'Work Ratio', 'Energy (kcal)', 'Distance (miles)', 'Sprint Distance (yards)',
+                'Top Speed (mph)', 'Max Acceleration (yd/s/s)', 'Max Deceleration (yd/s/s)',
+                'Distance Per Min (yd/min)', 'Hr Load', 'Hr Max (bpm)', 'Time In Red Zone (min)',
+                'Impacts', 'Impact Zones: > 20 G (Impacts)', 'Impact Zones: 15 - 20 G (Impacts)',
+                'Power Plays', 'Power Score (w/kg)', 'Distance in Speed Zone 4 (miles)',
+                'Distance in Speed Zone 5 (miles)', 'Time in HR Load Zone 85% - 96% Max HR (secs)'
+            ]
+            missing_cols = [f for f in required_features if f not in recent_data.columns]
+            if missing_cols:
+                st.error(f"Could not calculate risk: columns are missing: {set(missing_cols)}")
+                st.info("""
+                **El CSV contiene todas las columnas necesarias, pero algunas pueden tener espacios extra o diferencias sutiles en los nombres.**
+                
+                Por favor:
+                1. Verifica que el CSV tenga todas las columnas requeridas
+                2. Asegúrate de que los nombres de las columnas coincidan exactamente
+                3. Si el problema persiste, recarga el archivo CSV
+                """)
+            else:
+                st.error(f"Could not calculate risk: {error_msg}")
+            st.stop()
+        except Exception as e:
+            error_msg = str(e)
+            # Check if it's a column-related error
+            if 'columns are missing' in error_msg.lower() or 'not in index' in error_msg.lower() or 'KeyError' in str(type(e)):
+                required_features = [
+                    'Work Ratio', 'Energy (kcal)', 'Distance (miles)', 'Sprint Distance (yards)',
+                    'Top Speed (mph)', 'Max Acceleration (yd/s/s)', 'Max Deceleration (yd/s/s)',
+                    'Distance Per Min (yd/min)', 'Hr Load', 'Hr Max (bpm)', 'Time In Red Zone (min)',
+                    'Impacts', 'Impact Zones: > 20 G (Impacts)', 'Impact Zones: 15 - 20 G (Impacts)',
+                    'Power Plays', 'Power Score (w/kg)', 'Distance in Speed Zone 4 (miles)',
+                    'Distance in Speed Zone 5 (miles)', 'Time in HR Load Zone 85% - 96% Max HR (secs)'
+                ]
+                missing_cols = [f for f in required_features if f not in recent_data.columns]
+                if missing_cols:
+                    st.error(f"Could not calculate risk: columns are missing: {set(missing_cols)}")
+                else:
+                    st.error(f"Could not calculate risk: {error_msg}")
+            else:
+                st.error(f"Could not calculate risk: {error_msg}")
+            st.stop()
         
         recent_data['Predicted_Risk'] = predictions
         recent_data['Risk_Label'] = recent_data['Predicted_Risk'].map({0: 'Low', 1: 'Medium', 2: 'High'})
@@ -3313,6 +4623,60 @@ elif page == "Injury Prevention":
                                 st.markdown("### Data-Driven Actions")
                                 for action in intel_recs['specific_actions']:
                                     st.markdown(f"- {action}")
+                            
+                            # Enhanced Personalized Training Plan
+                            st.markdown("---")
+                            st.markdown("### Personalized Training Plan")
+                            
+                            training_plan = generate_personalized_training_plan(selected_player, df, recent_days=14)
+                            if training_plan:
+                                col_plan1, col_plan2 = st.columns(2)
+                                
+                                with col_plan1:
+                                    st.markdown("#### Priority Recommendations")
+                                    for rec in training_plan['recommendations']:
+                                        priority_label = "HIGH" if rec['priority'] == 'high' else "MEDIUM" if rec['priority'] == 'medium' else "LOW"
+                                        st.markdown(f"""
+                                        <div style="border-left: 4px solid {'#DC3545' if rec['priority'] == 'high' else '#FFC107' if rec['priority'] == 'medium' else '#28A745'}; padding-left: 1rem; margin: 0.5rem 0;">
+                                            <p><b>{priority_label} - {rec['type'].replace('_', ' ').title()}:</b> {rec['message']}</p>
+                                            <p style="color: #6C757D; font-size: 0.9rem;">→ {rec['action']}</p>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+                                
+                                with col_plan2:
+                                    if training_plan['training_schedule']:
+                                        st.markdown("#### Suggested Weekly Schedule")
+                                        schedule_df = pd.DataFrame(training_plan['training_schedule'])
+                                        st.dataframe(schedule_df, use_container_width=True, hide_index=True)
+                                
+                                if training_plan['recovery_days']:
+                                    st.markdown("#### Recommended Recovery Days")
+                                    for recovery_day in training_plan['recovery_days']:
+                                        st.info(f"{recovery_day}")
+                                
+                                # Export PDF button
+                                if PDF_AVAILABLE:
+                                    if st.button("Generate PDF Report", key=f"pdf_{selected_player}"):
+                                        with st.spinner("Generando reporte PDF..."):
+                                            pdf_path = generate_player_pdf_report(
+                                                selected_player,
+                                                df,
+                                                model_metrics=st.session_state.classification_metrics
+                                            )
+                                            if pdf_path and os.path.exists(pdf_path):
+                                                with open(pdf_path, 'rb') as pdf_file:
+                                                    st.download_button(
+                                                        label="Download PDF Report",
+                                                        data=pdf_file,
+                                                        file_name=os.path.basename(pdf_path),
+                                                        mime="application/pdf",
+                                                        key=f"download_pdf_{selected_player}"
+                                                    )
+                                                st.success(f"Report generated: {os.path.basename(pdf_path)}")
+                                            else:
+                                                st.error("Error generating PDF report")
+                                else:
+                                    st.info("Install 'reportlab' to generate PDF reports: pip install reportlab")
                             
                             if intel_recs.get('personalized_plan'):
                                 st.markdown("### Personalized Development Plan")
