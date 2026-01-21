@@ -16,7 +16,22 @@ graceland_soccer_web/
 
 ## Quick Start
 
-### Backend
+### Try it Online
+
+**Live Demo:** https://ml-models-z9jxxmnmkkxtca7eewrywj.streamlit.app/
+
+> **Note**: The demo is fully functional with sample Catapult data included. No installation required!
+
+**Features available:**
+- **Dashboard**: KPIs overview with real-time player risk alerts
+- **Model Training**: Train and evaluate regression + classification models
+- **Injury Prevention**: Automated risk assessment with personalized recommendations
+- **Player Load Analysis**: Individual player performance tracking and insights
+- **Team Lineup Calculator**: Optimize team formations with multiple strategies
+
+### Local Development
+
+#### Backend
 
 ```bash
 cd graceland_soccer_web/backend
@@ -24,13 +39,20 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-### Frontend
+#### Frontend
 
 ```bash
 cd graceland_soccer_web/frontend
 npm install
 npm run dev
 ```
+
+## Author
+
+**Alvaro Martin-Pena** | Machine Learning Engineer
+
+- GitHub: [@Alvaromp3](https://github.com/Alvaromp3)
+- LinkedIn: [Alvaro Martin-Pena](https://linkedin.com/in/alvaro-martin-pena)
 
 ## Features
 
