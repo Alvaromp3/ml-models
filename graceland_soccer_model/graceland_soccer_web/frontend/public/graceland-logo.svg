@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120">
+  <!-- Shield background -->
+  <path d="M50 5 L95 20 L95 70 Q95 100 50 115 Q5 100 5 70 L5 20 Z" fill="#1e3a5f"/>
+  
+  <!-- Shield border -->
+  <path d="M50 5 L95 20 L95 70 Q95 100 50 115 Q5 100 5 70 L5 20 Z" fill="none" stroke="#2d4a6f" stroke-width="2"/>
+  
+  <!-- Yellow/Gold bar at top -->
+  <path d="M12 22 L88 22 L88 32 L12 32 Z" fill="#f5b820"/>
+  
+  <!-- Letter G -->
+  <text x="50" y="85" font-family="Georgia, serif" font-size="55" font-weight="bold" fill="#f5b820" text-anchor="middle">G</text>
+</svg>

@@ -41,9 +41,6 @@ venv.bak/
 .ipynb_checkpoints
 *.ipynb
 
-# Streamlit
-.streamlit/
-
 # Data files
 *.csv
 !sample_*.csv
