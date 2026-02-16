@@ -43,19 +43,34 @@ import type { Player } from '../types';
 
 type CriteriaType = 'balanced' | 'speed' | 'load' | 'lowRisk' | 'highIntensity';
 
-// Simple layout positions for 11 players (no position labels)
+// Field layout positions (x%, y%) for 11 players - matches slot positions below
 const fieldLayout = [
-  { x: 50, y: 88 },  // GK
-  { x: 18, y: 68 },  // DEF
-  { x: 38, y: 72 },
-  { x: 62, y: 72 },
-  { x: 82, y: 68 },
-  { x: 28, y: 48 },  // MID
-  { x: 50, y: 42 },
-  { x: 72, y: 48 },
-  { x: 20, y: 22 },  // FWD
-  { x: 50, y: 15 },
-  { x: 80, y: 22 },
+  { x: 50, y: 88 },  // 0: GK
+  { x: 18, y: 68 },  // 1: LB
+  { x: 38, y: 72 },  // 2: CB
+  { x: 62, y: 72 },  // 3: CB
+  { x: 82, y: 68 },  // 4: RB
+  { x: 28, y: 48 },  // 5: MID
+  { x: 50, y: 42 },  // 6: MID
+  { x: 72, y: 48 },  // 7: MID
+  { x: 20, y: 22 },  // 8: LW
+  { x: 50, y: 15 },  // 9: ST
+  { x: 80, y: 22 },  // 10: RW
+];
+
+// Allowed positions per slot (4-3-3: GK, LB, CB, CB, RB, CM x3, LW, ST, RW)
+const slotPositions: string[][] = [
+  ['GK'],                                    // 0
+  ['LB'],                                    // 1
+  ['CB'],                                    // 2
+  ['CB'],                                    // 3
+  ['RB'],                                    // 4
+  ['CDM', 'CM'],                             // 5
+  ['CM', 'CAM'],                             // 6
+  ['CDM', 'CM', 'CAM'],                      // 7
+  ['LW'],                                    // 8
+  ['ST', 'CF'],                              // 9
+  ['RW'],                                    // 10
 ];
 
 const criteriaConfig: Record<CriteriaType, { label: string; description: string; icon: typeof Zap; color: string; gradient: string }> = {
@@ -97,43 +112,48 @@ export default function Lineup() {
     },
   });
 
-  // Generate best lineup based on criteria
+  // Score a player for the current criteria (higher = better)
+  const scorePlayer = useMemo(() => {
+    const riskOrder = { low: 1, medium: 0.7, high: 0.4 };
+    const riskOrderLowFirst = { low: 0, medium: 1, high: 2 };
+    return (p: Player) => {
+      switch (selectedCriteria) {
+        case 'speed':
+          return p.avgSpeed;
+        case 'load':
+          return p.avgLoad;
+        case 'lowRisk':
+          return 1000 - riskOrderLowFirst[p.riskLevel] * 500 + p.avgSpeed;
+        case 'highIntensity':
+          return p.avgLoad * p.avgSpeed;
+        case 'balanced':
+        default:
+          return (p.avgSpeed / 25) * 0.3 + (p.avgLoad / 600) * 0.3 + riskOrder[p.riskLevel] * 0.4;
+      }
+    };
+  }, [selectedCriteria]);
+
+  // Generate best lineup by position: fill each slot with best available player for that position
   const bestLineup = useMemo(() => {
     if (!players || players.length < 11) return [];
 
-    let sortedPlayers = [...players];
+    const result: (Player | null)[] = new Array(11).fill(null);
+    let remaining = [...players];
 
-    switch (selectedCriteria) {
-      case 'speed':
-        sortedPlayers.sort((a, b) => b.avgSpeed - a.avgSpeed);
-        break;
-      case 'load':
-        sortedPlayers.sort((a, b) => b.avgLoad - a.avgLoad);
-        break;
-      case 'lowRisk':
-        const riskOrder = { low: 0, medium: 1, high: 2 };
-        sortedPlayers.sort((a, b) => {
-          const riskDiff = riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
-          if (riskDiff !== 0) return riskDiff;
-          return b.avgSpeed - a.avgSpeed;
-        });
-        break;
-      case 'highIntensity':
-        sortedPlayers.sort((a, b) => (b.avgLoad * b.avgSpeed) - (a.avgLoad * a.avgSpeed));
-        break;
-      case 'balanced':
-      default:
-        sortedPlayers.sort((a, b) => {
-          const riskScore = { low: 1, medium: 0.7, high: 0.4 };
-          const scoreA = (a.avgSpeed / 25) * 0.3 + (a.avgLoad / 600) * 0.3 + riskScore[a.riskLevel] * 0.4;
-          const scoreB = (b.avgSpeed / 25) * 0.3 + (b.avgLoad / 600) * 0.3 + riskScore[b.riskLevel] * 0.4;
-          return scoreB - scoreA;
-        });
-        break;
+    for (let slot = 0; slot < 11; slot++) {
+      const allowed = slotPositions[slot];
+      const candidates = remaining.filter((p) => allowed.includes(p.position));
+      const pool = candidates.length > 0 ? candidates : remaining;
+      pool.sort((a, b) => scorePlayer(b) - scorePlayer(a));
+      const chosen = pool[0];
+      if (chosen) {
+        result[slot] = chosen;
+        remaining = remaining.filter((p) => p.id !== chosen.id);
+      }
     }
 
-    return sortedPlayers.slice(0, 11);
-  }, [players, selectedCriteria]);
+    return result.filter((p): p is Player => p !== null);
+  }, [players, scorePlayer]);
 
   // Stats for the lineup
   const lineupStats = useMemo(() => {
@@ -318,7 +338,7 @@ export default function Lineup() {
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white/25 rounded-full" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white/40 rounded-full" />
 
-              {/* Players */}
+              {/* Players - ordered by slot (GK, LB, CB, CB, RB, MID x3, LW, ST, RW) */}
               {fieldLayout.map((pos, idx) => {
                 const player = bestLineup[idx];
                 if (!player) return null;
@@ -331,22 +351,23 @@ export default function Lineup() {
                 
                 return (
                   <div
-                    key={idx}
+                    key={player.id}
                     className="absolute transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer"
                     style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
                   >
                     {/* Glow effect */}
                     <div className={`absolute inset-0 ${riskColors[player.riskLevel]} rounded-full blur-md opacity-50 group-hover:opacity-75 transition-opacity`} />
                     
-                    {/* Player circle */}
-                    <div className={`relative w-11 h-11 rounded-full ${riskColors[player.riskLevel]} flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white/60 transition-transform group-hover:scale-110`}>
-                      {player.number}
+                    {/* Player circle: number + position */}
+                    <div className={`relative w-12 h-12 rounded-full ${riskColors[player.riskLevel]} flex flex-col items-center justify-center text-white shadow-lg border-2 border-white/60 transition-transform group-hover:scale-110`}>
+                      <span className="text-xs font-bold leading-none">{player.number}</span>
+                      <span className="text-[9px] font-medium leading-tight opacity-95">{player.position}</span>
                     </div>
                     
                     {/* Tooltip */}
                     <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-slate-900/95 backdrop-blur px-3 py-2 rounded-lg text-center whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all z-10 shadow-xl border border-slate-700/50">
                       <p className="text-xs font-semibold text-white">{player.name}</p>
-                      <p className="text-[10px] text-slate-400">{player.avgSpeed} mph • {player.avgLoad} load</p>
+                      <p className="text-[10px] text-slate-400">{player.position} • {player.avgSpeed} mph • {player.avgLoad} load</p>
                     </div>
                   </div>
                 );
@@ -361,26 +382,27 @@ export default function Lineup() {
               Selected Players
             </h3>
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-              {bestLineup.map((player, idx) => {
+              {(['GK', 'LB', 'CB', 'CB', 'RB', 'MID', 'MID', 'MID', 'LW', 'ST', 'RW'] as const).map((slotLabel, idx) => {
+                const player = bestLineup[idx];
+                if (!player) return null;
                 const riskColors = {
                   low: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
                   medium: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
                   high: 'text-red-400 bg-red-500/10 border-red-500/30',
                 };
-                
                 return (
                   <div 
                     key={player.id} 
                     className="flex items-center gap-3 p-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-xl transition-all border border-transparent hover:border-slate-700/50"
                   >
-                    <div className="w-9 h-9 rounded-lg bg-slate-800/60 border border-slate-700/50 text-white flex items-center justify-center text-sm font-bold">
-                      {idx + 1}
+                    <div className="w-9 h-9 rounded-lg bg-slate-800/60 border border-slate-700/50 text-white flex items-center justify-center text-xs font-bold">
+                      {slotLabel}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">{player.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] text-slate-500">#{player.number}</span>
-                        <span className="text-[10px] text-slate-600">•</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-300">{player.position}</span>
                         <span className="text-[10px] text-slate-400">{player.avgSpeed} mph</span>
                       </div>
                     </div>

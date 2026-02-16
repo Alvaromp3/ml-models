@@ -13,7 +13,8 @@ import {
   Shield,
   Calendar,
   Clock,
-  Sparkles
+  Sparkles,
+  ChevronRight
 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import KPICard from '../components/dashboard/KPICard';
@@ -29,11 +30,13 @@ import {
   useDataStatus,
 } from '../hooks/useDashboard';
 import { dataApi } from '../services/api';
+import { useTeam } from '../contexts/TeamContext';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadStatus, setUploadStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const { currentTeam } = useTeam();
   
   const { data: dataStatus } = useDataStatus();
   const { data: kpis } = useDashboardKPIs();
@@ -54,7 +57,7 @@ export default function Dashboard() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: dataApi.upload,
+    mutationFn: (file: File) => dataApi.upload(file, currentTeam),
     onSuccess: (data) => {
       queryClient.invalidateQueries();
       setUploadStatus({ 
@@ -285,6 +288,32 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Alerts Widget */}
+      {highRiskPlayers && highRiskPlayers.length > 0 && (
+        <div className="card p-4 bg-red-500/10 border border-red-500/30 rounded-xl animate-slide-in-up">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-500/20 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">⚠️ Alert: High Risk Players Detected</h3>
+                <p className="text-sm text-slate-400">
+                  {highRiskPlayers.length} player{highRiskPlayers.length > 1 ? 's' : ''} require immediate attention
+                </p>
+              </div>
+            </div>
+            <a
+              href="/analysis"
+              className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              View Details
+              <ChevronRight className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
@@ -294,6 +323,7 @@ export default function Dashboard() {
           icon={Users}
           subtitle="active roster"
           delay={0}
+          sparklineData={loadHistory?.slice(-7).map(d => d.avgLoad) || []}
         />
         <KPICard
           title="Avg Team Load"
@@ -302,6 +332,7 @@ export default function Dashboard() {
           icon={Zap}
           subtitle="units per session"
           delay={50}
+          sparklineData={loadHistory?.slice(-7).map(d => d.avgLoad) || []}
         />
         <KPICard
           title="High Risk Players"

@@ -1,5 +1,6 @@
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
 interface KPICardProps {
   title: string;
@@ -9,6 +10,7 @@ interface KPICardProps {
   subtitle?: string;
   variant?: 'default' | 'warning' | 'success';
   delay?: number;
+  sparklineData?: number[];
 }
 
 export default function KPICard({ 
@@ -18,7 +20,8 @@ export default function KPICard({
   icon: Icon, 
   subtitle,
   variant = 'default',
-  delay = 0
+  delay = 0,
+  sparklineData
 }: KPICardProps) {
   const isPositive = change >= 0;
   
@@ -76,6 +79,24 @@ export default function KPICard({
           <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
         )}
       </div>
+
+      {/* Sparkline Chart */}
+      {sparklineData && sparklineData.length > 0 && (
+        <div className="mt-4 h-12 -mb-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={sparklineData.map((val, idx) => ({ value: val, index: idx }))}>
+              <Line 
+                type="monotone" 
+                dataKey="value" 
+                stroke={variant === 'warning' ? '#f97316' : variant === 'success' ? '#22c55e' : '#06b6d4'} 
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Bottom accent line */}
       <div className={`mt-5 h-1 rounded-full bg-gradient-to-r ${gradient} opacity-40`} />

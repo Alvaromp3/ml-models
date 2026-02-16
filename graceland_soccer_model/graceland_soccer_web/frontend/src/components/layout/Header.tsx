@@ -1,4 +1,5 @@
 import { Menu, Bell, Search, Calendar } from 'lucide-react';
+import TeamSelector from './TeamSelector';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -23,6 +24,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
           >
             <Menu className="w-5 h-5 text-slate-300" />
           </button>
+          
+          {/* Team Selector */}
+          <TeamSelector />
           
           {/* Search */}
           <div className="hidden md:flex items-center gap-3 bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-2.5 w-80 focus-within:border-slate-600 focus-within:bg-slate-800 transition-all">

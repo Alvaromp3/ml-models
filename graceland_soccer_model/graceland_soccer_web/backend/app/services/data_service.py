@@ -19,6 +19,16 @@ class DataService:
         self.is_cleaned: bool = False
         self.cleaning_stats: Dict[str, Any] = {}
         self.use_today_as_reference: bool = True
+        self.current_team: str = 'mens'  # 'mens' or 'womens'
+        self.team_data: Dict[str, Optional[pd.DataFrame]] = {
+            'mens': None,
+            'womens': None
+        }
+        # Store custom player positions: {team: {player_name: position}}
+        self.player_positions: Dict[str, Dict[str, str]] = {
+            'mens': {},
+            'womens': {}
+        }
         
         self.key_columns = {
             'player_name': 'Player Name',
@@ -42,22 +52,60 @@ class DataService:
         
         self.risk_thresholds = {'high_load': 500, 'low_load': 200}
     
-    def load_csv(self, file_path: str) -> Dict[str, Any]:
+    def load_csv(self, file_path: str, team: str = 'mens') -> Dict[str, Any]:
+        """Load CSV file for a specific team"""
+        self.current_team = team
         self.df = pd.read_csv(file_path)
         self.df_original = self.df.copy()
+        self.team_data[team] = self.df.copy()
         self.excluded_players = set()
         self.is_cleaned = False
         self.cleaning_stats = {}
         return self._process_loaded_data()
     
-    def load_from_upload(self, content: bytes) -> Dict[str, Any]:
+    def load_from_upload(self, content: bytes, team: str = 'mens') -> Dict[str, Any]:
+        """Load CSV from upload for a specific team"""
         from io import BytesIO
+        self.current_team = team
         self.df = pd.read_csv(BytesIO(content))
         self.df_original = self.df.copy()
+        self.team_data[team] = self.df.copy()
         self.excluded_players = set()
         self.is_cleaned = False
         self.cleaning_stats = {}
         return self._process_loaded_data()
+    
+    def switch_team(self, team: str) -> Dict[str, Any]:
+        """Switch between men's and women's team data"""
+        if team not in ['mens', 'womens']:
+            raise ValueError("Team must be 'mens' or 'womens'")
+        
+        self.current_team = team
+        if self.team_data[team] is not None:
+            self.df = self.team_data[team].copy()
+            self.df_original = self.team_data[team].copy()
+            self._process_loaded_data()
+            return {'success': True, 'team': team, 'message': f'Switched to {team} team'}
+        else:
+            return {'success': False, 'team': team, 'message': f'No data loaded for {team} team'}
+    
+    def get_current_team(self) -> str:
+        """Get current team"""
+        return self.current_team
+    
+    def get_team_status(self) -> Dict[str, Any]:
+        """Get status of both teams"""
+        return {
+            'currentTeam': self.current_team,
+            'mens': {
+                'loaded': self.team_data['mens'] is not None,
+                'rowCount': len(self.team_data['mens']) if self.team_data['mens'] is not None else 0
+            },
+            'womens': {
+                'loaded': self.team_data['womens'] is not None,
+                'rowCount': len(self.team_data['womens']) if self.team_data['womens'] is not None else 0
+            }
+        }
     
     def _process_loaded_data(self) -> Dict[str, Any]:
         self.columns = self.df.columns.tolist()
@@ -183,30 +231,91 @@ class DataService:
         active_df = self.df[self.df[player_col].str.strip().isin(active_players)]
         
         load_col, speed_col = self.key_columns['player_load'], self.key_columns['top_speed']
-        avg_load = active_df[load_col].mean() if load_col in active_df.columns else 0
-        avg_speed = active_df[speed_col].mean() if speed_col in active_df.columns else 0
+        
+        # Calculate real averages from data - ensure numeric and handle NaN
+        if load_col in active_df.columns and len(active_df) > 0:
+            load_values = pd.to_numeric(active_df[load_col], errors='coerce').dropna()
+            avg_load = float(load_values.mean()) if len(load_values) > 0 else 0.0
+        else:
+            avg_load = 0.0
+        
+        if speed_col in active_df.columns and len(active_df) > 0:
+            speed_values = pd.to_numeric(active_df[speed_col], errors='coerce').dropna()
+            avg_speed = float(speed_values.mean()) if len(speed_values) > 0 else 0.0
+        else:
+            avg_speed = 0.0
+        
+        # Count high risk players (real calculation)
+        high_risk_count = self._count_high_risk_players()
+        
+        # Calculate changes based on recent vs older data if available
+        # For now, set to 0 since we don't have historical comparison data
+        # In a real scenario, you'd compare current period vs previous period
+        total_players = len(active_players)
+        total_players_change = 0.0  # No historical data to compare
+        
+        # Calculate load change: compare recent 15 days vs previous 15 days if possible
+        avg_load_change = 0.0
+        if 'ParsedDate' in active_df.columns and len(active_df) > 0:
+            recent_cutoff = datetime.now() - timedelta(days=15)
+            recent_df = active_df[active_df['ParsedDate'] >= recent_cutoff] if active_df['ParsedDate'].notna().any() else pd.DataFrame()
+            older_df = active_df[active_df['ParsedDate'] < recent_cutoff] if active_df['ParsedDate'].notna().any() else pd.DataFrame()
+            
+            if len(recent_df) > 0 and len(older_df) > 0:
+                recent_load = float(recent_df[load_col].mean()) if load_col in recent_df.columns else avg_load
+                older_load = float(older_df[load_col].mean()) if load_col in older_df.columns else avg_load
+                if older_load > 0:
+                    avg_load_change = round(((recent_load - older_load) / older_load) * 100, 1)
+        
+        # Calculate speed change similarly
+        avg_speed_change = 0.0
+        if 'ParsedDate' in active_df.columns and len(active_df) > 0:
+            recent_cutoff = datetime.now() - timedelta(days=15)
+            recent_df = active_df[active_df['ParsedDate'] >= recent_cutoff] if active_df['ParsedDate'].notna().any() else pd.DataFrame()
+            older_df = active_df[active_df['ParsedDate'] < recent_cutoff] if active_df['ParsedDate'].notna().any() else pd.DataFrame()
+            
+            if len(recent_df) > 0 and len(older_df) > 0:
+                recent_speed = float(recent_df[speed_col].mean()) if speed_col in recent_df.columns else avg_speed
+                older_speed = float(older_df[speed_col].mean()) if speed_col in older_df.columns else avg_speed
+                if older_speed > 0:
+                    avg_speed_change = round(((recent_speed - older_speed) / older_speed) * 100, 1)
         
         return {
-            'totalPlayers': len(active_players), 'totalPlayersChange': 5.2,
-            'avgTeamLoad': round(avg_load, 1), 'avgTeamLoadChange': -3.1,
-            'highRiskPlayers': self._count_high_risk_players(), 'highRiskPlayersChange': 12.5,
-            'avgTeamSpeed': round(avg_speed, 1), 'avgTeamSpeedChange': 2.8
+            'totalPlayers': total_players,
+            'totalPlayersChange': total_players_change,
+            'avgTeamLoad': round(avg_load, 1),
+            'avgTeamLoadChange': avg_load_change,
+            'highRiskPlayers': high_risk_count,
+            'highRiskPlayersChange': 0.0,  # No historical comparison available
+            'avgTeamSpeed': round(avg_speed, 1),
+            'avgTeamSpeedChange': avg_speed_change
         }
     
     def _count_high_risk_players(self) -> int:
         """Count high risk players based on LAST 45 DAYS from TODAY only"""
-        if self.df is None: return 0
+        if self.df is None: 
+            return 0
         load_col = self.key_columns['player_load']
-        if load_col not in self.df.columns: return 0
+        if load_col not in self.df.columns: 
+            return 0
         
         active_players = self._get_active_players()
+        if not active_players:
+            return 0
+        
         high_risk_count = 0
         
         for player_name in active_players:
             recent_data = self._get_recent_data_for_player(player_name)
             # Only count as high risk if they have recent data AND high load
             if len(recent_data) > 0:
-                avg_load = recent_data[load_col].mean() if load_col in recent_data.columns else 0
+                if load_col in recent_data.columns:
+                    avg_load = float(pd.to_numeric(recent_data[load_col], errors='coerce').mean())
+                    if pd.isna(avg_load):
+                        avg_load = 0.0
+                else:
+                    avg_load = 0.0
+                
                 if avg_load > self.risk_thresholds['high_load']:
                     high_risk_count += 1
         
@@ -214,11 +323,15 @@ class DataService:
     
     def get_risk_distribution(self) -> Dict[str, int]:
         """Get risk distribution based on LAST 45 DAYS from TODAY only"""
-        if self.df is None: return {'low': 0, 'medium': 0, 'high': 0}
+        if self.df is None: 
+            return {'low': 0, 'medium': 0, 'high': 0}
         player_col, load_col = self.key_columns['player_name'], self.key_columns['player_load']
-        if load_col not in self.df.columns: return {'low': 0, 'medium': 0, 'high': 0}
+        if load_col not in self.df.columns: 
+            return {'low': 0, 'medium': 0, 'high': 0}
         
         active_players = self._get_active_players()
+        if not active_players:
+            return {'low': 0, 'medium': 0, 'high': 0}
         
         # Count risk for each player based on recent data only
         low, medium, high = 0, 0, 0
@@ -230,8 +343,15 @@ class DataService:
             if len(recent_data) == 0:
                 low += 1
             else:
-                # Calculate average load from recent data only
-                avg_load = recent_data[load_col].mean() if load_col in recent_data.columns else 0
+                # Calculate average load from recent data only - ensure numeric
+                if load_col in recent_data.columns:
+                    avg_load = float(pd.to_numeric(recent_data[load_col], errors='coerce').mean())
+                    if pd.isna(avg_load):
+                        avg_load = 0.0
+                else:
+                    avg_load = 0.0
+                
+                # Classify based on thresholds
                 if avg_load < self.risk_thresholds['low_load']:
                     low += 1
                 elif avg_load > self.risk_thresholds['high_load']:
@@ -242,21 +362,72 @@ class DataService:
         return {'low': low, 'medium': medium, 'high': high}
     
     def get_load_history(self, days: int = 15) -> List[Dict[str, Any]]:
-        if self.df is None or 'ParsedDate' not in self.df.columns: return []
+        if self.df is None or 'ParsedDate' not in self.df.columns: 
+            return []
         load_col = self.key_columns['player_load']
-        if load_col not in self.df.columns: return []
+        if load_col not in self.df.columns: 
+            return []
         
         player_col = self.key_columns['player_name']
         active_players = self._get_active_players()
-        active_df = self.df[self.df[player_col].str.strip().isin(active_players)]
+        if not active_players:
+            return []
         
-        daily = active_df.groupby(active_df['ParsedDate'].dt.date).agg({
-            load_col: 'mean', self.key_columns['player_name']: 'count'
+        active_df = self.df[self.df[player_col].str.strip().isin(active_players)].copy()
+        
+        # Filter out rows with invalid dates
+        active_df = active_df[active_df['ParsedDate'].notna()]
+        if len(active_df) == 0:
+            return []
+        
+        # Ensure ParsedDate is datetime
+        if not pd.api.types.is_datetime64_any_dtype(active_df['ParsedDate']):
+            active_df['ParsedDate'] = pd.to_datetime(active_df['ParsedDate'], errors='coerce')
+            active_df = active_df[active_df['ParsedDate'].notna()]
+        
+        if len(active_df) == 0:
+            return []
+        
+        # Group by date and calculate real averages
+        active_df['date_only'] = active_df['ParsedDate'].dt.date
+        daily = active_df.groupby('date_only').agg({
+            load_col: 'mean',
+            player_col: 'count'
         }).reset_index()
+        
         daily.columns = ['date', 'avgLoad', 'sessionCount']
-        daily = daily.sort_values('date').tail(days)
-        return [{'date': str(r['date']), 'avgLoad': round(r['avgLoad'], 1), 
-                 'sessionCount': int(r['sessionCount'])} for _, r in daily.iterrows()]
+        
+        # Ensure numeric values
+        daily['avgLoad'] = pd.to_numeric(daily['avgLoad'], errors='coerce').fillna(0)
+        daily['sessionCount'] = pd.to_numeric(daily['sessionCount'], errors='coerce').fillna(0).astype(int)
+        
+        # Sort by date and get last N days
+        daily = daily.sort_values('date', ascending=True).tail(days)
+        
+        # Return real data with properly formatted dates
+        result = []
+        for _, r in daily.iterrows():
+            try:
+                date_val = r['date']
+                # Ensure date is a date object, not string
+                if isinstance(date_val, str):
+                    date_val = pd.to_datetime(date_val).date()
+                elif pd.isna(date_val):
+                    continue
+                
+                avg_load_val = float(r['avgLoad']) if not pd.isna(r['avgLoad']) else 0.0
+                session_count_val = int(r['sessionCount']) if not pd.isna(r['sessionCount']) else 0
+                
+                result.append({
+                    'date': date_val.isoformat() if hasattr(date_val, 'isoformat') else str(date_val), 
+                    'avgLoad': round(avg_load_val, 1), 
+                    'sessionCount': session_count_val
+                })
+            except Exception as e:
+                logger.warning(f"Error formatting load history row: {e}")
+                continue
+        
+        return result
     
     def get_all_players(self) -> List[Dict[str, Any]]:
         """Get all players with risk based on LAST 45 DAYS from TODAY"""
@@ -271,8 +442,19 @@ class DataService:
             
             # Get all data for historical stats
             pdata = self.df[self.df[player_col].str.strip() == name]
-            avg_load = pdata[load_col].mean() if load_col in self.df.columns else 0
-            avg_speed = pdata[speed_col].mean() if speed_col in self.df.columns else 0
+            
+            # Calculate averages with proper numeric handling
+            if load_col in pdata.columns:
+                load_values = pd.to_numeric(pdata[load_col], errors='coerce').dropna()
+                avg_load = float(load_values.mean()) if len(load_values) > 0 else 0.0
+            else:
+                avg_load = 0.0
+            
+            if speed_col in pdata.columns:
+                speed_values = pd.to_numeric(pdata[speed_col], errors='coerce').dropna()
+                avg_speed = float(speed_values.mean()) if len(speed_values) > 0 else 0.0
+            else:
+                avg_speed = 0.0
             
             # Get recent data for risk calculation (last 45 days from TODAY)
             recent_data = self._get_recent_data_for_player(name)
@@ -282,15 +464,32 @@ class DataService:
                 # No recent data = LOW risk
                 risk = 'low'
             else:
-                recent_avg_load = recent_data[load_col].mean() if load_col in recent_data.columns else 0
-                risk = 'high' if recent_avg_load > self.risk_thresholds['high_load'] else ('low' if recent_avg_load < self.risk_thresholds['low_load'] else 'medium')
+                # Ensure numeric calculation
+                if load_col in recent_data.columns:
+                    load_values = pd.to_numeric(recent_data[load_col], errors='coerce').dropna()
+                    recent_avg_load = float(load_values.mean()) if len(load_values) > 0 else 0.0
+                else:
+                    recent_avg_load = 0.0
+                
+                # Classify risk based on thresholds
+                if recent_avg_load > self.risk_thresholds['high_load']:
+                    risk = 'high'
+                elif recent_avg_load < self.risk_thresholds['low_load']:
+                    risk = 'low'
+                else:
+                    risk = 'medium'
             
             last = str(pdata['ParsedDate'].max().date()) if 'ParsedDate' in pdata.columns and pdata['ParsedDate'].notna().any() else None
             
+            # Use custom position if set, otherwise use default circular assignment
+            player_name_clean = name.strip()
+            custom_position = self.player_positions.get(self.current_team, {}).get(player_name_clean)
+            position = custom_position if custom_position else positions[i % len(positions)]
+            
             players.append({
                 'id': f'player_{i}', 
-                'name': name.strip(), 
-                'position': positions[i % len(positions)],
+                'name': player_name_clean, 
+                'position': position,
                 'number': i + 1, 
                 'riskLevel': risk, 
                 'avgLoad': round(avg_load, 1), 
@@ -410,6 +609,300 @@ class DataService:
     
     def get_top_performers(self, limit: int = 5) -> List[Dict[str, Any]]:
         return sorted(self.get_all_players(), key=lambda x: x['avgLoad'], reverse=True)[:limit]
+    
+    def get_team_average_metrics(self) -> Optional[Dict[str, Any]]:
+        """Calculate average metrics for the entire team"""
+        if self.df is None:
+            return None
+        
+        all_players = self.get_all_players()
+        if not all_players:
+            return None
+        
+        # Get all player details with metrics
+        player_details = []
+        for player in all_players:
+            detail = self.get_player_detail(player['id'])
+            if detail and detail.get('hasRecentData', False):
+                player_details.append(detail)
+        
+        if not player_details:
+            return None
+        
+        # Calculate averages across all metrics using the same structure as individual players
+        # We need to calculate metrics from recent data for all players combined
+        all_recent_data = []
+        for player_name in [p['name'] for p in all_players]:
+            recent_data = self._get_recent_data_for_player(player_name)
+            if not recent_data.empty:
+                all_recent_data.append(recent_data)
+        
+        if all_recent_data:
+            combined_recent = pd.concat(all_recent_data, ignore_index=True)
+        else:
+            combined_recent = pd.DataFrame()
+        
+        def safe_mean(col, data=combined_recent): 
+            if data.empty or col not in data.columns:
+                return 0.0
+            return round(float(pd.to_numeric(data[col], errors='coerce').mean()), 2) if data[col].notna().any() else 0.0
+        
+        # Build metrics with original column names for ML model compatibility
+        avg_metrics = {
+            'Player Load': safe_mean(self.key_columns['player_load']),
+            'Duration': safe_mean(self.key_columns['duration']),
+            'Distance (miles)': safe_mean(self.key_columns['distance']),
+            'Sprint Distance (yards)': safe_mean(self.key_columns['sprint_distance']),
+            'Top Speed (mph)': safe_mean(self.key_columns['top_speed']),
+            'Max Acceleration (yd/s/s)': safe_mean(self.key_columns['max_acceleration']),
+            'Max Deceleration (yd/s/s)': safe_mean(self.key_columns['max_deceleration']),
+            'Work Ratio': safe_mean(self.key_columns['work_ratio']),
+            'Energy (kcal)': safe_mean(self.key_columns['energy']),
+            'Hr Load': safe_mean(self.key_columns['hr_load']),
+            'Impacts': safe_mean(self.key_columns['impacts']),
+            'Power Plays': safe_mean(self.key_columns['power_plays']),
+            'Power Score (w/kg)': safe_mean(self.key_columns['power_score']),
+            'Distance Per Min (yd/min)': safe_mean(self.key_columns['distance_per_min']),
+        }
+        
+        # Calculate average risk level (weighted by number of players)
+        risk_counts = {'low': 0, 'medium': 0, 'high': 0}
+        total_sessions = 0
+        total_load = 0.0
+        total_speed = 0.0
+        
+        for player in all_players:
+            risk = player.get('riskLevel', 'low')
+            risk_counts[risk] += 1
+            total_sessions += player.get('sessions', 0)
+            total_load += player.get('avgLoad', 0)
+            total_speed += player.get('avgSpeed', 0)
+        
+        # Use ML model to predict risk based on average metrics
+        try:
+            risk_level, _, _, _ = ml_service.predict_risk(avg_metrics)
+        except:
+            # Fallback to majority rule if ML prediction fails
+            if risk_counts['high'] > 0:
+                risk_level = 'high'
+            elif risk_counts['medium'] > risk_counts['low']:
+                risk_level = 'medium'
+            else:
+                risk_level = 'low'
+        
+        # Calculate extended stats
+        load_values = []
+        for player in player_details:
+            load_val = player.get('metrics', {}).get('Player Load', 0)
+            if load_val > 0:
+                load_values.append(load_val)
+        
+        load_std = float(pd.Series(load_values).std()) if len(load_values) > 1 else 0.0
+        
+        # Create team average player object
+        team_avg = {
+            'id': 'team_average',
+            'name': 'Team Average',
+            'position': 'TEAM',
+            'number': 0,
+            'riskLevel': risk_level,
+            'avgLoad': round(avg_metrics.get('Player Load', 0), 1),
+            'avgSpeed': round(avg_metrics.get('Top Speed (mph)', 0), 1),
+            'sessions': total_sessions,
+            'lastSession': None,
+            'hasRecentData': len(player_details) > 0,
+            'recentSessionCount': sum(p.get('recentSessionCount', 0) for p in player_details),
+            'metrics': avg_metrics,
+            'extendedStats': {
+                'playerLoad': {
+                    'avg': avg_metrics.get('Player Load', 0),
+                    'max': max(load_values, default=0),
+                    'min': min(load_values, default=0),
+                    'std': load_std
+                }
+            },
+            'teamStats': {
+                'totalPlayers': len(all_players),
+                'playersWithRecentData': len(player_details),
+                'riskDistribution': risk_counts
+            }
+        }
+        
+        return team_avg
+    
+    def get_player_rankings(self, metric: str = 'player_load') -> List[Dict[str, Any]]:
+        """Get player rankings sorted by different metrics"""
+        if self.df is None:
+            return []
+        
+        player_col = self.key_columns['player_name']
+        active_players = self._get_active_players()
+        if not active_players:
+            return []
+        
+        rankings = []
+        
+        for player_name in active_players:
+            pdata = self.df[self.df[player_col].str.strip() == player_name]
+            if len(pdata) == 0:
+                continue
+            
+            # Calculate all metrics
+            metrics = {}
+            
+            # Player Load
+            load_col = self.key_columns['player_load']
+            if load_col in pdata.columns:
+                load_values = pd.to_numeric(pdata[load_col], errors='coerce').dropna()
+                metrics['player_load'] = float(load_values.mean()) if len(load_values) > 0 else 0.0
+                metrics['total_load'] = float(load_values.sum()) if len(load_values) > 0 else 0.0
+                metrics['max_load'] = float(load_values.max()) if len(load_values) > 0 else 0.0
+            else:
+                metrics['player_load'] = 0.0
+                metrics['total_load'] = 0.0
+                metrics['max_load'] = 0.0
+            
+            # Distance
+            distance_col = self.key_columns['distance']
+            if distance_col in pdata.columns:
+                distance_values = pd.to_numeric(pdata[distance_col], errors='coerce').dropna()
+                metrics['distance'] = float(distance_values.mean()) if len(distance_values) > 0 else 0.0
+                metrics['total_distance'] = float(distance_values.sum()) if len(distance_values) > 0 else 0.0
+                metrics['max_distance'] = float(distance_values.max()) if len(distance_values) > 0 else 0.0
+            else:
+                metrics['distance'] = 0.0
+                metrics['total_distance'] = 0.0
+                metrics['max_distance'] = 0.0
+            
+            # Sprint Distance
+            sprint_col = self.key_columns['sprint_distance']
+            if sprint_col in pdata.columns:
+                sprint_values = pd.to_numeric(pdata[sprint_col], errors='coerce').dropna()
+                metrics['sprint_distance'] = float(sprint_values.mean()) if len(sprint_values) > 0 else 0.0
+                metrics['total_sprints'] = float(sprint_values.sum()) if len(sprint_values) > 0 else 0.0
+                metrics['max_sprints'] = float(sprint_values.max()) if len(sprint_values) > 0 else 0.0
+            else:
+                metrics['sprint_distance'] = 0.0
+                metrics['total_sprints'] = 0.0
+                metrics['max_sprints'] = 0.0
+            
+            # Top Speed
+            speed_col = self.key_columns['top_speed']
+            if speed_col in pdata.columns:
+                speed_values = pd.to_numeric(pdata[speed_col], errors='coerce').dropna()
+                metrics['top_speed'] = float(speed_values.mean()) if len(speed_values) > 0 else 0.0
+                metrics['max_speed'] = float(speed_values.max()) if len(speed_values) > 0 else 0.0
+            else:
+                metrics['top_speed'] = 0.0
+                metrics['max_speed'] = 0.0
+            
+            # Work Ratio (Intensity)
+            work_ratio_col = self.key_columns['work_ratio']
+            if work_ratio_col in pdata.columns:
+                work_values = pd.to_numeric(pdata[work_ratio_col], errors='coerce').dropna()
+                metrics['work_ratio'] = float(work_values.mean()) if len(work_values) > 0 else 0.0
+                metrics['max_intensity'] = float(work_values.max()) if len(work_values) > 0 else 0.0
+            else:
+                metrics['work_ratio'] = 0.0
+                metrics['max_intensity'] = 0.0
+            
+            # Energy
+            energy_col = self.key_columns['energy']
+            if energy_col in pdata.columns:
+                energy_values = pd.to_numeric(pdata[energy_col], errors='coerce').dropna()
+                metrics['energy'] = float(energy_values.mean()) if len(energy_values) > 0 else 0.0
+                metrics['total_energy'] = float(energy_values.sum()) if len(energy_values) > 0 else 0.0
+            else:
+                metrics['energy'] = 0.0
+                metrics['total_energy'] = 0.0
+            
+            # Power Score
+            power_col = self.key_columns['power_score']
+            if power_col in pdata.columns:
+                power_values = pd.to_numeric(pdata[power_col], errors='coerce').dropna()
+                metrics['power_score'] = float(power_values.mean()) if len(power_values) > 0 else 0.0
+                metrics['max_power'] = float(power_values.max()) if len(power_values) > 0 else 0.0
+            else:
+                metrics['power_score'] = 0.0
+                metrics['max_power'] = 0.0
+            
+            # Max Acceleration
+            accel_col = self.key_columns['max_acceleration']
+            if accel_col in pdata.columns:
+                accel_values = pd.to_numeric(pdata[accel_col], errors='coerce').dropna()
+                metrics['max_acceleration'] = float(accel_values.max()) if len(accel_values) > 0 else 0.0
+                metrics['avg_acceleration'] = float(accel_values.mean()) if len(accel_values) > 0 else 0.0
+            else:
+                metrics['max_acceleration'] = 0.0
+                metrics['avg_acceleration'] = 0.0
+            
+            # Max Deceleration
+            decel_col = self.key_columns['max_deceleration']
+            if decel_col in pdata.columns:
+                decel_values = pd.to_numeric(pdata[decel_col], errors='coerce').dropna()
+                metrics['max_deceleration'] = float(decel_values.max()) if len(decel_values) > 0 else 0.0
+            else:
+                metrics['max_deceleration'] = 0.0
+            
+            # Distance per Minute
+            dist_per_min_col = self.key_columns['distance_per_min']
+            if dist_per_min_col in pdata.columns:
+                dist_per_min_values = pd.to_numeric(pdata[dist_per_min_col], errors='coerce').dropna()
+                metrics['distance_per_min'] = float(dist_per_min_values.mean()) if len(dist_per_min_values) > 0 else 0.0
+            else:
+                metrics['distance_per_min'] = 0.0
+            
+            # Impacts
+            impacts_col = self.key_columns.get('impacts', 'Impacts')
+            if impacts_col in pdata.columns:
+                impacts_values = pd.to_numeric(pdata[impacts_col], errors='coerce').dropna()
+                metrics['impacts'] = float(impacts_values.mean()) if len(impacts_values) > 0 else 0.0
+                metrics['total_impacts'] = float(impacts_values.sum()) if len(impacts_values) > 0 else 0.0
+            else:
+                metrics['impacts'] = 0.0
+                metrics['total_impacts'] = 0.0
+            
+            # Sessions count
+            metrics['sessions'] = len(pdata)
+            
+            rankings.append({
+                'name': player_name.strip(),
+                'metrics': metrics
+            })
+        
+        # Sort by requested metric
+        metric_map = {
+            'player_load': 'player_load',
+            'total_distance': 'total_distance',
+            'distance': 'distance',
+            'sprint_distance': 'sprint_distance',
+            'total_sprints': 'total_sprints',
+            'top_speed': 'top_speed',
+            'max_speed': 'max_speed',
+            'work_ratio': 'work_ratio',
+            'intensity': 'work_ratio',
+            'max_intensity': 'max_intensity',
+            'energy': 'energy',
+            'total_energy': 'total_energy',
+            'power_score': 'power_score',
+            'max_power': 'max_power',
+            'max_acceleration': 'max_acceleration',
+            'max_deceleration': 'max_deceleration',
+            'distance_per_min': 'distance_per_min',
+            'impacts': 'impacts',
+            'total_impacts': 'total_impacts',
+        }
+        
+        sort_key = metric_map.get(metric, 'player_load')
+        
+        # Sort descending (highest first)
+        rankings.sort(key=lambda x: x['metrics'].get(sort_key, 0), reverse=True)
+        
+        # Add rank position
+        for i, player in enumerate(rankings, 1):
+            player['rank'] = i
+        
+        return rankings
     
     def get_data_for_training(self) -> Tuple[pd.DataFrame, List[str]]:
         if self.df is None: return pd.DataFrame(), []
@@ -616,6 +1109,34 @@ class DataService:
             'useTodayAsReference': self.use_today_as_reference,
             'message': f'Date reference set to: {"Today\'s date" if use_today else "Last training date from CSV"}'
         }
+    
+    def update_player_position(self, player_name: str, position: str, team: str = None) -> Dict[str, Any]:
+        """Update player position for a specific team"""
+        team = team or self.current_team
+        if team not in ['mens', 'womens']:
+            raise ValueError("Team must be 'mens' or 'womens'")
+        
+        valid_positions = ['GK', 'CB', 'LB', 'RB', 'CM', 'CDM', 'CAM', 'LW', 'RW', 'ST', 'CF']
+        if position not in valid_positions:
+            raise ValueError(f"Position must be one of: {', '.join(valid_positions)}")
+        
+        if team not in self.player_positions:
+            self.player_positions[team] = {}
+        
+        self.player_positions[team][player_name] = position
+        
+        return {
+            'success': True,
+            'playerName': player_name,
+            'position': position,
+            'team': team,
+            'message': f'Position updated to {position} for {player_name}'
+        }
+    
+    def get_player_position(self, player_name: str, team: str = None) -> Optional[str]:
+        """Get player position for a specific team"""
+        team = team or self.current_team
+        return self.player_positions.get(team, {}).get(player_name)
 
 
 data_service = DataService()

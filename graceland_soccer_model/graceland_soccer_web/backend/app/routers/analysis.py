@@ -39,10 +39,65 @@ async def predict_load(request: PredictLoadRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/team-average", response_model=ApiResponse)
+async def get_team_average():
+    """Get team average metrics"""
+    try:
+        team_avg = data_service.get_team_average_metrics()
+        if not team_avg:
+            raise HTTPException(status_code=404, detail="No team data available")
+        
+        return ApiResponse(success=True, data=team_avg)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/predict-risk", response_model=ApiResponse)
 async def predict_risk(request: PredictRiskRequest):
     """Predict injury risk - only uses data from last 45 days (1.5 months)"""
     try:
+        # Handle team average special case
+        if request.playerId == 'team_average':
+            team_avg = data_service.get_team_average_metrics()
+            if not team_avg:
+                raise HTTPException(status_code=404, detail="No team data available")
+            
+            # Use team average metrics for prediction
+            features = team_avg.get('metrics', {})
+            has_recent_data = team_avg.get('hasRecentData', False)
+            recent_sessions = team_avg.get('recentSessionCount', 0)
+            
+            if not has_recent_data or recent_sessions == 0:
+                return ApiResponse(success=True, data={
+                    'playerId': 'team_average',
+                    'playerName': 'Team Average',
+                    'riskLevel': 'low',
+                    'probability': 0.0,
+                    'factors': [f"No recent training data in the last 45 days ({recent_sessions} sessions)"],
+                    'recommendations': [
+                        "Team has no recent training sessions",
+                        "Risk cannot be accurately assessed without recent data",
+                        "Consider starting with low intensity training to gather baseline data"
+                    ],
+                    'hasRecentData': False,
+                    'recentSessionCount': recent_sessions
+                })
+            
+            risk_level, probability, factors, recommendations = ml_service.predict_risk(features)
+            
+            return ApiResponse(success=True, data={
+                'playerId': 'team_average',
+                'playerName': 'Team Average',
+                'riskLevel': risk_level,
+                'probability': probability,
+                'factors': factors,
+                'recommendations': recommendations,
+                'hasRecentData': True,
+                'recentSessionCount': recent_sessions
+            })
+        
         player = data_service.get_player_detail(request.playerId)
         if not player:
             raise HTTPException(status_code=404, detail="Player not found")
@@ -131,13 +186,27 @@ async def get_ollama_status():
 @router.post("/ai-recommendations", response_model=ApiResponse)
 async def get_ai_recommendations(request: PredictRiskRequest):
     """Get AI-powered recommendations for a player using Ollama"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
-        player = data_service.get_player_detail(request.playerId)
-        if not player:
-            raise HTTPException(status_code=404, detail="Player not found")
+        logger.info(f"Getting AI recommendations for player: {request.playerId}")
+        
+        # Handle team average special case
+        if request.playerId == 'team_average':
+            player = data_service.get_team_average_metrics()
+            if not player:
+                logger.warning("Team average data not available")
+                raise HTTPException(status_code=404, detail="No team data available")
+        else:
+            player = data_service.get_player_detail(request.playerId)
+            if not player:
+                logger.warning(f"Player not found: {request.playerId}")
+                raise HTTPException(status_code=404, detail="Player not found")
         
         # Check for recent data
         has_recent_data = player.get('hasRecentData', False)
+        logger.info(f"Player {player['name']} has recent data: {has_recent_data}")
         
         # Get risk prediction first
         if not has_recent_data:
@@ -147,6 +216,8 @@ async def get_ai_recommendations(request: PredictRiskRequest):
             features = player['metrics']
             risk_level, _, risk_factors, _ = ml_service.predict_risk(features)
         
+        logger.info(f"Risk level determined: {risk_level}")
+        
         # Get AI recommendations
         result = ollama_service.get_player_recommendations(
             player_name=player['name'],
@@ -154,6 +225,8 @@ async def get_ai_recommendations(request: PredictRiskRequest):
             risk_level=risk_level,
             risk_factors=risk_factors
         )
+        
+        logger.info(f"AI recommendations result - success: {result.get('success')}, source: {result.get('source')}")
         
         return ApiResponse(success=True, data={
             'playerId': request.playerId,
@@ -169,4 +242,5 @@ async def get_ai_recommendations(request: PredictRiskRequest):
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error getting AI recommendations: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

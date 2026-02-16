@@ -20,26 +20,49 @@ export default function LoadChart({ data }: LoadChartProps) {
     ? data.reduce((sum, d) => sum + d.avgLoad, 0) / data.length 
     : 0;
 
-  const formattedData = data
-    .filter(d => d.date && d.date !== 'Unknown')
+  // Sort data by date to ensure correct order
+  const sortedData = [...data].sort((a, b) => {
+    try {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateA - dateB;
+    } catch {
+      return 0;
+    }
+  });
+
+  const formattedData = sortedData
+    .filter(d => d.date && d.date !== 'Unknown' && d.date !== '')
     .map(d => {
       try {
-        const date = new Date(d.date);
+        // Handle ISO date strings (YYYY-MM-DD)
+        let date: Date;
+        if (d.date.includes('T')) {
+          date = new Date(d.date);
+        } else {
+          // Assume YYYY-MM-DD format
+          date = new Date(d.date + 'T00:00:00');
+        }
+        
         if (isNaN(date.getTime())) {
           return null;
         }
+        
         return {
           ...d,
+          date: date.toISOString().split('T')[0], // Ensure consistent format
           displayDate: date.toLocaleDateString('en-US', { 
             month: 'short', 
             day: 'numeric' 
           }),
+          avgLoad: typeof d.avgLoad === 'number' ? d.avgLoad : parseFloat(d.avgLoad) || 0,
         };
-      } catch {
+      } catch (e) {
+        console.warn('Error parsing date:', d.date, e);
         return null;
       }
     })
-    .filter(d => d !== null);
+    .filter(d => d !== null && d.avgLoad !== undefined && !isNaN(d.avgLoad));
 
   return (
     <div 
@@ -69,8 +92,16 @@ export default function LoadChart({ data }: LoadChartProps) {
       </div>
 
       <div className="h-72">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={formattedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+        {formattedData.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-slate-500 text-sm mb-2">No data available</p>
+              <p className="text-slate-600 text-xs">Load sample data to see chart</p>
+            </div>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={formattedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
             <defs>
               <linearGradient id="loadGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.3} />
@@ -126,6 +157,7 @@ export default function LoadChart({ data }: LoadChartProps) {
             />
           </AreaChart>
         </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

@@ -3,12 +3,13 @@ import {
   LayoutDashboard, 
   Users, 
   BarChart3, 
-  Dumbbell, 
   Settings,
   X,
   ChevronRight,
   Trophy,
-  FileSearch
+  Brain,
+  Award,
+  GitCompare
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -21,8 +22,9 @@ const navItems = [
   { path: '/players', icon: Users, label: 'Players', description: 'Team roster' },
   { path: '/analysis', icon: BarChart3, label: 'Analysis', description: 'Risk predictions' },
   { path: '/lineup', icon: Trophy, label: 'Best Lineup', description: 'Optimal XI' },
-  { path: '/training', icon: Dumbbell, label: 'Training', description: 'ML models' },
-  { path: '/data-audit', icon: FileSearch, label: 'Data Audit', description: 'Clean outliers' },
+  { path: '/rankings', icon: Award, label: 'Rankings', description: 'Player stats' },
+  { path: '/comparison', icon: GitCompare, label: 'Team Comparison', description: 'Men vs Women' },
+  { path: '/models', icon: Brain, label: 'ML Models', description: 'Explanation & Training' },
   { path: '/settings', icon: Settings, label: 'Settings', description: 'Preferences' },
 ];
 

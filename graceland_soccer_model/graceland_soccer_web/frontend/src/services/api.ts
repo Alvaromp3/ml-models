@@ -84,6 +84,20 @@ export const playersApi = {
     const { data } = await api.delete<ApiResponse<{ message: string; playerId: string }>>(`/players/${playerId}`);
     return data.data!;
   },
+
+  getRankings: async (metric: string): Promise<any[]> => {
+    const { data } = await api.get<ApiResponse<any[]>>(`/players/rankings/${metric}`);
+    return data.data!;
+  },
+
+  updatePosition: async (playerName: string, position: string, team?: string): Promise<{ message: string; playerName: string; position: string }> => {
+    const { data } = await api.post<ApiResponse<{ message: string; playerName: string; position: string }>>('/data/update-position', {
+      playerName,
+      position,
+      team,
+    });
+    return data.data!;
+  },
 };
 
 // Analysis endpoints
@@ -119,6 +133,11 @@ export const analysisApi = {
     const { data } = await api.post<ApiResponse<any>>('/analysis/ai-recommendations', { playerId });
     return data.data!;
   },
+
+  getTeamAverage: async (): Promise<any> => {
+    const { data } = await api.get<ApiResponse<any>>('/analysis/team-average');
+    return data.data!;
+  },
 };
 
 // Training endpoints
@@ -148,12 +167,15 @@ export const trainingApi = {
   },
 };
 
+// Export for Models page
+export const getModelStatus = trainingApi.getModelStatus;
+
 // Data endpoints
 export const dataApi = {
-  upload: async (file: File): Promise<UploadResult> => {
+  upload: async (file: File, team: string = 'mens'): Promise<UploadResult> => {
     const formData = new FormData();
     formData.append('file', file);
-    const { data } = await api.post<ApiResponse<UploadResult>>('/data/upload', formData, {
+    const { data } = await api.post<ApiResponse<UploadResult>>(`/data/upload?team=${team}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -196,6 +218,16 @@ export const settingsApi = {
 
   setDateReference: async (useTodayAsReference: boolean): Promise<any> => {
     const { data } = await api.post<ApiResponse<any>>('/settings/date-reference', { useTodayAsReference });
+    return data.data!;
+  },
+
+  getTeamStatus: async (): Promise<any> => {
+    const { data } = await api.get<ApiResponse<any>>('/settings/team-status');
+    return data.data!;
+  },
+
+  switchTeam: async (team: string): Promise<any> => {
+    const { data } = await api.post<ApiResponse<any>>('/settings/switch-team', { team });
     return data.data!;
   },
 };

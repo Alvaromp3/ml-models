@@ -47,6 +47,12 @@ export default function Analysis() {
     enabled: !!dataStatus?.loaded,
   });
 
+  const { data: teamAverage } = useQuery({
+    queryKey: ['teamAverage'],
+    queryFn: analysisApi.getTeamAverage,
+    enabled: !!dataStatus?.loaded,
+  });
+
   // Ollama status query
   const { data: ollamaStatus } = useQuery({
     queryKey: ['ollama', 'status'],
@@ -67,13 +73,47 @@ export default function Analysis() {
 
   const aiMutation = useMutation({
     mutationFn: (playerId: string) => analysisApi.getAIRecommendations(playerId),
-    onSuccess: (data) => setAiRecommendations(data),
+    onSuccess: (data) => {
+      setAiRecommendations(data);
+    },
+    onError: (error: Error) => {
+      console.error('AI Analysis error:', error);
+      setAiRecommendations({
+        aiSuccess: false,
+        aiError: error.message || 'Failed to get AI recommendations',
+        aiRecommendations: 'Unable to generate AI analysis. Please check if Ollama is running and try again.',
+        playerId: selectedPlayer,
+        playerName: selectedPlayerData?.name || 'Unknown'
+      });
+    },
   });
 
   const handlePlayerSelect = (playerId: string) => {
     setSelectedPlayer(playerId);
-    const player = players?.find(p => p.id === playerId);
-    setSelectedPlayerData(player || null);
+    
+    if (playerId === 'team_average') {
+      // Use team average data
+      if (teamAverage) {
+        setSelectedPlayerData({
+          id: 'team_average',
+          name: 'Team Average',
+          number: 0,
+          position: 'TEAM',
+          riskLevel: teamAverage.riskLevel || 'low',
+          avgLoad: teamAverage.avgLoad || 0,
+          avgSpeed: teamAverage.avgSpeed || 0,
+          sessions: teamAverage.sessions || 0,
+          hasRecentData: teamAverage.hasRecentData || false,
+          recentSessions: teamAverage.recentSessionCount || 0
+        });
+      } else {
+        setSelectedPlayerData(null);
+      }
+    } else {
+      const player = players?.find(p => p.id === playerId);
+      setSelectedPlayerData(player || null);
+    }
+    
     setPrediction(null);
     setAiRecommendations(null);
   };
@@ -198,11 +238,16 @@ export default function Analysis() {
                 className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500 transition-colors"
               >
                 <option value="">Choose a player...</option>
-                {players?.map((player) => (
-                  <option key={player.id} value={player.id}>
-                    {player.name}
-                  </option>
-                ))}
+                <option value="team_average" className="font-semibold">
+                  📊 Team Average (All Players)
+                </option>
+                <optgroup label="Players">
+                  {players?.map((player) => (
+                    <option key={player.id} value={player.id}>
+                      {player.name}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
 
               <button
@@ -231,14 +276,21 @@ export default function Analysis() {
               <div className="flex items-center gap-4 mb-4">
                 <div className={`
                   w-14 h-14 rounded-xl flex items-center justify-center font-bold text-xl
-                  ${riskConfig[selectedPlayerData.riskLevel].bg} ${riskConfig[selectedPlayerData.riskLevel].text}
-                  border ${riskConfig[selectedPlayerData.riskLevel].border}
+                  ${selectedPlayerData.id === 'team_average' 
+                    ? 'bg-gradient-to-br from-purple-500 to-blue-600 text-white border border-purple-500/30'
+                    : `${riskConfig[selectedPlayerData.riskLevel].bg} ${riskConfig[selectedPlayerData.riskLevel].text} border ${riskConfig[selectedPlayerData.riskLevel].border}`
+                  }
                 `}>
-                  {selectedPlayerData.number}
+                  {selectedPlayerData.id === 'team_average' ? '📊' : selectedPlayerData.number}
                 </div>
                 <div>
                   <h3 className="font-semibold text-white">{selectedPlayerData.name}</h3>
-                  <p className="text-sm text-slate-500">#{selectedPlayerData.number}</p>
+                  <p className="text-sm text-slate-500">
+                    {selectedPlayerData.id === 'team_average' 
+                      ? `Average of ${teamAverage?.teamStats?.totalPlayers || 0} players`
+                      : `#${selectedPlayerData.number}`
+                    }
+                  </p>
                 </div>
               </div>
 
@@ -266,6 +318,27 @@ export default function Analysis() {
                   <p className="text-[10px] text-slate-500">Current Risk</p>
                 </div>
               </div>
+              
+              {/* Team Stats for Team Average */}
+              {selectedPlayerData.id === 'team_average' && teamAverage?.teamStats && (
+                <div className="mt-4 pt-4 border-t border-slate-700">
+                  <p className="text-xs text-slate-500 mb-2">Team Distribution</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center p-2 bg-emerald-500/10 rounded-lg">
+                      <p className="text-lg font-bold text-emerald-400">{teamAverage.teamStats.riskDistribution.low}</p>
+                      <p className="text-[10px] text-slate-500">Low Risk</p>
+                    </div>
+                    <div className="text-center p-2 bg-yellow-500/10 rounded-lg">
+                      <p className="text-lg font-bold text-yellow-400">{teamAverage.teamStats.riskDistribution.medium}</p>
+                      <p className="text-[10px] text-slate-500">Medium</p>
+                    </div>
+                    <div className="text-center p-2 bg-red-500/10 rounded-lg">
+                      <p className="text-lg font-bold text-red-400">{teamAverage.teamStats.riskDistribution.high}</p>
+                      <p className="text-[10px] text-slate-500">High Risk</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -428,8 +501,8 @@ export default function Analysis() {
                   
                   <button
                     onClick={handleGetAIRecommendations}
-                    disabled={aiMutation.isPending}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-lg font-medium text-white text-sm flex items-center gap-2 disabled:opacity-50 transition-all"
+                    disabled={aiMutation.isPending || !selectedPlayer}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-lg font-medium text-white text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     {aiMutation.isPending ? (
                       <>
@@ -459,6 +532,18 @@ export default function Analysis() {
                   </div>
                 )}
 
+                {/* Error Message */}
+                {aiMutation.isError && (
+                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-400" />
+                      <span className="text-sm text-red-400">
+                        Failed to get AI analysis: {(aiMutation.error as Error)?.message || 'Unknown error'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* AI Recommendations Content */}
                 {aiRecommendations ? (
                     <div className="p-4 bg-slate-800/30 rounded-xl">
@@ -468,8 +553,8 @@ export default function Analysis() {
                         {aiRecommendations.aiSuccess ? 'AI Analysis' : 'Standard Recommendations'}
                       </span>
                       {!aiRecommendations.aiSuccess && aiRecommendations.aiError && (
-                        <span className="text-xs text-slate-500">
-                          ({aiRecommendations.aiError})
+                        <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">
+                          {aiRecommendations.aiError}
                         </span>
                       )}
                     </div>
@@ -492,9 +577,16 @@ export default function Analysis() {
                 ) : (
                   <div className="p-6 bg-slate-800/20 rounded-xl text-center">
                     <Bot className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                    <p className="text-sm text-slate-500">
-                      Click "Get AI Analysis" to receive personalized coaching recommendations based on this player's performance data.
+                    <p className="text-sm text-slate-500 mb-2">
+                      {selectedPlayer 
+                        ? 'Click "Get AI Analysis" to receive personalized coaching recommendations based on this player\'s performance data.'
+                        : 'Select a player first to get AI-powered coaching recommendations.'}
                     </p>
+                    {!selectedPlayer && (
+                      <p className="text-xs text-slate-600 mt-2">
+                        The AI Analysis button will be enabled once you select a player.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

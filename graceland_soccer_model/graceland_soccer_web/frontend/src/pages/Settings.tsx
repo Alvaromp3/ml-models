@@ -1,11 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Calendar, Clock, CheckCircle, RefreshCw, Database } from 'lucide-react';
-import { settingsApi } from '../services/api';
+import { Calendar, Clock, CheckCircle, RefreshCw, Database, Brain, FileSearch, Settings as SettingsIcon } from 'lucide-react';
+import { settingsApi, trainingApi, dataApi, useDataStatus } from '../services/api';
+import TrainingContent from '../components/settings/TrainingContent';
+import DataAuditContent from '../components/settings/DataAuditContent';
+
+type SettingsTab = 'general' | 'training' | 'data-audit';
 
 export default function Settings() {
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
 
   const { data: dateReferenceSetting, isLoading } = useQuery({
     queryKey: ['settings', 'date-reference'],
@@ -28,17 +33,23 @@ export default function Settings() {
     updateDateReferenceMutation.mutate(useToday);
   };
 
+  const tabs = [
+    { id: 'general' as SettingsTab, label: 'General', icon: SettingsIcon },
+    { id: 'training' as SettingsTab, label: 'Model Training', icon: Brain },
+    { id: 'data-audit' as SettingsTab, label: 'Data Audit', icon: FileSearch },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold text-white flex items-center gap-3">
           <div className="p-2 bg-slate-800/60 border border-slate-700/50 rounded-xl">
-            <Calendar className="w-5 h-5 text-slate-300" />
+            <SettingsIcon className="w-5 h-5 text-slate-300" />
           </div>
           Settings
         </h1>
         <p className="text-slate-500 text-sm mt-2 ml-12">
-          Configure your dashboard preferences
+          Configure your application preferences
         </p>
       </div>
 
@@ -50,20 +61,45 @@ export default function Settings() {
         </div>
       )}
 
-      <div className="max-w-2xl">
-        {/* Date Reference Setting */}
-        <div className="card p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
-              <Calendar className="w-6 h-6 text-slate-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">Date Reference</h2>
-              <p className="text-sm text-slate-500">Risk calculation period</p>
-            </div>
-          </div>
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-slate-800">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                flex items-center gap-2 px-4 py-3 border-b-2 transition-colors
+                ${activeTab === tab.id
+                  ? 'border-cyan-500 text-white'
+                  : 'border-transparent text-slate-400 hover:text-slate-300'
+                }
+              `}
+            >
+              <Icon className="w-4 h-4" />
+              <span className="font-medium">{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
-          <div className="space-y-4">
+      {/* Tab Content */}
+      {activeTab === 'general' && (
+        <div className="max-w-2xl">
+          {/* Date Reference Setting */}
+          <div className="card p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                <Calendar className="w-6 h-6 text-slate-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-white">Date Reference</h2>
+                <p className="text-sm text-slate-500">Risk calculation period</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
             <div className="p-4 bg-slate-800/30 rounded-xl border border-slate-700/50">
               <p className="text-sm text-slate-400 mb-4">
                 Choose how to calculate the 45-day risk assessment period:
@@ -137,9 +173,13 @@ export default function Settings() {
                 </div>
               )}
             </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {activeTab === 'training' && <TrainingContent />}
+      {activeTab === 'data-audit' && <DataAuditContent />}
     </div>
   );
 }

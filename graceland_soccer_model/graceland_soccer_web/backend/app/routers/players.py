@@ -79,7 +79,38 @@ async def get_top_performers(limit: int = 5):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{player_id}", response_model=ApiResponse)
+@router.get("/rankings/{metric}", response_model=ApiResponse)
+async def get_player_rankings(metric: str):
+    """Get player rankings by metric
+    
+    Available metrics:
+    - player_load: Average player load
+    - total_distance: Total distance covered
+    - distance: Average distance per session
+    - sprint_distance: Average sprint distance
+    - total_sprints: Total sprint distance
+    - top_speed: Average top speed
+    - max_speed: Maximum speed reached
+    - work_ratio: Average work ratio (intensity)
+    - max_intensity: Maximum intensity
+    - energy: Average energy
+    - total_energy: Total energy
+    - power_score: Average power score
+    - max_power: Maximum power
+    - max_acceleration: Maximum acceleration
+    - max_deceleration: Maximum deceleration
+    - distance_per_min: Distance per minute
+    - impacts: Average impacts
+    - total_impacts: Total impacts
+    """
+    try:
+        rankings = data_service.get_player_rankings(metric)
+        return ApiResponse(success=True, data=rankings)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/detail/{player_id}", response_model=ApiResponse)
 async def get_player_detail(player_id: str):
     """Get detailed player information"""
     try:

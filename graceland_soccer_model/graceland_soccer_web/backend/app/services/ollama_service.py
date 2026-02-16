@@ -81,11 +81,26 @@ class OllamaService:
         risk_factors: List[str]
     ) -> Dict[str, Any]:
         status = self.get_status()
+        logger.info(f"Ollama status check: available={status.get('available')}, status={status.get('status')}")
+        
         if not status.get('available') or status.get('status') != 'ready':
+            error_msg = status.get('message', 'Ollama not available')
+            logger.warning(f"Ollama not ready: {error_msg}")
             return {
                 'success': False,
-                'error': status.get('message', 'Ollama not available'),
-                'recommendations': self._get_fallback_recommendations(risk_level, player_data)
+                'error': error_msg,
+                'recommendations': self._get_fallback_recommendations(risk_level, player_data),
+                'source': 'fallback'
+            }
+        
+        # Double-check that Ollama is actually reachable
+        if not self.is_reachable():
+            logger.warning("Ollama status says ready but server is not reachable")
+            return {
+                'success': False,
+                'error': 'Ollama server is not reachable',
+                'recommendations': self._get_fallback_recommendations(risk_level, player_data),
+                'source': 'fallback'
             }
         
         try:
@@ -141,41 +156,51 @@ Provide 3-4 specific, actionable training recommendations:
 
 Be professional, specific, and reference the actual data values provided. Use coaching terminology appropriate for elite-level soccer."""
 
-            # Call Ollama
-            response = ollama.chat(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                options={
-                    'temperature': 0.7,
-                    'num_predict': 800,  # Increased for more detailed professional responses
-                    'top_k': 40,
-                    'top_p': 0.9
-                }
-            )
+            # Call Ollama with timeout
+            logger.info(f"Calling Ollama with model: {self.model}")
+            try:
+                response = ollama.chat(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    options={
+                        'temperature': 0.7,
+                        'num_predict': 800,  # Increased for more detailed professional responses
+                        'top_k': 40,
+                        'top_p': 0.9
+                    }
+                )
+                logger.info(f"Ollama response received: {bool(response)}")
+            except Exception as ollama_error:
+                logger.error(f"Ollama chat error: {ollama_error}", exc_info=True)
+                raise
             
             if response and 'message' in response and 'content' in response['message']:
+                content = response['message']['content'].strip()
+                logger.info(f"Ollama generated {len(content)} characters of recommendations")
                 return {
                     'success': True,
-                    'recommendations': response['message']['content'].strip(),
+                    'recommendations': content,
                     'model': self.model,
                     'source': 'ollama'
                 }
             else:
+                logger.warning(f"Unexpected Ollama response format: {response}")
                 return {
                     'success': False,
-                    'error': 'No response from Ollama',
+                    'error': 'Invalid response format from Ollama',
                     'recommendations': self._get_fallback_recommendations(risk_level, player_data)
                 }
                 
         except Exception as e:
-            logger.error(f"Ollama error: {e}")
+            logger.error(f"Ollama error: {e}", exc_info=True)
             return {
                 'success': False,
                 'error': str(e),
-                'recommendations': self._get_fallback_recommendations(risk_level, player_data)
+                'recommendations': self._get_fallback_recommendations(risk_level, player_data),
+                'source': 'fallback'
             }
     
     def _format_player_context(
