@@ -38,8 +38,10 @@ import {
   Line,
   CartesianGrid,
 } from 'recharts';
-import { playersApi, trainingApi, useDataStatus } from '../services/api';
+import { playersApi, trainingApi, analysisApi, useDataStatus } from '../services/api';
+import { useTeam } from '../contexts/TeamContext';
 import type { Player } from '../types';
+import Chart3D from '../components/charts/Chart3D';
 
 type CriteriaType = 'balanced' | 'speed' | 'load' | 'lowRisk' | 'highIntensity';
 
@@ -75,9 +77,9 @@ const slotPositions: string[][] = [
 
 const criteriaConfig: Record<CriteriaType, { label: string; description: string; icon: typeof Zap; color: string; gradient: string }> = {
   balanced: { label: 'Balanced', description: 'Best overall', icon: Trophy, color: 'cyan', gradient: 'from-cyan-500 to-blue-600' },
-  speed: { label: 'Max Speed', description: 'Fastest players', icon: Gauge, color: 'emerald', gradient: 'from-emerald-500 to-green-600' },
+  speed: { label: 'Max Speed', description: 'Fastest players', icon: Gauge, color: 'blue', gradient: 'from-[#1e40af] to-[#3b82f6]' },
   load: { label: 'High Load', description: 'Work capacity', icon: Zap, color: 'orange', gradient: 'from-orange-500 to-red-600' },
-  lowRisk: { label: 'Low Risk', description: 'Safest players', icon: Shield, color: 'green', gradient: 'from-green-500 to-emerald-600' },
+  lowRisk: { label: 'Low Risk', description: 'Safest players', icon: Shield, color: 'blue', gradient: 'from-[#1e40af] to-[#3b82f6]' },
   highIntensity: { label: 'Intensity', description: 'Match ready', icon: Activity, color: 'red', gradient: 'from-red-500 to-rose-600' },
 };
 
@@ -87,6 +89,7 @@ export default function Lineup() {
   const [selectedPlayerForPrediction, setSelectedPlayerForPrediction] = useState<string>('');
   const [sessionType, setSessionType] = useState<'match' | 'training'>('match');
 
+  const { currentTeam } = useTeam();
   const { data: dataStatus } = useDataStatus();
 
   const { data: players, isLoading } = useQuery({
@@ -95,19 +98,18 @@ export default function Lineup() {
     enabled: !!dataStatus?.loaded,
   });
 
-  // Predict load mutation
+  // Predict load: backend fetches player metrics (single request, avoids 404 from getDetail)
   const predictLoadMutation = useMutation({
     mutationFn: async (playerId: string) => {
       const player = players?.find(p => p.id === playerId);
       if (!player) throw new Error('Player not found');
-      
-      const detail = await playersApi.getDetail(playerId);
-      const result = await trainingApi.predictLoad({
+
+      const result = await analysisApi.predictLoad({
         playerId,
         sessionType,
-        features: detail.metrics
+        features: {}, // backend fills from get_player_detail when empty
       });
-      
+
       return { player, result };
     },
   });
@@ -203,22 +205,17 @@ export default function Lineup() {
     ].filter(d => d.value > 0);
   }, [lineupStats]);
 
-  // No data state
+  const teamLabel = currentTeam === 'mens' ? 'Men\'s Team' : 'Women\'s Team';
+
+  // No data state for current team
   if (!dataStatus?.loaded) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center animate-fade-in">
-        <div className="card p-8 max-w-md text-center">
-          <div className="w-16 h-16 mx-auto mb-6 bg-slate-800/60 border border-slate-700/50 rounded-2xl flex items-center justify-center">
-            <Trophy className="w-8 h-8 text-slate-300" />
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">No Data Loaded</h2>
-          <p className="text-slate-400 text-sm mb-6">
-            Load CSV data first to generate lineups.
-          </p>
-          <a 
-            href="/"
-            className="inline-flex items-center gap-2 px-5 py-2.5 btn-primary rounded-xl font-medium text-white text-sm"
-          >
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="panel panel--elevated p-8 max-w-md text-center">
+          <Trophy className="w-10 h-10 mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <h2 className="section-title mb-2">No data</h2>
+          <p className="caption mb-6">Upload a CSV for {teamLabel} in the Dashboard to generate lineups.</p>
+          <a href="/" className="btn btn--primary gap-2">
             Go to Dashboard
             <ChevronRight className="w-4 h-4" />
           </a>
@@ -229,8 +226,8 @@ export default function Lineup() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full" />
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-[var(--accent-performance)] border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -239,52 +236,39 @@ export default function Lineup() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <div className="p-2 bg-slate-800/60 border border-slate-700/50 rounded-xl">
-              <Trophy className="w-5 h-5 text-slate-300" />
-            </div>
-            Best Lineup Generator
-          </h1>
-          <p className="text-slate-500 text-sm mt-2 ml-12">
-            Generate optimal lineups and predict player load
-          </p>
-        </div>
-        
-        {/* Current criteria badge */}
-        <div className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-xl flex items-center gap-2">
-          <config.icon className="w-4 h-4 text-slate-400" />
-          <span className="text-sm font-medium text-slate-300">{config.label} Mode</span>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="caption">Optimal XI and load prediction</p>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded border border-[var(--border-default)] bg-[var(--bg-elevated)]">
+          <config.icon className="w-4 h-4 text-[var(--text-secondary)]" />
+          <span className="text-sm font-medium text-[var(--text-primary)]">{config.label}</span>
         </div>
       </div>
 
-      {/* Criteria Selection - Horizontal scroll on mobile */}
-      <div className="flex gap-3 overflow-x-auto pb-2 -mx-2 px-2">
+      {/* Criteria */}
+      <div className="flex flex-wrap gap-2">
         {(Object.entries(criteriaConfig) as [CriteriaType, typeof criteriaConfig.balanced][]).map(([key, cfg]) => {
           const Icon = cfg.icon;
           const isSelected = selectedCriteria === key;
           return (
             <button
               key={key}
+              type="button"
               onClick={() => setSelectedCriteria(key)}
-              className={`flex-shrink-0 p-4 rounded-xl border transition-all min-w-[140px] ${
+              className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded border text-sm font-medium transition-colors ${
                 isSelected
-                  ? 'bg-slate-800/60 border-slate-600 shadow-lg'
-                  : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50 hover:border-slate-600'
+                  ? 'bg-[var(--accent-performance-muted)] border-[var(--accent-performance)] text-[var(--accent-performance)]'
+                  : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
               }`}
             >
-              <Icon className={`w-6 h-6 mx-auto mb-2 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
-              <p className={`text-sm font-medium text-center ${isSelected ? 'text-white' : 'text-slate-300'}`}>{cfg.label}</p>
-              <p className={`text-[10px] text-center mt-1 ${isSelected ? 'text-white/70' : 'text-slate-500'}`}>{cfg.description}</p>
+              <Icon className="w-4 h-4" />
+              {cfg.label}
             </button>
           );
         })}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+      <div className="flex gap-1 border-b border-[var(--border-subtle)] pb-2 overflow-x-auto">
         {[
           { id: 'lineup', label: 'Lineup', icon: Users },
           { id: 'comparison', label: 'Compare', icon: BarChart3 },
@@ -295,11 +279,12 @@ export default function Lineup() {
           return (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'bg-slate-800/60 border border-slate-700/50 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  ? 'bg-[var(--accent-performance-muted)] text-[var(--accent-performance)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -312,62 +297,42 @@ export default function Lineup() {
       {/* Tab Content */}
       {activeTab === 'lineup' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Soccer Field */}
-          <div className="lg:col-span-2 card p-6 relative overflow-hidden">
-            {/* Background decoration */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-slate-800/20 rounded-full blur-3xl" />
-            
-            <h3 className="font-semibold text-white mb-4 flex items-center gap-2 relative">
-              <Star className="w-5 h-5 text-slate-400" />
-              Best XI - {config.label}
-            </h3>
-            
-            {/* Field */}
-            <div className="relative w-full aspect-[4/5] max-h-[500px] bg-gradient-to-b from-emerald-900/50 via-emerald-800/40 to-emerald-900/50 rounded-2xl border border-emerald-700/30 overflow-hidden">
-              {/* Field pattern */}
-              <div className="absolute inset-0 opacity-20">
-                <div className="absolute top-1/4 left-0 right-0 h-px bg-white/30" />
-                <div className="absolute top-3/4 left-0 right-0 h-px bg-white/30" />
-              </div>
-              
-              {/* Field markings */}
-              <div className="absolute inset-4 border-2 border-white/25 rounded-lg" />
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-14 border-2 border-white/25 border-t-0 rounded-b-lg" />
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-28 h-14 border-2 border-white/25 border-b-0 rounded-t-lg" />
-              <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-white/20" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white/25 rounded-full" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white/40 rounded-full" />
+          {/* Field — realistic grass, minimal markings */}
+          <div className="lg:col-span-2 panel panel--elevated p-4">
+            <h3 className="section-title mb-4">Best XI — {config.label}</h3>
+            <div
+              className="relative w-full aspect-[4/5] max-h-[500px] overflow-hidden"
+              style={{
+                background: 'linear-gradient(180deg, #1a4d2e 0%, #2d6a3e 25%, #3d7a4a 50%, #2d6a3e 75%, #1a4d2e 100%)',
+                boxShadow: 'inset 0 0 80px rgba(0,0,0,0.15)',
+              }}
+            >
+              <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'repeating-linear-gradient(90deg, transparent 0, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px)' }} />
+              <div className="absolute inset-[3%] border-[2px] border-white/50" style={{ borderRadius: '2px' }} />
+              <div className="absolute top-[3%] left-1/2 -translate-x-1/2 w-[35%] h-[16%] border-[2px] border-white/50 border-t-0" style={{ borderRadius: '0 0 2px 2px' }} />
+              <div className="absolute top-[3%] left-1/2 -translate-x-1/2 w-[12%] h-[6%] border-[2px] border-white/50 border-t-0" style={{ borderRadius: '0 0 2px 2px' }} />
+              <div className="absolute bottom-[3%] left-1/2 -translate-x-1/2 w-[35%] h-[16%] border-[2px] border-white/50 border-b-0" style={{ borderRadius: '2px 2px 0 0' }} />
+              <div className="absolute bottom-[3%] left-1/2 -translate-x-1/2 w-[12%] h-[6%] border-[2px] border-white/50 border-b-0" style={{ borderRadius: '2px 2px 0 0' }} />
+              <div className="absolute top-1/2 left-[3%] right-[3%] h-[1px] bg-white/50 -translate-y-1/2" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[22%] h-[22%] border-[2px] border-white/50 rounded-full" />
+              <div className="absolute top-1/2 left-1/2 w-1.5 h-1.5 rounded-full bg-white/70 -translate-x-1/2 -translate-y-1/2" />
 
-              {/* Players - ordered by slot (GK, LB, CB, CB, RB, MID x3, LW, ST, RW) */}
               {fieldLayout.map((pos, idx) => {
                 const player = bestLineup[idx];
                 if (!player) return null;
-                
-                const riskColors = {
-                  low: 'bg-emerald-500 shadow-emerald-500/50',
-                  medium: 'bg-yellow-500 shadow-yellow-500/50',
-                  high: 'bg-red-500 shadow-red-500/50',
-                };
-                
+                const riskBorder = player.riskLevel === 'high' ? 'border-[var(--risk-high)]' : player.riskLevel === 'medium' ? 'border-[var(--risk-medium)]' : 'border-white/60';
                 return (
                   <div
                     key={player.id}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer"
+                    className="absolute -translate-x-1/2 -translate-y-1/2 group cursor-default"
                     style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
                   >
-                    {/* Glow effect */}
-                    <div className={`absolute inset-0 ${riskColors[player.riskLevel]} rounded-full blur-md opacity-50 group-hover:opacity-75 transition-opacity`} />
-                    
-                    {/* Player circle: number + position */}
-                    <div className={`relative w-12 h-12 rounded-full ${riskColors[player.riskLevel]} flex flex-col items-center justify-center text-white shadow-lg border-2 border-white/60 transition-transform group-hover:scale-110`}>
+                    <div className={`w-11 h-11 rounded-full bg-white/95 flex flex-col items-center justify-center border-2 ${riskBorder} text-[var(--bg-app)] shadow-md group-hover:scale-105 transition-transform`}>
                       <span className="text-xs font-bold leading-none">{player.number}</span>
-                      <span className="text-[9px] font-medium leading-tight opacity-95">{player.position}</span>
+                      <span className="text-[8px] font-medium leading-tight opacity-90">{player.position}</span>
                     </div>
-                    
-                    {/* Tooltip */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-slate-900/95 backdrop-blur px-3 py-2 rounded-lg text-center whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all z-10 shadow-xl border border-slate-700/50">
-                      <p className="text-xs font-semibold text-white">{player.name}</p>
-                      <p className="text-[10px] text-slate-400">{player.position} • {player.avgSpeed} mph • {player.avgLoad} load</p>
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 bg-[var(--bg-elevated)] border border-[var(--border-default)] px-2 py-1 rounded text-center whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 text-[11px] text-[var(--text-primary)] shadow-lg">
+                      {player.name} · {player.avgSpeed} mph
                     </div>
                   </div>
                 );
@@ -375,55 +340,41 @@ export default function Lineup() {
             </div>
           </div>
 
-          {/* Player List */}
-          <div className="card p-6">
-            <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-              <Users className="w-4 h-4 text-slate-400" />
-              Selected Players
-            </h3>
-            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+          {/* Bench list */}
+          <div className="panel panel--elevated p-4">
+            <h3 className="section-title mb-3">Selected</h3>
+            <ul className="space-y-1.5 max-h-[420px] overflow-y-auto custom-scrollbar">
               {(['GK', 'LB', 'CB', 'CB', 'RB', 'MID', 'MID', 'MID', 'LW', 'ST', 'RW'] as const).map((slotLabel, idx) => {
                 const player = bestLineup[idx];
                 if (!player) return null;
-                const riskColors = {
-                  low: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
-                  medium: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
-                  high: 'text-red-400 bg-red-500/10 border-red-500/30',
-                };
                 return (
-                  <div 
-                    key={player.id} 
-                    className="flex items-center gap-3 p-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-xl transition-all border border-transparent hover:border-slate-700/50"
+                  <li
+                    key={player.id}
+                    className="flex items-center gap-2 py-2 px-2 rounded border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
                   >
-                    <div className="w-9 h-9 rounded-lg bg-slate-800/60 border border-slate-700/50 text-white flex items-center justify-center text-xs font-bold">
+                    <span className="w-8 h-8 flex-shrink-0 rounded flex items-center justify-center text-[10px] font-semibold border border-[var(--border-default)] bg-[var(--bg-elevated)] text-[var(--text-primary)]">
                       {slotLabel}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">{player.name}</p>
+                      <p className="text-[10px] text-[var(--text-tertiary)]">#{player.number} · {player.position} · {player.avgSpeed} mph</p>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{player.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-slate-500">#{player.number}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-300">{player.position}</span>
-                        <span className="text-[10px] text-slate-400">{player.avgSpeed} mph</span>
-                      </div>
-                    </div>
-                    <span className={`text-[10px] px-2 py-1 rounded-full border ${riskColors[player.riskLevel]}`}>
+                    <span className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded risk-badge--${player.riskLevel}`}>
                       {player.riskLevel}
                     </span>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
-            
-            {/* Summary */}
+            </ul>
             {lineupStats && (
-              <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-2 gap-3">
-                <div className="text-center p-3 bg-slate-800/30 rounded-lg">
-                  <p className="text-lg font-bold text-white">{lineupStats.avgSpeed.toFixed(1)}</p>
-                  <p className="text-[10px] text-slate-500">Avg Speed</p>
+              <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex gap-4">
+                <div>
+                  <p className="metric-value text-lg">{lineupStats.avgSpeed.toFixed(1)}</p>
+                  <p className="metric-label">Avg Speed</p>
                 </div>
-                <div className="text-center p-3 bg-slate-800/30 rounded-lg">
-                  <p className="text-lg font-bold text-white">{lineupStats.avgLoad.toFixed(0)}</p>
-                  <p className="text-[10px] text-slate-500">Avg Load</p>
+                <div>
+                  <p className="metric-value text-lg">{lineupStats.avgLoad.toFixed(0)}</p>
+                  <p className="metric-label">Avg Load</p>
                 </div>
               </div>
             )}
@@ -433,92 +384,104 @@ export default function Lineup() {
 
       {activeTab === 'comparison' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="card p-6">
-            <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-              <Gauge className="w-5 h-5 text-slate-400" />
-              Speed Comparison
+          <Chart3D tilt={3} className="p-6">
+            <h3 className="font-semibold text-[#1e293b] mb-4 flex items-center gap-2">
+              <Gauge className="w-5 h-5 text-[#1e40af]" />
+              Speed Comparison (mph)
             </h3>
+            <p className="text-xs text-[#64748b] mb-3">Max speed per player — higher is better</p>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={comparisonData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                  <XAxis type="number" stroke="#475569" fontSize={11} />
-                  <YAxis dataKey="name" type="category" stroke="#475569" fontSize={10} width={60} />
+                <BarChart data={comparisonData} layout="vertical" margin={{ left: 8, right: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                  <XAxis type="number" stroke="#64748b" fontSize={11} tick={{ fill: '#64748b' }} />
+                  <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={11} width={72} tick={{ fill: '#334155', fontWeight: 600 }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                      border: '1px solid rgba(51, 65, 85, 0.5)',
-                      borderRadius: '12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                     }}
+                    formatter={(value: number) => [`${Number(value).toFixed(1)} mph`, 'Speed']}
+                    labelFormatter={(label) => `Player: ${label}`}
                   />
-                  <Bar dataKey="speed" fill="url(#speedGradient)" radius={[0, 6, 6, 0]} name="Speed (mph)" />
+                  <Bar dataKey="speed" fill="url(#lineupSpeedGrad)" radius={[0, 6, 6, 0]} name="Speed (mph)" maxBarSize={28} />
                   <defs>
-                    <linearGradient id="speedGradient" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#06b6d4" />
-                      <stop offset="100%" stopColor="#3b82f6" />
+                    <linearGradient id="lineupSpeedGrad" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#3b82f6" />
+                      <stop offset="100%" stopColor="#1e40af" />
                     </linearGradient>
                   </defs>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </Chart3D>
 
-          <div className="card p-6">
-            <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-orange-400" />
-              Load Comparison
+          <Chart3D tilt={-2} className="p-6">
+            <h3 className="font-semibold text-[#1e293b] mb-4 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-[#ea580c]" />
+              Load Comparison (units)
             </h3>
+            <p className="text-xs text-[#64748b] mb-3">Training load per player — compare workload</p>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={comparisonData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                  <XAxis type="number" stroke="#475569" fontSize={11} />
-                  <YAxis dataKey="name" type="category" stroke="#475569" fontSize={10} width={60} />
+                <BarChart data={comparisonData} layout="vertical" margin={{ left: 8, right: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                  <XAxis type="number" stroke="#64748b" fontSize={11} tick={{ fill: '#64748b' }} />
+                  <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={11} width={72} tick={{ fill: '#334155', fontWeight: 600 }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                      border: '1px solid rgba(51, 65, 85, 0.5)',
-                      borderRadius: '12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                     }}
                     formatter={(value: number) => [`${(value * 10).toFixed(0)}`, 'Load']}
+                    labelFormatter={(label) => `Player: ${label}`}
                   />
-                  <Bar dataKey="load" fill="url(#loadGradient)" radius={[0, 6, 6, 0]} name="Load" />
+                  <Bar dataKey="load" fill="url(#lineupLoadGrad)" radius={[0, 6, 6, 0]} name="Load" maxBarSize={28} />
                   <defs>
-                    <linearGradient id="loadGradient" x1="0" y1="0" x2="1" y2="0">
+                    <linearGradient id="lineupLoadGrad" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor="#f97316" />
-                      <stop offset="100%" stopColor="#ef4444" />
+                      <stop offset="100%" stopColor="#ea580c" />
                     </linearGradient>
                   </defs>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </Chart3D>
 
-          <div className="card p-6 lg:col-span-2">
-            <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-emerald-400" />
+          <Chart3D tilt={2} className="p-6 lg:col-span-2">
+            <h3 className="font-semibold text-[#1e293b] mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-[#1e40af]" />
               Performance Trend
             </h3>
+            <p className="text-xs text-[#64748b] mb-3">Speed (mph) vs Fitness % by player — compare both metrics</p>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={comparisonData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="name" stroke="#475569" fontSize={11} />
-                  <YAxis stroke="#475569" fontSize={11} />
+                <LineChart data={comparisonData} margin={{ top: 8, right: 16, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={11} tick={{ fill: '#334155' }} />
+                  <YAxis yAxisId="left" stroke="#64748b" fontSize={11} tick={{ fill: '#64748b' }} label={{ value: 'Speed (mph)', angle: -90, position: 'insideLeft', style: { fill: '#1e40af', fontSize: 11 } }} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={11} tick={{ fill: '#64748b' }} domain={[0, 100]} label={{ value: 'Fitness %', angle: 90, position: 'insideRight', style: { fill: '#ea580c', fontSize: 11 } }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                      border: '1px solid rgba(51, 65, 85, 0.5)',
-                      borderRadius: '12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                     }}
+                    formatter={(value: number, name: string) => [name === 'Speed' ? `${Number(value).toFixed(1)} mph` : `${Number(value).toFixed(0)}%`, name]}
+                    labelFormatter={(label) => `Player: ${label}`}
                   />
                   <Legend />
-                  <Line type="monotone" dataKey="speed" stroke="#06b6d4" strokeWidth={3} dot={{ fill: '#06b6d4', strokeWidth: 2 }} name="Speed" />
-                  <Line type="monotone" dataKey="risk" stroke="#22c55e" strokeWidth={3} dot={{ fill: '#22c55e', strokeWidth: 2 }} name="Fitness %" />
+                  <Line yAxisId="left" type="monotone" dataKey="speed" stroke="#1e40af" strokeWidth={2.5} dot={{ fill: '#1e40af', strokeWidth: 2, r: 4 }} name="Speed (mph)" />
+                  <Line yAxisId="right" type="monotone" dataKey="risk" stroke="#ea580c" strokeWidth={2.5} dot={{ fill: '#ea580c', strokeWidth: 2, r: 4 }} name="Fitness %" strokeDasharray="5 5" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </Chart3D>
         </div>
       )}
 
@@ -555,7 +518,7 @@ export default function Lineup() {
 
           <div className="card p-6">
             <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-emerald-400" />
+              <Shield className="w-5 h-5 text-[#1e40af]" />
               Risk Distribution
             </h3>
             <div className="h-64 relative">
@@ -611,14 +574,14 @@ export default function Lineup() {
               {[
                 { label: 'Avg Speed', value: lineupStats?.avgSpeed.toFixed(1), unit: 'mph', color: 'cyan', max: 25 },
                 { label: 'Avg Load', value: lineupStats?.avgLoad.toFixed(0), unit: '', color: 'orange', max: 600 },
-                { label: 'Team Fitness', value: lineupStats ? Math.round((lineupStats.riskCounts.low / 11) * 100) : 0, unit: '%', color: 'emerald', max: 100 },
+                { label: 'Team Fitness', value: lineupStats ? Math.round((lineupStats.riskCounts.low / 11) * 100) : 0, unit: '%', color: 'blue', max: 100 },
               ].map((stat) => (
-                <div key={stat.label} className="p-4 bg-slate-800/30 rounded-xl">
+                <div key={stat.label} className="p-4 bg-white/5 rounded-xl border border-white/5">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-slate-400 text-sm">{stat.label}</span>
                     <span className={`text-${stat.color}-400 font-bold`}>{stat.value}{stat.unit}</span>
                   </div>
-                  <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                     <div 
                       className={`h-full bg-gradient-to-r from-${stat.color}-500 to-${stat.color}-400 rounded-full transition-all duration-500`}
                       style={{ width: `${(parseFloat(stat.value?.toString() || '0') / stat.max) * 100}%` }}
@@ -627,7 +590,7 @@ export default function Lineup() {
                 </div>
               ))}
               
-              <div className="p-4 bg-slate-800/30 rounded-xl">
+              <div className="p-4 bg-white/5 rounded-xl border border-white/5">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400 text-sm">Total Sessions</span>
                   <span className="text-purple-400 font-bold">{lineupStats?.totalSessions}</span>
@@ -643,7 +606,7 @@ export default function Lineup() {
           {/* Prediction Form */}
           <div className="card p-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50">
+              <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
                 <Calculator className="w-5 h-5 text-slate-300" />
               </div>
               <div>
@@ -661,7 +624,7 @@ export default function Lineup() {
                   className={`p-4 rounded-xl border transition-all flex items-center gap-3 ${
                     sessionType === 'match'
                       ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 border-orange-500/50'
-                      : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50'
+                      : 'bg-white/5 border-white/10 hover:bg-white/10'
                   }`}
                 >
                   <Trophy className={`w-5 h-5 ${sessionType === 'match' ? 'text-orange-400' : 'text-slate-400'}`} />
@@ -674,8 +637,8 @@ export default function Lineup() {
                   onClick={() => setSessionType('training')}
                   className={`p-4 rounded-xl border transition-all flex items-center gap-3 ${
                     sessionType === 'training'
-                      ? 'bg-slate-800/50 border-slate-600/50'
-                      : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50'
+                      ? 'bg-cyan-500/20 border-cyan-500/30'
+                      : 'bg-white/5 border-white/10 hover:bg-white/10'
                   }`}
                 >
                   <Activity className={`w-5 h-5 ${sessionType === 'training' ? 'text-slate-300' : 'text-slate-400'}`} />
@@ -693,7 +656,7 @@ export default function Lineup() {
               <select
                 value={selectedPlayerForPrediction}
                 onChange={(e) => setSelectedPlayerForPrediction(e.target.value)}
-                className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-500 transition-colors"
               >
                 <option value="">-- Select a player --</option>
                 {players?.map((player) => (
@@ -708,7 +671,7 @@ export default function Lineup() {
             <button
               onClick={() => predictLoadMutation.mutate(selectedPlayerForPrediction)}
               disabled={!selectedPlayerForPrediction || predictLoadMutation.isPending}
-              className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-xl font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+              className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-600 border border-cyan-500/30 rounded-xl font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
             >
               {predictLoadMutation.isPending ? (
                 <>
@@ -727,15 +690,15 @@ export default function Lineup() {
           {/* Prediction Result */}
           <div className="card p-6">
             <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-emerald-400" />
+              <TrendingUp className="w-5 h-5 text-[#1e40af]" />
               Prediction Result
             </h3>
 
             {!predictLoadMutation.data && !predictLoadMutation.error && (
               <div className="h-64 flex items-center justify-center text-slate-500 text-sm">
                 <div className="text-center">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-slate-800/50 rounded-2xl flex items-center justify-center">
-                    <Calculator className="w-8 h-8 text-slate-600" />
+                  <div className="w-16 h-16 mx-auto mb-4 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10">
+                    <Calculator className="w-8 h-8 text-slate-500" />
                   </div>
                   <p>Select a player and click Predict</p>
                   <p className="text-[10px] text-slate-600 mt-1">to see expected load for next session</p>
@@ -752,8 +715,8 @@ export default function Lineup() {
             {predictLoadMutation.data && (
               <div className="space-y-4 animate-slide-in-up">
                 {/* Player Info */}
-                <div className="flex items-center gap-4 p-4 bg-slate-800/30 rounded-xl">
-                  <div className="w-14 h-14 rounded-xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-center text-white font-bold text-lg">
+                <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
+                  <div className="w-14 h-14 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center text-white font-bold text-lg">
                     {predictLoadMutation.data.player.number}
                   </div>
                   <div>
@@ -763,7 +726,7 @@ export default function Lineup() {
                 </div>
 
                 {/* Predicted Load */}
-                <div className="p-6 bg-slate-800/30 border border-slate-700/50 rounded-xl text-center relative overflow-hidden">
+                <div className="p-6 bg-white/5 border border-white/10 rounded-xl text-center relative overflow-hidden">
                   <p className="text-sm text-slate-400 mb-2 relative">Predicted Player Load</p>
                   <p className="text-6xl font-bold text-white relative">
                     {predictLoadMutation.data.result.predictedLoad?.toFixed(0) || 'N/A'}
@@ -773,18 +736,18 @@ export default function Lineup() {
 
                 {/* Additional Info */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-slate-800/30 rounded-lg text-center">
+                  <div className="p-3 bg-white/5 rounded-lg text-center border border-white/5">
                     <p className="text-xs text-slate-500">Historical Avg</p>
                     <p className="text-lg font-bold text-white">{predictLoadMutation.data.player.avgLoad.toFixed(0)}</p>
                   </div>
-                  <div className="p-3 bg-slate-800/30 rounded-lg text-center">
+                  <div className="p-3 bg-white/5 rounded-lg text-center border border-white/5">
                     <p className="text-xs text-slate-500">Sessions</p>
                     <p className="text-lg font-bold text-white">{predictLoadMutation.data.player.sessions}</p>
                   </div>
                 </div>
 
                 {/* Note */}
-                <div className="p-3 bg-slate-800/20 rounded-lg flex items-start gap-2">
+                <div className="p-3 bg-white/5 rounded-lg flex items-start gap-2 border border-white/5">
                   <Clock className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-slate-500">
                     Prediction uses regression model trained on historical data.

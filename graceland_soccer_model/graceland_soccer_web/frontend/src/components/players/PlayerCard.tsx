@@ -8,9 +8,9 @@ interface PlayerCardProps {
 
 const riskStyles = {
   low: {
-    bg: 'bg-accent-green/10',
-    text: 'text-accent-green',
-    border: 'border-accent-green/30',
+    bg: 'bg-[#1e40af]/10',
+    text: 'text-[#1e40af]',
+    border: 'border-[#1e40af]/30',
   },
   medium: {
     bg: 'bg-accent-yellow/10',
@@ -43,7 +43,7 @@ export default function PlayerCard({ player, onClick }: PlayerCardProps) {
             {/* Risk indicator dot */}
             <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-dark-800 ${
               player.riskLevel === 'high' ? 'bg-accent-red' :
-              player.riskLevel === 'medium' ? 'bg-accent-yellow' : 'bg-accent-green'
+              player.riskLevel === 'medium' ? 'bg-accent-yellow' : 'bg-[#1e40af]'
             }`} />
           </div>
           

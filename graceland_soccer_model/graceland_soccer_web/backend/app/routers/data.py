@@ -29,32 +29,52 @@ class UpdatePositionRequest(BaseModel):
     team: Optional[str] = None
 
 
+# Max upload size 15 MB
+MAX_CSV_SIZE_BYTES = 15 * 1024 * 1024
+
+
 @router.post("/upload", response_model=ApiResponse)
 async def upload_data(file: UploadFile = File(...), team: str = 'mens'):
     """Upload CSV file for a specific team"""
     try:
+        logger.info(f"Upload request: team={team}, filename={file.filename or 'none'}")
         if team not in ['mens', 'womens']:
             raise HTTPException(status_code=400, detail="Team must be 'mens' or 'womens'")
         
-        if not file.filename or not file.filename.endswith('.csv'):
+        if not file.filename or not file.filename.lower().endswith('.csv'):
             raise HTTPException(status_code=400, detail="Only CSV files are accepted")
         
         content = await file.read()
         if len(content) == 0:
             raise HTTPException(status_code=400, detail="File is empty")
+        if len(content) > MAX_CSV_SIZE_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large. Maximum size is {MAX_CSV_SIZE_BYTES // (1024*1024)} MB"
+            )
         
+        logger.info(f"CSV size: {len(content)} bytes, processing...")
         result = data_service.load_from_upload(content, team)
+        logger.info(f"Upload success: {result.get('rowCount', 0)} rows, {len(result.get('players', []))} players")
         return ApiResponse(success=True, data=result)
     except HTTPException:
         raise
     except pd.errors.EmptyDataError:
         raise HTTPException(status_code=400, detail="CSV file is empty or invalid")
     except pd.errors.ParserError as e:
+        logger.warning(f"CSV parse error: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid CSV format: {str(e)}")
+    except ValueError as e:
+        logger.error(f"Upload validation error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         import traceback
-        logger.error(f"Upload error: {str(e)}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+        tb = traceback.format_exc()
+        logger.error(f"Upload error: {str(e)}\n{tb}")
+        detail = str(e)
+        if len(detail) > 200:
+            detail = detail[:200] + "..."
+        raise HTTPException(status_code=500, detail=f"Error processing file: {detail}")
 
 
 @router.post("/load-sample", response_model=ApiResponse)

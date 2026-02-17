@@ -67,13 +67,53 @@ class DataService:
         """Load CSV from upload for a specific team"""
         from io import BytesIO
         self.current_team = team
-        self.df = pd.read_csv(BytesIO(content))
+        for encoding in ('utf-8-sig', 'utf-8', 'latin-1', 'cp1252'):
+            try:
+                self.df = pd.read_csv(BytesIO(content), encoding=encoding)
+                break
+            except Exception as e:
+                logger.debug(f"Failed with encoding {encoding}: {e}")
+                continue
+        else:
+            try:
+                self.df = pd.read_csv(BytesIO(content))
+            except Exception as e:
+                logger.error(f"Failed to read CSV: {e}")
+                raise ValueError(f"Could not parse CSV file. Check encoding and format: {str(e)}")
+        
+        if self.df is None or self.df.empty:
+            raise ValueError("CSV file is empty")
+        
+        # Normalize column names: strip BOM, whitespace, and try to match expected names
+        try:
+            self.df.columns = self.df.columns.str.strip().str.replace('\ufeff', '', regex=False)
+            # Map common variants to canonical names (only when different to avoid duplicates)
+            col_map = {}
+            for c in self.df.columns:
+                c_clean = c.strip().replace('\ufeff', '')
+                if c_clean.lower() == 'player name' and c_clean != 'Player Name':
+                    col_map[c] = 'Player Name'
+                elif c_clean.lower() == 'date' and c_clean != 'Date':
+                    col_map[c] = 'Date'
+                elif c_clean.lower() == 'player load' and c_clean != 'Player Load':
+                    col_map[c] = 'Player Load'
+            if col_map:
+                self.df = self.df.rename(columns=col_map)
+        except Exception as e:
+            logger.warning(f"Could not normalize column names: {e}")
+        
         self.df_original = self.df.copy()
-        self.team_data[team] = self.df.copy()
         self.excluded_players = set()
         self.is_cleaned = False
         self.cleaning_stats = {}
-        return self._process_loaded_data()
+        
+        try:
+            result = self._process_loaded_data()
+            self.team_data[team] = self.df.copy()
+            return result
+        except Exception as e:
+            logger.error(f"Error processing loaded data: {e}", exc_info=True)
+            raise ValueError(f"Error processing CSV data: {str(e)}")
     
     def switch_team(self, team: str) -> Dict[str, Any]:
         """Switch between men's and women's team data"""
@@ -87,6 +127,13 @@ class DataService:
             self._process_loaded_data()
             return {'success': True, 'team': team, 'message': f'Switched to {team} team'}
         else:
+            self.df = None
+            self.df_original = None
+            self.players = []
+            self.columns = []
+            self.excluded_players = set()
+            self.is_cleaned = False
+            self.cleaning_stats = {}
             return {'success': False, 'team': team, 'message': f'No data loaded for {team} team'}
     
     def get_current_team(self) -> str:
@@ -108,18 +155,43 @@ class DataService:
         }
     
     def _process_loaded_data(self) -> Dict[str, Any]:
+        if self.df is None or self.df.empty:
+            raise ValueError("DataFrame is empty or None")
+        
         self.columns = self.df.columns.tolist()
+        self.players = []
         player_col = self.key_columns['player_name']
+        
         if player_col in self.df.columns:
-            self.players = self.df[player_col].str.strip().unique().tolist()
-        self._convert_numeric_columns()
-        self._parse_dates()
+            try:
+                self.players = self.df[player_col].astype(str).str.strip().unique().tolist()
+                self.players = [p for p in self.players if p and p.lower() != 'nan' and p.lower() != 'none']
+            except Exception as e:
+                logger.warning(f"Could not extract players from column {player_col}: {e}")
+                self.players = []
+        
+        try:
+            self._convert_numeric_columns()
+        except Exception as e:
+            logger.warning(f"Error converting numeric columns: {e}")
+        
+        try:
+            self._parse_dates()
+        except Exception as e:
+            logger.warning(f"Error parsing dates: {e}")
+        
+        try:
+            date_range = self._get_date_range()
+        except Exception as e:
+            logger.warning(f"Error getting date range: {e}")
+            date_range = {'start': 'Unknown', 'end': 'Unknown'}
+        
         return {
             'rowCount': len(self.df),
             'columnCount': len(self.columns),
             'columns': self.columns,
             'players': self.players,
-            'dateRange': self._get_date_range()
+            'dateRange': date_range
         }
     
     def _convert_numeric_columns(self):
@@ -137,12 +209,21 @@ class DataService:
             self.df['ParsedDate'] = pd.to_datetime(self.df[date_col], errors='coerce')
     
     def _get_date_range(self) -> Dict[str, str]:
-        if 'ParsedDate' in self.df.columns and self.df['ParsedDate'].notna().any():
+        if 'ParsedDate' not in self.df.columns:
+            return {'start': 'Unknown', 'end': 'Unknown'}
+        if not self.df['ParsedDate'].notna().any():
+            return {'start': 'Unknown', 'end': 'Unknown'}
+        try:
+            min_date = self.df['ParsedDate'].min()
+            max_date = self.df['ParsedDate'].max()
+            if pd.isna(min_date) or pd.isna(max_date):
+                return {'start': 'Unknown', 'end': 'Unknown'}
             return {
-                'start': self.df['ParsedDate'].min().strftime('%Y-%m-%d'),
-                'end': self.df['ParsedDate'].max().strftime('%Y-%m-%d')
+                'start': min_date.strftime('%Y-%m-%d'),
+                'end': max_date.strftime('%Y-%m-%d')
             }
-        return {'start': 'Unknown', 'end': 'Unknown'}
+        except Exception:
+            return {'start': 'Unknown', 'end': 'Unknown'}
     
     def _get_recent_data_for_player(self, player_name: str) -> pd.DataFrame:
         """Get data from the last 45 days (1.5 months) from TODAY's date for a player"""

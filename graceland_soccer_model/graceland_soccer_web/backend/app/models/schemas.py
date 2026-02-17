@@ -80,6 +80,7 @@ class LoadHistory(BaseModel):
 class PredictLoadRequest(BaseModel):
     playerId: str
     features: Optional[Dict[str, float]] = None
+    sessionType: Optional[str] = 'match'  # 'match' or 'training'
 
 
 class LoadPrediction(BaseModel):

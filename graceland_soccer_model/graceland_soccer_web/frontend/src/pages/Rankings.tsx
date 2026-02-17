@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Trophy, 
@@ -12,9 +12,24 @@ import {
   Flame,
   Bolt,
   Wind,
-  BarChart3
+  BarChart3,
+  Users,
+  TrendingDown
 } from 'lucide-react';
-import { playersApi } from '../services/api';
+import { playersApi, useDataStatus } from '../services/api';
+import { useTeam } from '../contexts/TeamContext';
+import Chart3D from '../components/charts/Chart3D';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  ReferenceLine,
+  CartesianGrid
+} from 'recharts';
 
 interface RankingMetric {
   id: string;
@@ -32,7 +47,7 @@ const metrics: RankingMetric[] = [
     name: 'Player Load',
     description: 'Average player load',
     icon: Zap,
-    color: 'text-blue-400',
+    color: '#1e40af',
     unit: 'units',
     key: 'player_load'
   },
@@ -41,7 +56,7 @@ const metrics: RankingMetric[] = [
     name: 'Total Distance',
     description: 'Who runs the most (total)',
     icon: Activity,
-    color: 'text-green-400',
+    color: '#3b82f6',
     unit: 'miles',
     key: 'total_distance'
   },
@@ -50,7 +65,7 @@ const metrics: RankingMetric[] = [
     name: 'Average Distance',
     description: 'Average distance per session',
     icon: TrendingUp,
-    color: 'text-emerald-400',
+    color: '#1e40af',
     unit: 'miles',
     key: 'distance'
   },
@@ -59,7 +74,7 @@ const metrics: RankingMetric[] = [
     name: 'Total Sprints',
     description: 'Total sprints performed',
     icon: Bolt,
-    color: 'text-yellow-400',
+    color: '#f97316',
     unit: 'yards',
     key: 'total_sprints'
   },
@@ -68,7 +83,7 @@ const metrics: RankingMetric[] = [
     name: 'Sprint Distance',
     description: 'Average distance in sprints',
     icon: Wind,
-    color: 'text-orange-400',
+    color: '#f97316',
     unit: 'yards',
     key: 'sprint_distance'
   },
@@ -77,7 +92,7 @@ const metrics: RankingMetric[] = [
     name: 'Maximum Speed',
     description: 'Maximum speed reached',
     icon: Gauge,
-    color: 'text-red-400',
+    color: '#dc2626',
     unit: 'mph',
     key: 'max_speed'
   },
@@ -86,7 +101,7 @@ const metrics: RankingMetric[] = [
     name: 'Average Speed',
     description: 'Average maximum speed',
     icon: BarChart3,
-    color: 'text-purple-400',
+    color: '#3b82f6',
     unit: 'mph',
     key: 'top_speed'
   },
@@ -95,7 +110,7 @@ const metrics: RankingMetric[] = [
     name: 'Intensity (Work Ratio)',
     description: 'Average work ratio',
     icon: Flame,
-    color: 'text-pink-400',
+    color: '#f97316',
     unit: '',
     key: 'work_ratio'
   },
@@ -104,7 +119,7 @@ const metrics: RankingMetric[] = [
     name: 'Maximum Intensity',
     description: 'Maximum intensity reached',
     icon: Target,
-    color: 'text-rose-400',
+    color: '#dc2626',
     unit: '',
     key: 'max_intensity'
   },
@@ -113,7 +128,7 @@ const metrics: RankingMetric[] = [
     name: 'Total Energy',
     description: 'Total energy consumed',
     icon: Zap,
-    color: 'text-cyan-400',
+    color: '#1e40af',
     unit: 'kcal',
     key: 'total_energy'
   },
@@ -122,7 +137,7 @@ const metrics: RankingMetric[] = [
     name: 'Average Energy',
     description: 'Average energy per session',
     icon: Activity,
-    color: 'text-teal-400',
+    color: '#1e40af',
     unit: 'kcal',
     key: 'energy'
   },
@@ -131,7 +146,7 @@ const metrics: RankingMetric[] = [
     name: 'Maximum Power',
     description: 'Maximum power generated',
     icon: Bolt,
-    color: 'text-amber-400',
+    color: '#f97316',
     unit: 'w/kg',
     key: 'max_power'
   },
@@ -140,7 +155,7 @@ const metrics: RankingMetric[] = [
     name: 'Average Power',
     description: 'Average relative power',
     icon: Trophy,
-    color: 'text-indigo-400',
+    color: '#3b82f6',
     unit: 'w/kg',
     key: 'power_score'
   },
@@ -149,7 +164,7 @@ const metrics: RankingMetric[] = [
     name: 'Maximum Acceleration',
     description: 'Maximum acceleration reached',
     icon: TrendingUp,
-    color: 'text-lime-400',
+    color: '#1e40af',
     unit: 'yd/s²',
     key: 'max_acceleration'
   },
@@ -158,7 +173,7 @@ const metrics: RankingMetric[] = [
     name: 'Distance per Minute',
     description: 'Average work pace',
     icon: BarChart3,
-    color: 'text-sky-400',
+    color: '#3b82f6',
     unit: 'yd/min',
     key: 'distance_per_min'
   },
@@ -167,17 +182,17 @@ const metrics: RankingMetric[] = [
     name: 'Total Impacts',
     description: 'Total impacts received',
     icon: Target,
-    color: 'text-violet-400',
+    color: '#a855f7',
     unit: '',
     key: 'total_impacts'
   }
 ];
 
 function getRankIcon(rank: number) {
-  if (rank === 1) return <Trophy className="w-5 h-5 text-yellow-400" />;
-  if (rank === 2) return <Medal className="w-5 h-5 text-gray-300" />;
-  if (rank === 3) return <Medal className="w-5 h-5 text-amber-600" />;
-  return <Award className="w-5 h-5 text-slate-500" />;
+  if (rank === 1) return <Trophy className="w-5 h-5" style={{ color: '#f59e0b' }} strokeWidth={2.5} />;
+  if (rank === 2) return <Medal className="w-5 h-5" style={{ color: '#94a3b8' }} strokeWidth={2.5} />;
+  if (rank === 3) return <Medal className="w-5 h-5" style={{ color: '#ea580c' }} strokeWidth={2.5} />;
+  return <Award className="w-4 h-4" style={{ color: '#cbd5e1' }} strokeWidth={2} />;
 }
 
 function formatValue(value: number, unit: string): string {
@@ -189,189 +204,310 @@ function formatValue(value: number, unit: string): string {
 
 export default function Rankings() {
   const [selectedMetric, setSelectedMetric] = useState<string>('player_load');
+  const { currentTeam } = useTeam();
+  const { data: dataStatus } = useDataStatus();
   
   const currentMetric = metrics.find(m => m.id === selectedMetric) || metrics[0];
   
   const { data: rankings, isLoading } = useQuery({
     queryKey: ['rankings', selectedMetric],
     queryFn: () => playersApi.getRankings(selectedMetric),
+    enabled: !!dataStatus?.loaded,
   });
 
+  const teamLabel = currentTeam === 'mens' ? 'Men\'s Team' : 'Women\'s Team';
+
+  // Prepare chart data - Estilo Catapult profesional
+  const chartData = useMemo(() => {
+    if (!rankings || rankings.length === 0) return [];
+    const top10 = rankings.slice(0, 10);
+    const maxValue = Math.max(...top10.map((p: any) => p.metrics[currentMetric.key] || 0));
+    const avgValue = top10.reduce((sum: number, p: any) => sum + (p.metrics[currentMetric.key] || 0), 0) / top10.length;
+    
+    return top10.map((player: any) => ({
+      name: player.name.split(' ').pop() || player.name,
+      fullName: player.name,
+      value: player.metrics[currentMetric.key] || 0,
+      percentage: maxValue > 0 ? ((player.metrics[currentMetric.key] || 0) / maxValue) * 100 : 0,
+      rank: player.rank,
+      sessions: player.metrics.sessions || 0,
+      isAboveAvg: (player.metrics[currentMetric.key] || 0) > avgValue
+    }));
+  }, [rankings, currentMetric]);
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    if (!rankings || rankings.length === 0) return null;
+    const values = rankings.map((p: any) => p.metrics[currentMetric.key] || 0);
+    const maxValue = Math.max(...values);
+    const minValue = Math.min(...values);
+    const avgValue = values.reduce((sum, val) => sum + val, 0) / values.length;
+    const topPlayer = rankings[0];
+    
+    return { maxValue, minValue, avgValue, topPlayer };
+  }, [rankings, currentMetric]);
+
+  if (!dataStatus?.loaded) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center">
+        <div className="card p-8 max-w-md text-center">
+          <h2 className="text-xl font-bold title-3d mb-2">No Data Available</h2>
+          <p className="text-sm text-[#64748b] mb-6">
+            Upload a CSV for {teamLabel} in Dashboard to view rankings.
+          </p>
+          <a href="/" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#1e40af] hover:bg-[#3b82f6] text-white font-semibold text-sm uppercase transition-colors rounded-lg" style={{ letterSpacing: '0.5px' }}>
+            Go to Dashboard
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-6 border border-slate-700">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-3 bg-yellow-600/20 rounded-lg">
-            <Trophy className="w-6 h-6 text-yellow-400" />
-          </div>
+    <div className="space-y-6">
+      {/* Header - Professional Style */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Player Rankings</h1>
-            <p className="text-slate-400">Statistics and rankings by metrics</p>
+            <h1 className="text-2xl font-bold title-3d">Player Rankings</h1>
+            <p className="text-sm text-field-muted mt-1">{teamLabel} • Performance Metrics</p>
           </div>
-        </div>
-      </div>
-
-      {/* Metric Selector */}
-      <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-lg font-semibold text-white mb-4">Select Metric</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {metrics.map((metric) => {
-            const Icon = metric.icon;
-            const isSelected = selectedMetric === metric.id;
-            return (
-              <button
-                key={metric.id}
-                onClick={() => setSelectedMetric(metric.id)}
-                className={`
-                  p-4 rounded-lg border transition-all duration-200 text-left
-                  ${isSelected 
-                    ? 'bg-slate-800 border-cyan-500/50 shadow-lg shadow-cyan-500/10' 
-                    : 'bg-slate-800/50 border-slate-700 hover:border-slate-600 hover:bg-slate-800'
-                  }
-                `}
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <Icon className={`w-5 h-5 ${isSelected ? metric.color : 'text-slate-500'}`} />
-                  <span className={`text-sm font-semibold ${isSelected ? 'text-white' : 'text-slate-400'}`}>
-                    {metric.name}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500">{metric.description}</p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Rankings Table */}
-      <div className="bg-slate-900/50 rounded-xl border border-slate-700 overflow-hidden">
-        <div className="p-6 border-b border-slate-700">
-          <div className="flex items-center gap-3">
-            {(() => {
-              const Icon = currentMetric.icon;
-              return <Icon className={`w-6 h-6 ${currentMetric.color}`} />;
-            })()}
-            <div>
-              <h2 className="text-xl font-bold text-white">{currentMetric.name}</h2>
-              <p className="text-sm text-slate-400">{currentMetric.description}</p>
+          {rankings && rankings.length > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg">
+              <Users className="w-4 h-4 text-[#1e40af]" />
+              <span className="text-sm font-semibold text-[#1e293b]">{rankings.length} Players</span>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Metric selector - simple dropdown */}
+      <div className="card p-4">
+        <label htmlFor="metric-select" className="block text-sm font-semibold text-[#1e293b] mb-2">
+          Metric
+        </label>
+        <select
+          id="metric-select"
+          value={selectedMetric}
+          onChange={(e) => setSelectedMetric(e.target.value)}
+          className="w-full max-w-xs px-4 py-2.5 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] font-medium text-sm focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-[#1e40af]"
+        >
+          {metrics.map((m) => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Stats Summary - Professional Style */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="card p-4 bg-white">
+            <p className="text-xs font-semibold text-[#64748b] uppercase mb-1" style={{ letterSpacing: '0.5px' }}>Top Performer</p>
+            <p className="text-lg font-bold text-[#1e293b] mb-1">{stats.topPlayer?.name}</p>
+            <p className="text-sm font-semibold" style={{ color: currentMetric.color }}>
+              {formatValue(stats.maxValue, currentMetric.unit)} {currentMetric.unit}
+            </p>
           </div>
+          <div className="card p-4 bg-white">
+            <p className="text-xs font-semibold text-[#64748b] uppercase mb-1" style={{ letterSpacing: '0.5px' }}>Average</p>
+            <p className="text-2xl font-bold text-[#1e293b] mb-1">{formatValue(stats.avgValue, currentMetric.unit)}</p>
+            <p className="text-xs text-[#64748b]">{currentMetric.unit}</p>
+          </div>
+          <div className="card p-4 bg-white">
+            <p className="text-xs font-semibold text-[#64748b] uppercase mb-1" style={{ letterSpacing: '0.5px' }}>Range</p>
+            <p className="text-sm font-semibold text-[#1e293b] mb-1">
+              {formatValue(stats.minValue, currentMetric.unit)} - {formatValue(stats.maxValue, currentMetric.unit)}
+            </p>
+            <p className="text-xs text-[#64748b]">{currentMetric.unit}</p>
+          </div>
+          <div className="card p-4 bg-white">
+            <p className="text-xs font-semibold text-[#64748b] uppercase mb-1" style={{ letterSpacing: '0.5px' }}>Players</p>
+            <p className="text-2xl font-bold text-[#1e293b] mb-1">{rankings?.length || 0}</p>
+            <p className="text-xs text-[#64748b]">in ranking</p>
+          </div>
+        </div>
+      )}
+
+      {/* Chart - 3D style, clear labels */}
+      {chartData.length > 0 && (
+        <Chart3D tilt={3} className="p-6">
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-on-field" style={{ textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>{currentMetric.name}</h2>
+                <p className="text-xs text-field-muted">Top 10 Players — {currentMetric.description}</p>
+              </div>
+              {stats && (
+                <div className="text-right">
+                  <p className="text-xs text-field-muted uppercase font-semibold" style={{ letterSpacing: '0.5px' }}>Average</p>
+                  <p className="text-sm font-semibold text-on-field" style={{ textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>{formatValue(stats.avgValue, currentMetric.unit)} {currentMetric.unit}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="h-96 w-full" style={{ minHeight: 384, minWidth: 1 }}>
+            <ResponsiveContainer width="100%" height={384} minWidth={0}>
+              <BarChart 
+                data={chartData} 
+                layout="vertical"
+                margin={{ top: 10, right: 40, left: 100, bottom: 10 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={true} vertical={false} />
+                <XAxis 
+                  type="number" 
+                  stroke="#94a3b8"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fill: '#64748b' }}
+                  tickFormatter={(value) => formatValue(value, currentMetric.unit)}
+                />
+                <YAxis 
+                  dataKey="name" 
+                  type="category"
+                  stroke="#94a3b8"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  width={90}
+                  tick={{ fill: '#334155', fontWeight: 600 }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                    padding: '10px 12px'
+                  }}
+                  labelStyle={{ 
+                    color: '#1e293b', 
+                    fontWeight: 600,
+                    marginBottom: '6px',
+                    fontSize: '12px'
+                  }}
+                  itemStyle={{ color: '#334155', fontSize: '13px' }}
+                  formatter={(value: any, name: string, props: any) => {
+                    return [
+                      `${formatValue(value, currentMetric.unit)} ${currentMetric.unit}`,
+                      currentMetric.name
+                    ];
+                  }}
+                  labelFormatter={(label) => `Player: ${chartData.find(d => d.name === label)?.fullName || label}`}
+                  cursor={{ stroke: currentMetric.color, strokeWidth: 1, strokeDasharray: '5 5', opacity: 0.3 }}
+                />
+                {stats && (
+                  <ReferenceLine 
+                    x={stats.avgValue} 
+                    stroke={currentMetric.color}
+                    strokeDasharray="5 5"
+                    strokeWidth={2}
+                    strokeOpacity={0.6}
+                    label={{ value: 'Avg', position: 'right', fill: '#64748b', fontSize: 11, fontWeight: 600 }}
+                  />
+                )}
+                <Bar 
+                  dataKey="value" 
+                  radius={[0, 6, 6, 0]}
+                  fill={currentMetric.color}
+                >
+                  {chartData.map((entry, index) => {
+                    const isTopThree = entry.rank <= 3;
+                    const opacity = isTopThree ? 1 : 0.7;
+                    return (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={currentMetric.color}
+                        style={{
+                          opacity: opacity,
+                          transition: 'all 0.2s ease'
+                        }}
+                      />
+                    );
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            </div>
+          </>
+        </Chart3D>
+      )}
+
+      {/* Full ranking - clean list */}
+      <div className="card overflow-hidden bg-white">
+        <div className="px-6 py-4 border-b border-[#e2e8f0] bg-white">
+          <h2 className="text-lg font-bold text-[#1e293b]">{currentMetric.name} — Full Ranking</h2>
+          <p className="text-sm text-[#64748b] mt-0.5">
+            {rankings?.length ?? 0} players · unit: {currentMetric.unit || '—'}
+          </p>
         </div>
 
         {isLoading ? (
           <div className="p-12 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
-            <p className="text-slate-400 mt-4">Loading rankings...</p>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-[#e2e8f0] border-t-[#1e40af]" />
+            <p className="text-[#64748b] mt-4 text-sm font-medium">Loading rankings...</p>
           </div>
         ) : !rankings || rankings.length === 0 ? (
           <div className="p-12 text-center">
-            <Trophy className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-            <p className="text-slate-400">No data available</p>
-            <p className="text-slate-500 text-sm mt-2">Load data to see rankings</p>
+            <Trophy className="w-12 h-12 mx-auto mb-4 text-[#cbd5e1]" strokeWidth={2} />
+            <p className="font-semibold text-[#1e293b]">No data available</p>
+            <p className="text-[#64748b] text-sm mt-2">Upload data in Dashboard to see rankings.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-700">
-                  <th className="text-left p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Rank</th>
-                  <th className="text-left p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Player</th>
-                  <th className="text-right p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    {currentMetric.name} ({currentMetric.unit})
-                  </th>
-                  <th className="text-right p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Sessions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rankings.map((player: any, index: number) => {
-                  const value = player.metrics[currentMetric.key] || 0;
-                  const isTopThree = player.rank <= 3;
-                  
-                  return (
-                    <tr 
-                      key={player.name}
-                      className={`
-                        border-b border-slate-800/50 transition-colors
-                        ${isTopThree ? 'bg-slate-800/30' : 'hover:bg-slate-800/20'}
-                      `}
-                    >
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          {getRankIcon(player.rank)}
-                          <span className={`font-bold ${isTopThree ? 'text-white' : 'text-slate-400'}`}>
-                            #{player.rank}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`
-                            w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm
-                            ${isTopThree 
-                              ? 'bg-gradient-to-br from-yellow-500/20 to-amber-500/20 text-yellow-400 border border-yellow-500/30' 
-                              : 'bg-slate-800 text-slate-400 border border-slate-700'
-                            }
-                          `}>
-                            {player.name.charAt(0).toUpperCase()}
-                          </div>
-                          <span className={`font-semibold ${isTopThree ? 'text-white' : 'text-slate-300'}`}>
-                            {player.name}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-right">
-                        <span className={`text-lg font-bold ${isTopThree ? currentMetric.color : 'text-white'}`}>
-                          {formatValue(value, currentMetric.unit)}
-                        </span>
-                        {currentMetric.unit && (
-                          <span className="text-xs text-slate-500 ml-1">{currentMetric.unit}</span>
-                        )}
-                      </td>
-                      <td className="p-4 text-right">
-                        <span className="text-slate-400">{player.metrics.sessions || 0}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="divide-y divide-[#e2e8f0]">
+            {rankings.map((player: any, index: number) => {
+              const value = player.metrics[currentMetric.key] || 0;
+              const isTopThree = player.rank <= 3;
+              const maxValue = Math.max(...rankings.map((p: any) => p.metrics[currentMetric.key] || 0));
+              const percentage = maxValue > 0 ? (value / maxValue) * 100 : 0;
+              const isAboveAvg = stats && value > stats.avgValue;
+
+              return (
+                <div
+                  key={player.name}
+                  className={`flex flex-wrap items-center gap-4 px-6 py-4 transition-colors hover:bg-[#f8fafc] sm:flex-nowrap ${
+                    isTopThree ? 'bg-[#1e40af]/5' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 shrink-0">
+                      {getRankIcon(player.rank)}
+                      <span className="font-bold text-[#1e293b] w-6 text-right tabular-nums">{player.rank}</span>
+                    </div>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 shrink-0 flex items-center justify-center font-bold text-sm rounded-lg border-2 ${
+                        isTopThree ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-[#f1f5f9] text-[#475569] border-[#e2e8f0]'
+                      }`}>
+                        {player.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-semibold text-[#1e293b] truncate">{player.name}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="text-right">
+                      <span className="text-base font-bold text-[#1e293b]">{formatValue(value, currentMetric.unit)}</span>
+                      {currentMetric.unit && <span className="text-xs text-[#64748b] ml-1">{currentMetric.unit}</span>}
+                    </div>
+                    <div className="w-24 sm:w-32 h-2 bg-[#e2e8f0] rounded-full overflow-hidden shrink-0">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${percentage}%`, backgroundColor: currentMetric.color }}
+                      />
+                    </div>
+                    <span className="text-sm text-[#64748b] w-12 text-right">{player.metrics.sessions ?? 0} sess.</span>
+                    {stats && (
+                      <span className={`inline-flex items-center gap-1 text-xs font-medium w-14 ${isAboveAvg ? 'text-[#1e40af]' : 'text-[#64748b]'}`}>
+                        {isAboveAvg ? <TrendingUp className="w-3.5 h-3.5" strokeWidth={2.5} /> : <TrendingDown className="w-3.5 h-3.5" strokeWidth={2.5} />}
+                        {isAboveAvg ? 'Above' : 'Below'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
-
-      {/* Additional Stats */}
-      {rankings && rankings.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-            <p className="text-xs text-slate-500 mb-1">Best</p>
-            <p className="text-lg font-bold text-white">
-              {rankings[0]?.name}
-            </p>
-            <p className="text-sm text-cyan-400">
-              {formatValue(rankings[0]?.metrics[currentMetric.key] || 0, currentMetric.unit)} {currentMetric.unit}
-            </p>
-          </div>
-          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-            <p className="text-xs text-slate-500 mb-1">Average</p>
-            <p className="text-lg font-bold text-white">
-              {rankings.length > 0 
-                ? formatValue(
-                    rankings.reduce((sum: number, p: any) => sum + (p.metrics[currentMetric.key] || 0), 0) / rankings.length,
-                    currentMetric.unit
-                  )
-                : '0'
-              }
-            </p>
-            <p className="text-sm text-slate-400">{currentMetric.unit}</p>
-          </div>
-          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-            <p className="text-xs text-slate-500 mb-1">Total Players</p>
-            <p className="text-lg font-bold text-white">{rankings.length}</p>
-            <p className="text-sm text-slate-400">in ranking</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

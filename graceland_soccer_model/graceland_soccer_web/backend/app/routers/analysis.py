@@ -9,29 +9,36 @@ router = APIRouter(prefix="/analysis", tags=["Analysis"])
 
 @router.post("/predict-load", response_model=ApiResponse)
 async def predict_load(request: PredictLoadRequest):
-    """Predict player load"""
+    """Predict player load for next session (match or training)."""
     try:
-        # Get player data if no features provided
         features = request.features
         if not features:
             player = data_service.get_player_detail(request.playerId)
             if not player:
-                raise HTTPException(status_code=404, detail="Player not found")
+                raise HTTPException(
+                    status_code=404,
+                    detail="Player not found. Load data in Dashboard and ensure the player is in the current team."
+                )
             features = player['metrics']
-        
-        prediction, confidence = ml_service.predict_load(features)
-        
+
+        session_type = (request.sessionType or 'match').lower()
+        if session_type not in ('match', 'training'):
+            session_type = 'match'
+        result = ml_service.predict_load(features, session_type)
+
         player_name = "Unknown"
         player = data_service.get_player_detail(request.playerId)
         if player:
             player_name = player['name']
-        
+
         return ApiResponse(success=True, data={
             'playerId': request.playerId,
             'playerName': player_name,
-            'predictedLoad': round(prediction, 2),
-            'confidence': confidence,
-            'features': features
+            'predictedLoad': round(result['predictedLoad'], 2),
+            'confidence': result.get('confidence', 0.8),
+            'method': result.get('method', 'ml_model'),
+            'sessionType': result.get('sessionType', session_type),
+            'features': features,
         })
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -41,17 +48,41 @@ async def predict_load(request: PredictLoadRequest):
 
 @router.get("/team-average", response_model=ApiResponse)
 async def get_team_average():
-    """Get team average metrics"""
+    """Get team average metrics. Returns stub when no data so frontend does not break."""
     try:
         team_avg = data_service.get_team_average_metrics()
         if not team_avg:
-            raise HTTPException(status_code=404, detail="No team data available")
-        
+            return ApiResponse(success=True, data={
+                'id': 'team_average',
+                'name': 'Team Average',
+                'position': 'TEAM',
+                'number': 0,
+                'riskLevel': 'low',
+                'avgLoad': 0,
+                'avgSpeed': 0,
+                'sessions': 0,
+                'lastSession': None,
+                'hasRecentData': False,
+                'recentSessionCount': 0,
+                'metrics': {},
+                'teamStats': {'totalPlayers': 0, 'playersWithRecentData': 0, 'riskDistribution': {'low': 0, 'medium': 0, 'high': 0}},
+            })
         return ApiResponse(success=True, data=team_avg)
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return ApiResponse(success=True, data={
+            'id': 'team_average',
+            'name': 'Team Average',
+            'position': 'TEAM',
+            'number': 0,
+            'riskLevel': 'low',
+            'avgLoad': 0,
+            'avgSpeed': 0,
+            'sessions': 0,
+            'hasRecentData': False,
+            'recentSessionCount': 0,
+            'metrics': {},
+            'teamStats': {'totalPlayers': 0, 'playersWithRecentData': 0, 'riskDistribution': {'low': 0, 'medium': 0, 'high': 0}},
+        })
 
 
 @router.post("/predict-risk", response_model=ApiResponse)
@@ -62,14 +93,26 @@ async def predict_risk(request: PredictRiskRequest):
         if request.playerId == 'team_average':
             team_avg = data_service.get_team_average_metrics()
             if not team_avg:
-                raise HTTPException(status_code=404, detail="No team data available")
+                return ApiResponse(success=True, data={
+                    'playerId': 'team_average',
+                    'playerName': 'Team Average',
+                    'riskLevel': 'low',
+                    'probability': 0.0,
+                    'factors': ["No team data available. Upload a CSV in Dashboard to analyze."],
+                    'recommendations': [
+                        "Upload training data in the Dashboard",
+                        "Risk cannot be assessed without data",
+                    ],
+                    'hasRecentData': False,
+                    'recentSessionCount': 0,
+                })
             
             # Use team average metrics for prediction
             features = team_avg.get('metrics', {})
             has_recent_data = team_avg.get('hasRecentData', False)
             recent_sessions = team_avg.get('recentSessionCount', 0)
             
-            if not has_recent_data or recent_sessions == 0:
+            if not has_recent_data or recent_sessions == 0 or not features:
                 return ApiResponse(success=True, data={
                     'playerId': 'team_average',
                     'playerName': 'Team Average',
@@ -85,7 +128,40 @@ async def predict_risk(request: PredictRiskRequest):
                     'recentSessionCount': recent_sessions
                 })
             
-            risk_level, probability, factors, recommendations = ml_service.predict_risk(features)
+            # Validate features before prediction
+            if not isinstance(features, dict) or len(features) == 0:
+                return ApiResponse(success=True, data={
+                    'playerId': 'team_average',
+                    'playerName': 'Team Average',
+                    'riskLevel': 'low',
+                    'probability': 0.0,
+                    'factors': ["Insufficient metrics data for risk prediction"],
+                    'recommendations': [
+                        "Team metrics are not available",
+                        "Upload training data to enable risk analysis"
+                    ],
+                    'hasRecentData': False,
+                    'recentSessionCount': recent_sessions
+                })
+            
+            try:
+                risk_level, probability, factors, recommendations = ml_service.predict_risk(features)
+            except Exception as e:
+                # Fallback if prediction fails
+                return ApiResponse(success=True, data={
+                    'playerId': 'team_average',
+                    'playerName': 'Team Average',
+                    'riskLevel': 'low',
+                    'probability': 0.0,
+                    'factors': [f"Risk prediction unavailable: {str(e)}"],
+                    'recommendations': [
+                        "Unable to calculate risk with current data",
+                        "Ensure training models are properly trained",
+                        "Check that sufficient player data is available"
+                    ],
+                    'hasRecentData': True,
+                    'recentSessionCount': recent_sessions
+                })
             
             return ApiResponse(success=True, data={
                 'playerId': 'team_average',
@@ -100,8 +176,18 @@ async def predict_risk(request: PredictRiskRequest):
         
         player = data_service.get_player_detail(request.playerId)
         if not player:
-            raise HTTPException(status_code=404, detail="Player not found")
+            return ApiResponse(success=True, data={
+                'playerId': request.playerId,
+                'playerName': 'Unknown',
+                'riskLevel': 'low',
+                'probability': 0.0,
+                'factors': ["Player not found or no data available."],
+                'recommendations': ["Select a player from the list and ensure data is loaded."],
+                'hasRecentData': False,
+                'recentSessionCount': 0,
+            })
         
+        player_name = player.get('name', 'Unknown')
         # Check if player has recent data (last 45 days)
         has_recent_data = player.get('hasRecentData', False)
         recent_sessions = player.get('recentSessionCount', 0)
@@ -110,7 +196,7 @@ async def predict_risk(request: PredictRiskRequest):
         if not has_recent_data or recent_sessions == 0:
             return ApiResponse(success=True, data={
                 'playerId': request.playerId,
-                'playerName': player['name'],
+                'playerName': player_name,
                 'riskLevel': 'low',
                 'probability': 0.0,
                 'factors': [f"No training data in the last 45 days ({recent_sessions} sessions)"],
@@ -123,12 +209,46 @@ async def predict_risk(request: PredictRiskRequest):
                 'recentSessionCount': recent_sessions
             })
         
-        features = player['metrics']
-        risk_level, probability, factors, recommendations = ml_service.predict_risk(features)
+        features = player.get('metrics', {})
+        
+        # Validate features before prediction
+        if not isinstance(features, dict) or len(features) == 0:
+            return ApiResponse(success=True, data={
+                'playerId': request.playerId,
+                'playerName': player_name,
+                'riskLevel': 'low',
+                'probability': 0.0,
+                'factors': ["Insufficient metrics data for risk prediction"],
+                'recommendations': [
+                    "Player metrics are not available",
+                    "Upload training data to enable risk analysis"
+                ],
+                'hasRecentData': True,
+                'recentSessionCount': recent_sessions
+            })
+        
+        try:
+            risk_level, probability, factors, recommendations = ml_service.predict_risk(features)
+        except Exception as e:
+            # Fallback if prediction fails
+            return ApiResponse(success=True, data={
+                'playerId': request.playerId,
+                'playerName': player_name,
+                'riskLevel': 'low',
+                'probability': 0.0,
+                'factors': [f"Risk prediction unavailable: {str(e)}"],
+                'recommendations': [
+                    "Unable to calculate risk with current data",
+                    "Ensure training models are properly trained",
+                    "Check that sufficient player data is available"
+                ],
+                'hasRecentData': True,
+                'recentSessionCount': recent_sessions
+            })
         
         return ApiResponse(success=True, data={
             'playerId': request.playerId,
-            'playerName': player['name'],
+            'playerName': player_name,
             'riskLevel': risk_level,
             'probability': probability,
             'factors': factors,
@@ -137,9 +257,27 @@ async def predict_risk(request: PredictRiskRequest):
             'recentSessionCount': recent_sessions
         })
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return ApiResponse(success=True, data={
+            'playerId': getattr(request, 'playerId', ''),
+            'playerName': 'Unknown',
+            'riskLevel': 'low',
+            'probability': 0.0,
+            'factors': [str(e)],
+            'recommendations': ["Check input data and try again."],
+            'hasRecentData': False,
+            'recentSessionCount': 0,
+        })
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return ApiResponse(success=True, data={
+            'playerId': getattr(request, 'playerId', ''),
+            'playerName': 'Unknown',
+            'riskLevel': 'low',
+            'probability': 0.0,
+            'factors': [f"Analysis error: {str(e)}"],
+            'recommendations': ["Something went wrong. Try again or upload data in Dashboard."],
+            'hasRecentData': False,
+            'recentSessionCount': 0,
+        })
 
 
 @router.post("/compare", response_model=ApiResponse)

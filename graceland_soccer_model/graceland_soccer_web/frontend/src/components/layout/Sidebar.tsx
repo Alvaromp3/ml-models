@@ -1,120 +1,138 @@
-import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  BarChart3, 
+import { NavLink, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Users,
+  BarChart3,
   Settings,
   X,
-  ChevronRight,
   Trophy,
   Brain,
   Award,
-  GitCompare
+  GitCompare,
 } from 'lucide-react';
+import Logo from './Logo';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'Dashboard', description: 'Overview & KPIs' },
-  { path: '/players', icon: Users, label: 'Players', description: 'Team roster' },
-  { path: '/analysis', icon: BarChart3, label: 'Analysis', description: 'Risk predictions' },
-  { path: '/lineup', icon: Trophy, label: 'Best Lineup', description: 'Optimal XI' },
-  { path: '/rankings', icon: Award, label: 'Rankings', description: 'Player stats' },
-  { path: '/comparison', icon: GitCompare, label: 'Team Comparison', description: 'Men vs Women' },
-  { path: '/models', icon: Brain, label: 'ML Models', description: 'Explanation & Training' },
-  { path: '/settings', icon: Settings, label: 'Settings', description: 'Preferences' },
+const navGroups = [
+  {
+    label: 'Overview',
+    items: [{ path: '/', icon: LayoutDashboard, label: 'Dashboard' }],
+  },
+  {
+    label: 'Squad',
+    items: [
+      { path: '/players', icon: Users, label: 'Players' },
+      { path: '/lineup', icon: Trophy, label: 'Best Lineup' },
+      { path: '/rankings', icon: Award, label: 'Rankings' },
+    ],
+  },
+  {
+    label: 'Analysis',
+    items: [
+      { path: '/analysis', icon: BarChart3, label: 'Analysis' },
+      { path: '/comparison', icon: GitCompare, label: 'Team Comparison' },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { path: '/models', icon: Brain, label: 'ML Models' },
+      { path: '/settings', icon: Settings, label: 'Settings' },
+    ],
+  },
 ];
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const location = useLocation();
+
   return (
     <>
-      {/* Mobile overlay */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 lg:hidden"
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={onClose}
+          aria-hidden="true"
         />
       )}
-      
-      {/* Sidebar */}
-      <aside className={`
-        fixed top-0 left-0 z-50 h-full w-72 
-        bg-[#0c1222] border-r border-slate-800/80
-        transform transition-transform duration-300 ease-in-out
-        lg:translate-x-0 lg:static lg:z-auto
-        flex flex-col
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        {/* Logo Section */}
-        <div className="p-6 border-b border-slate-800/80">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img 
-                src="/graceland-logo.png" 
-                alt="Graceland" 
-                className="w-12 h-12 object-contain"
-              />
-              <div>
-                <h1 className="font-bold text-lg text-white">Graceland Soccer</h1>
-                <p className="text-[11px] text-slate-500 font-medium tracking-wide">UNIVERSITY</p>
-              </div>
+      <aside
+        className={`
+          fixed top-0 left-0 z-50 h-full w-56
+          flex flex-col
+          bg-[var(--bg-surface)]
+          border-r border-[var(--border-subtle)]
+          transform transition-transform duration-200 ease-out
+          lg:translate-x-0 lg:static lg:z-auto
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)]">
+          <div className="flex items-center gap-3 min-w-0">
+            <Logo size={32} className="flex-shrink-0 rounded" />
+            <div className="min-w-0">
+              <p className="font-semibold text-[var(--text-primary)] truncate text-sm">
+                Graceland
+              </p>
+              <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider truncate">
+                Soccer Analytics
+              </p>
             </div>
-            <button 
-              onClick={onClose}
-              className="lg:hidden p-2 hover:bg-slate-800 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5 text-slate-400" />
-            </button>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="lg:hidden p-2 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4 overflow-y-auto">
-          <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em] mb-4 px-3">
-            Main Menu
-          </p>
-          <div className="space-y-1.5">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                onClick={onClose}
-                className={({ isActive }) => `
-                  flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group
-                  ${isActive 
-                    ? 'bg-slate-800/60 text-white border border-slate-700/50' 
-                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
-                  }
-                `}
-              >
-                {({ isActive }) => (
-                  <>
-                    <div className={`
-                      p-2 rounded-lg transition-all
-                      ${isActive 
-                        ? 'bg-slate-700/80' 
-                        : 'bg-slate-800/80 group-hover:bg-slate-700'
-                      }
-                    `}>
-                      <item.icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
-                    </div>
-                    <div className="flex-1">
-                      <p className={`text-sm font-medium ${isActive ? 'text-white' : ''}`}>{item.label}</p>
-                      <p className="text-[10px] text-slate-500">{item.description}</p>
-                    </div>
-                    {isActive && (
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
-                    )}
-                  </>
-                )}
-              </NavLink>
-            ))}
-          </div>
+        <nav className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+          {navGroups.map((group) => (
+            <div key={group.label} className="mb-6">
+              <p className="px-3 mb-2 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+                {group.label}
+              </p>
+              <ul className="space-y-0.5">
+                {group.items.map((item) => {
+                  const isActive =
+                    item.path === '/'
+                      ? location.pathname === '/'
+                      : location.pathname.startsWith(item.path);
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.path}>
+                      <NavLink
+                        to={item.path}
+                        onClick={onClose}
+                        className={`
+                          flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium
+                          transition-colors
+                          ${
+                            isActive
+                              ? 'bg-[var(--accent-performance-muted)] text-[var(--accent-performance)] border-l-2 border-[var(--accent-performance)]'
+                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] border-l-2 border-transparent'
+                          }
+                        `}
+                        style={isActive ? { marginLeft: -1 } : {}}
+                      >
+                        <Icon
+                          className="w-5 h-5 flex-shrink-0"
+                          strokeWidth={isActive ? 2.5 : 2}
+                        />
+                        <span>{item.label}</span>
+                      </NavLink>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
         </nav>
-
       </aside>
     </>
   );

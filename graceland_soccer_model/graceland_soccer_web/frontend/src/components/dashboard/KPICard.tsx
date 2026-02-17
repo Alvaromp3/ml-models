@@ -27,68 +27,77 @@ export default function KPICard({
   
   const config = {
     default: {
-      gradient: 'from-cyan-500 to-blue-600',
-      shadow: 'shadow-cyan-500/20',
-      bg: 'bg-cyan-500/10',
-      border: 'border-cyan-500/20',
+      bg: 'rgba(255, 193, 7, 0.08)',
+      border: 'rgba(255, 193, 7, 0.15)',
+      accent: '#ffc107',
     },
     warning: {
-      gradient: 'from-orange-500 to-red-600',
-      shadow: 'shadow-red-500/20',
-      bg: 'bg-red-500/10',
-      border: 'border-red-500/20',
+      bg: 'rgba(245, 158, 11, 0.08)',
+      border: 'rgba(245, 158, 11, 0.15)',
+      accent: '#f59e0b',
     },
     success: {
-      gradient: 'from-emerald-500 to-green-600',
-      shadow: 'shadow-emerald-500/20',
-      bg: 'bg-emerald-500/10',
-      border: 'border-emerald-500/20',
+      bg: 'rgba(132, 204, 22, 0.08)',
+      border: 'rgba(132, 204, 22, 0.15)',
+      accent: '#84cc16',
     },
   };
 
-  const { gradient, shadow, bg, border } = config[variant];
+  const { bg, border, accent } = config[variant];
 
   return (
     <div 
       className={`
-        card card-hover p-6 opacity-0 animate-slide-in-up
+        relative p-5 opacity-0 animate-slide-in-up
+        card
       `}
-      style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
+      style={{ 
+        animationDelay: `${delay}ms`, 
+        animationFillMode: 'forwards',
+      }}
     >
       <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} ${shadow} shadow-lg`}>
-          <Icon className="w-5 h-5 text-white" />
-        </div>
-        
+        {/* Change badge - Field theme */}
         <div className={`
-          flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold
+          flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase
           ${isPositive 
-            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' 
-            : 'bg-red-500/15 text-red-400 border border-red-500/20'
+            ? 'bg-opacity-10 border border-field' 
+            : 'bg-opacity-10 border border-field'
           }
-        `}>
-          {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+        `} style={{ 
+          letterSpacing: '0.05em',
+          backgroundColor: isPositive ? 'rgba(132, 204, 22, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+          borderColor: isPositive ? 'rgba(132, 204, 22, 0.25)' : 'rgba(239, 68, 68, 0.25)',
+          color: isPositive ? '#84cc16' : '#ef4444',
+        }}>
+          {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
           <span>{Math.abs(change)}%</span>
         </div>
       </div>
       
       <div>
-        <h3 className="text-3xl font-bold text-white mb-1 count-up">{value}</h3>
-        <p className="text-sm font-medium text-slate-400">{title}</p>
+        {/* Number - Field theme */}
+        <h3 className="text-4xl font-bold text-on-field mb-1 count-up leading-none" style={{ 
+          letterSpacing: '-0.02em',
+          fontVariantNumeric: 'tabular-nums',
+        }}>{value}</h3>
+        <p className="text-sm font-semibold text-field-muted mt-2">{title}</p>
         {subtitle && (
-          <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
+          <p className="text-[10px] text-field-subtle mt-1 uppercase" style={{ 
+            letterSpacing: '0.05em',
+          }}>{subtitle}</p>
         )}
       </div>
 
-      {/* Sparkline Chart */}
+      {/* Sparkline Chart - Field theme */}
       {sparklineData && sparklineData.length > 0 && (
-        <div className="mt-4 h-12 -mb-2">
+        <div className="mt-4 h-10 -mb-1" style={{ minWidth: 0, minHeight: '40px' }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={sparklineData.map((val, idx) => ({ value: val, index: idx }))}>
               <Line 
                 type="monotone" 
                 dataKey="value" 
-                stroke={variant === 'warning' ? '#f97316' : variant === 'success' ? '#22c55e' : '#06b6d4'} 
+                stroke={accent} 
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
@@ -98,8 +107,8 @@ export default function KPICard({
         </div>
       )}
 
-      {/* Bottom accent line */}
-      <div className={`mt-5 h-1 rounded-full bg-gradient-to-r ${gradient} opacity-40`} />
+      {/* Bottom accent - Field theme */}
+      <div className="mt-4 h-1 rounded-full" style={{ backgroundColor: bg, borderColor: border }} />
     </div>
   );
 }

@@ -67,17 +67,17 @@ export default function DataAuditContent() {
 
   if (!dataStatus?.loaded) {
     return (
-      <div className="card p-8 text-center">
+      <div className="panel panel--elevated p-8 text-center">
         <div className="w-16 h-16 mx-auto mb-6 bg-slate-800/60 border border-slate-700/50 rounded-2xl flex items-center justify-center">
           <Database className="w-8 h-8 text-slate-300" />
         </div>
         <h2 className="text-xl font-bold text-white mb-2">No Data Loaded</h2>
         <p className="text-slate-400 text-sm mb-6">
-          Load CSV data first to perform data audit.
+          Upload a CSV in the Dashboard to audit the data.
         </p>
         <a 
           href="/"
-          className="inline-flex items-center gap-2 px-5 py-2.5 btn-primary rounded-xl font-medium text-white text-sm"
+          className="btn btn--primary gap-2 text-sm"
         >
           Go to Dashboard
           <ChevronRight className="w-4 h-4" />
@@ -94,13 +94,13 @@ export default function DataAuditContent() {
     );
   }
 
-  const qualityColor = audit?.dataQualityScore >= 80 ? 'emerald' : audit?.dataQualityScore >= 60 ? 'yellow' : 'red';
+  const qualityColor = audit?.dataQualityScore >= 80 ? 'blue' : audit?.dataQualityScore >= 60 ? 'yellow' : 'red';
 
   return (
     <div className="space-y-6">
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card p-5">
+        <div className="panel p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className={`p-2 bg-${qualityColor}-500/10 rounded-lg`}>
               <Shield className={`w-5 h-5 text-${qualityColor}-400`} />
@@ -112,7 +112,7 @@ export default function DataAuditContent() {
           </p>
         </div>
 
-        <div className="card p-5">
+        <div className="panel p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
               <Database className="w-5 h-5 text-slate-400" />
@@ -124,7 +124,7 @@ export default function DataAuditContent() {
           </p>
         </div>
 
-        <div className="card p-5">
+        <div className="panel p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-orange-500/10 rounded-lg">
               <AlertTriangle className="w-5 h-5 text-orange-400" />
@@ -136,7 +136,7 @@ export default function DataAuditContent() {
           </p>
         </div>
 
-        <div className="card p-5">
+        <div className="panel p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
               <Zap className="w-5 h-5 text-slate-400" />
@@ -155,7 +155,7 @@ export default function DataAuditContent() {
         <div className="lg:col-span-2 space-y-6">
           {/* Outliers Chart */}
           {outlierChartData.length > 0 && (
-            <div className="card p-6">
+            <div className="panel panel--elevated p-6">
               <div className="flex items-center gap-2 mb-4">
                 <BarChart3 className="w-5 h-5 text-orange-400" />
                 <h3 className="font-semibold text-white">Outliers by Column</h3>
@@ -184,7 +184,7 @@ export default function DataAuditContent() {
           )}
 
           {/* Clean Outliers Action */}
-          <div className="card p-6">
+          <div className="panel panel--elevated p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50">
                 <Trash2 className="w-5 h-5 text-slate-300" />
@@ -241,10 +241,10 @@ export default function DataAuditContent() {
             </div>
 
             {cleanMutation.data?.success && (
-              <div className="mt-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl animate-slide-in-up">
+              <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl animate-slide-in-up">
                 <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-400" />
-                  <p className="text-sm font-semibold text-emerald-400">Cleaning Complete!</p>
+                  <CheckCircle className="w-4 h-4 text-blue-400" />
+                  <p className="text-sm font-semibold text-blue-400">Cleaning Complete!</p>
                 </div>
                 <p className="text-sm text-slate-400">{cleanMutation.data.message}</p>
                 {cleanMutation.data.stats && (
@@ -267,7 +267,7 @@ export default function DataAuditContent() {
         {/* Sidebar */}
         <div className="space-y-6">
           {audit?.warnings && audit.warnings.length > 0 && (
-            <div className="card p-6">
+            <div className="panel panel--elevated p-6">
               <div className="flex items-center gap-2 mb-4">
                 <AlertTriangle className="w-5 h-5 text-yellow-400" />
                 <h3 className="font-semibold text-white">Warnings</h3>
@@ -283,7 +283,7 @@ export default function DataAuditContent() {
           )}
 
           {audit?.recommendations && audit.recommendations.length > 0 && (
-            <div className="card p-6">
+            <div className="panel panel--elevated p-6">
               <div className="flex items-center gap-2 mb-4">
                 <CheckCircle className="w-5 h-5 text-cyan-400" />
                 <h3 className="font-semibold text-white">Recommendations</h3>

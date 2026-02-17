@@ -28,8 +28,10 @@ import {
   PieChart,
   Pie,
   Cell,
+  Tooltip,
 } from 'recharts';
 import { playersApi, analysisApi, useDataStatus } from '../services/api';
+import { useTeam } from '../contexts/TeamContext';
 import type { RiskPrediction, Player } from '../types';
 import ReactMarkdown from 'react-markdown';
 
@@ -39,6 +41,7 @@ export default function Analysis() {
   const [selectedPlayerData, setSelectedPlayerData] = useState<Player | null>(null);
   const [aiRecommendations, setAiRecommendations] = useState<any>(null);
 
+  const { currentTeam } = useTeam();
   const { data: dataStatus } = useDataStatus();
 
   const { data: players } = useQuery({
@@ -132,47 +135,44 @@ export default function Analysis() {
 
   const riskConfig = {
     low: { 
-      bg: 'bg-emerald-500/15', 
-      text: 'text-emerald-400', 
-      border: 'border-emerald-500/30',
+      bg: 'bg-[#1e40af]/10', 
+      text: 'text-[#1e40af]', 
+      border: 'border-[#1e40af]/30',
       icon: CheckCircle,
-      color: '#22c55e',
-      gradient: 'from-emerald-500 to-green-600'
+      color: '#1e40af',
+      gradient: 'from-[#1e40af] to-[#3b82f6]'
     },
     medium: { 
-      bg: 'bg-yellow-500/15', 
-      text: 'text-yellow-400', 
-      border: 'border-yellow-500/30',
+      bg: 'bg-[#f59e0b]/10', 
+      text: 'text-[#f59e0b]', 
+      border: 'border-[#f59e0b]/30',
       icon: AlertTriangle,
-      color: '#eab308',
-      gradient: 'from-yellow-500 to-orange-500'
+      color: '#f59e0b',
+      gradient: 'from-[#f59e0b] to-[#fbbf24]'
     },
     high: { 
-      bg: 'bg-red-500/15', 
-      text: 'text-red-400', 
-      border: 'border-red-500/30',
+      bg: 'bg-[#dc2626]/10', 
+      text: 'text-[#dc2626]', 
+      border: 'border-[#dc2626]/30',
       icon: AlertTriangle,
-      color: '#ef4444',
-      gradient: 'from-red-500 to-rose-600'
+      color: '#dc2626',
+      gradient: 'from-[#dc2626] to-[#ef4444]'
     },
   };
 
-  // No data loaded state
+  const teamLabel = currentTeam === 'mens' ? 'Men\'s Team' : 'Women\'s Team';
+
+  // No data loaded state for current team
   if (!dataStatus?.loaded) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center animate-fade-in">
-        <div className="card p-8 max-w-md text-center">
-          <div className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30">
-            <AlertTriangle className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">No Data Loaded</h2>
-          <p className="text-slate-400 text-sm mb-6">
-            Load CSV data first to analyze player risk. Go to Dashboard to upload your data.
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="panel panel--elevated p-8 max-w-md text-center">
+          <AlertTriangle className="w-10 h-10 mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <h2 className="section-title mb-2">No data</h2>
+          <p className="caption mb-6">
+            Upload a CSV for {teamLabel} in the Dashboard to analyze risk.
           </p>
-          <a 
-            href="/"
-            className="inline-flex items-center gap-2 px-5 py-2.5 btn-primary rounded-xl font-medium text-white text-sm"
-          >
+          <a href="/" className="btn btn--primary gap-2">
             Go to Dashboard
             <ArrowRight className="w-4 h-4" />
           </a>
@@ -199,7 +199,7 @@ export default function Analysis() {
     const prob = prediction.probability * 100;
     return [
       { name: 'Risk', value: prob, color: riskConfig[prediction.riskLevel].color },
-      { name: 'Safe', value: 100 - prob, color: '#1e293b' },
+      { name: 'Safe', value: 100 - prob, color: '#e2e8f0' },
     ];
   };
 
@@ -207,11 +207,11 @@ export default function Analysis() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-          <Shield className="w-7 h-7 text-slate-400" />
+        <h1 className="text-2xl font-bold text-[#1e293b] flex items-center gap-3">
+          <Shield className="w-7 h-7 text-[#64748b]" />
           Risk Analysis
         </h1>
-        <p className="text-slate-500 text-sm mt-1">
+        <p className="text-[#64748b] text-sm mt-1">
           Predict injury risk and get AI-powered recommendations
         </p>
       </div>
@@ -220,14 +220,14 @@ export default function Analysis() {
         {/* Left Panel - Player Selection */}
         <div className="lg:col-span-1 space-y-4">
           {/* Select Player Card */}
-          <div className="card p-6">
+          <div className="panel panel--elevated p-6 bg-white">
             <div className="flex items-center gap-3 mb-5">
-              <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50">
-                <Target className="w-5 h-5 text-slate-300" />
+              <div className="p-2.5 rounded-lg bg-[#ea580c]/10 border border-[#ea580c]/20">
+                <Target className="w-5 h-5 text-[#ea580c]" />
               </div>
               <div>
-                <h2 className="font-semibold text-white">Select Player</h2>
-                <p className="text-xs text-slate-500">Choose a player to analyze</p>
+                <h2 className="font-semibold text-[#1e293b]">Select Player</h2>
+                <p className="text-xs text-[#64748b]">Choose a player to analyze</p>
               </div>
             </div>
 
@@ -235,11 +235,11 @@ export default function Analysis() {
               <select
                 value={selectedPlayer}
                 onChange={(e) => handlePlayerSelect(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full px-4 py-3 bg-white border border-[#e2e8f0] rounded-lg text-[#1e293b] focus:outline-none focus:border-[#1e40af] transition-colors"
               >
                 <option value="">Choose a player...</option>
                 <option value="team_average" className="font-semibold">
-                  📊 Team Average (All Players)
+                  Team Average (All Players)
                 </option>
                 <optgroup label="Players">
                   {players?.map((player) => (
@@ -253,7 +253,7 @@ export default function Analysis() {
               <button
                 onClick={handlePredict}
                 disabled={!selectedPlayer || predictMutation.isPending}
-                className="w-full py-3 btn-primary rounded-xl font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn btn--primary w-full py-3 gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {predictMutation.isPending ? (
                   <>
@@ -272,95 +272,110 @@ export default function Analysis() {
 
           {/* Selected Player Info */}
           {selectedPlayerData && (
-            <div className="card p-6 animate-slide-in-up">
+            <div className="panel panel--elevated p-6 bg-white animate-slide-in-up">
               <div className="flex items-center gap-4 mb-4">
                 <div className={`
-                  w-14 h-14 rounded-xl flex items-center justify-center font-bold text-xl
+                  w-14 h-14 rounded-lg flex items-center justify-center font-bold text-xl border-2
                   ${selectedPlayerData.id === 'team_average' 
-                    ? 'bg-gradient-to-br from-purple-500 to-blue-600 text-white border border-purple-500/30'
+                    ? 'bg-[#7c3aed]/10 text-[#7c3aed] border-[#7c3aed]/30'
                     : `${riskConfig[selectedPlayerData.riskLevel].bg} ${riskConfig[selectedPlayerData.riskLevel].text} border ${riskConfig[selectedPlayerData.riskLevel].border}`
                   }
                 `}>
-                  {selectedPlayerData.id === 'team_average' ? '📊' : selectedPlayerData.number}
+                  {selectedPlayerData.id === 'team_average' ? 'TA' : selectedPlayerData.number}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white">{selectedPlayerData.name}</h3>
-                  <p className="text-sm text-slate-500">
+                  <h3 className="font-semibold text-[#1e293b]">{selectedPlayerData.name}</h3>
+                  <p className="text-sm text-[#64748b]">
                     {selectedPlayerData.id === 'team_average' 
-                      ? `Average of ${teamAverage?.teamStats?.totalPlayers || 0} players`
+                      ? (teamAverage?.teamStats?.totalPlayers
+                          ? `Average of ${teamAverage.teamStats.totalPlayers} players`
+                          : 'No team data loaded')
                       : `#${selectedPlayerData.number}`
                     }
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-800/50 rounded-lg text-center">
-                  <Zap className="w-4 h-4 text-slate-400 mx-auto mb-1" />
-                  <p className="text-lg font-bold text-white">{selectedPlayerData.avgLoad}</p>
-                  <p className="text-[10px] text-slate-500">Avg Load</p>
-                </div>
-                <div className="p-3 bg-slate-800/50 rounded-lg text-center">
-                  <TrendingUp className="w-4 h-4 text-slate-400 mx-auto mb-1" />
-                  <p className="text-lg font-bold text-white">{selectedPlayerData.avgSpeed}</p>
-                  <p className="text-[10px] text-slate-500">Avg Speed</p>
-                </div>
-                <div className="p-3 bg-slate-800/50 rounded-lg text-center">
-                  <Activity className="w-4 h-4 text-slate-400 mx-auto mb-1" />
-                  <p className="text-lg font-bold text-white">{selectedPlayerData.sessions}</p>
-                  <p className="text-[10px] text-slate-500">Sessions</p>
-                </div>
-                <div className="p-3 bg-slate-800/50 rounded-lg text-center">
-                  <Heart className="w-4 h-4 text-red-400 mx-auto mb-1" />
-                  <p className={`text-lg font-bold capitalize ${riskConfig[selectedPlayerData.riskLevel].text}`}>
-                    {selectedPlayerData.riskLevel}
+              {/* When Team Average has no data, show empty state instead of zeros */}
+              {selectedPlayerData.id === 'team_average' && (!teamAverage?.teamStats?.totalPlayers || selectedPlayerData.sessions === 0) ? (
+                <div className="py-6 px-4 rounded-lg bg-[#f8fafc] border border-[#e2e8f0] text-center">
+                  <p className="text-sm text-[#64748b]">
+                    Upload a CSV in the Dashboard to see team averages and risk distribution.
                   </p>
-                  <p className="text-[10px] text-slate-500">Current Risk</p>
+                  <a href="/" className="inline-block mt-3 text-sm font-medium text-[#1e40af] hover:underline">
+                    Go to Dashboard
+                  </a>
                 </div>
-              </div>
-              
-              {/* Team Stats for Team Average */}
-              {selectedPlayerData.id === 'team_average' && teamAverage?.teamStats && (
-                <div className="mt-4 pt-4 border-t border-slate-700">
-                  <p className="text-xs text-slate-500 mb-2">Team Distribution</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="text-center p-2 bg-emerald-500/10 rounded-lg">
-                      <p className="text-lg font-bold text-emerald-400">{teamAverage.teamStats.riskDistribution.low}</p>
-                      <p className="text-[10px] text-slate-500">Low Risk</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-[#f8fafc] rounded-lg text-center border border-[#e2e8f0]">
+                      <Zap className="w-4 h-4 text-[#64748b] mx-auto mb-1" />
+                      <p className="text-lg font-bold text-[#1e293b]">{selectedPlayerData.avgLoad}</p>
+                      <p className="text-[10px] text-[#64748b]">Avg Load</p>
                     </div>
-                    <div className="text-center p-2 bg-yellow-500/10 rounded-lg">
-                      <p className="text-lg font-bold text-yellow-400">{teamAverage.teamStats.riskDistribution.medium}</p>
-                      <p className="text-[10px] text-slate-500">Medium</p>
+                    <div className="p-3 bg-[#f8fafc] rounded-lg text-center border border-[#e2e8f0]">
+                      <TrendingUp className="w-4 h-4 text-[#64748b] mx-auto mb-1" />
+                      <p className="text-lg font-bold text-[#1e293b]">{selectedPlayerData.avgSpeed}</p>
+                      <p className="text-[10px] text-[#64748b]">Avg Speed</p>
                     </div>
-                    <div className="text-center p-2 bg-red-500/10 rounded-lg">
-                      <p className="text-lg font-bold text-red-400">{teamAverage.teamStats.riskDistribution.high}</p>
-                      <p className="text-[10px] text-slate-500">High Risk</p>
+                    <div className="p-3 bg-[#f8fafc] rounded-lg text-center border border-[#e2e8f0]">
+                      <Activity className="w-4 h-4 text-[#64748b] mx-auto mb-1" />
+                      <p className="text-lg font-bold text-[#1e293b]">{selectedPlayerData.sessions}</p>
+                      <p className="text-[10px] text-[#64748b]">Sessions</p>
+                    </div>
+                    <div className="p-3 bg-[#f8fafc] rounded-lg text-center border border-[#e2e8f0]">
+                      <Heart className="w-4 h-4 text-[#dc2626] mx-auto mb-1" />
+                      <p className={`text-lg font-bold capitalize ${riskConfig[selectedPlayerData.riskLevel].text}`}>
+                        {selectedPlayerData.riskLevel}
+                      </p>
+                      <p className="text-[10px] text-[#64748b]">Current Risk</p>
                     </div>
                   </div>
-                </div>
+                  {/* Team Stats for Team Average - only when we have real data */}
+                  {selectedPlayerData.id === 'team_average' && teamAverage?.teamStats?.totalPlayers > 0 && (
+                    <div className="mt-4 pt-4 border-t border-[#e2e8f0]">
+                      <p className="text-xs text-[#64748b] mb-2">Team Distribution</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="text-center p-2 rounded border border-[var(--border-default)] bg-[var(--bg-elevated)]">
+                          <p className="text-lg font-bold text-[#10b981]">{teamAverage.teamStats.riskDistribution.low}</p>
+                          <p className="caption">Low Risk</p>
+                        </div>
+                        <div className="text-center p-2 bg-[#f59e0b]/10 border border-[#f59e0b]/20 rounded-lg">
+                          <p className="text-lg font-bold text-[#f59e0b]">{teamAverage.teamStats.riskDistribution.medium}</p>
+                          <p className="text-[10px] text-[#64748b]">Medium</p>
+                        </div>
+                        <div className="text-center p-2 bg-[#dc2626]/10 border border-[#dc2626]/20 rounded-lg">
+                          <p className="text-lg font-bold text-[#dc2626]">{teamAverage.teamStats.riskDistribution.high}</p>
+                          <p className="text-[10px] text-[#64748b]">High Risk</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
 
-          {/* Player Radar Chart */}
-          {selectedPlayerData && (
-            <div className="card p-6 animate-slide-in-up" style={{ animationDelay: '100ms' }}>
-              <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-slate-400" />
+          {/* Player Radar Chart - hide when Team Average has no data */}
+          {selectedPlayerData && !(selectedPlayerData.id === 'team_average' && (!teamAverage?.teamStats?.totalPlayers || selectedPlayerData.sessions === 0)) && (
+            <div className="panel panel--elevated p-6 bg-white animate-slide-in-up" style={{ animationDelay: '100ms' }}>
+              <h3 className="font-semibold text-[#1e293b] mb-4 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-[#64748b]" />
                 Performance Profile
               </h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-64 min-h-[256px] w-full">
+                <ResponsiveContainer width="100%" height={256} minWidth={0}>
                   <RadarChart data={getRadarData()}>
-                    <PolarGrid stroke="#334155" />
-                    <PolarAngleAxis dataKey="metric" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} />
+                    <PolarGrid stroke="#e2e8f0" />
+                    <PolarAngleAxis dataKey="metric" tick={{ fill: '#64748b', fontSize: 11 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 10 }} />
                     <Radar
                       name="Performance"
                       dataKey="value"
-                      stroke="#06b6d4"
-                      fill="#06b6d4"
-                      fillOpacity={0.3}
+                      stroke="#1e40af"
+                      fill="#1e40af"
+                      fillOpacity={0.2}
                       strokeWidth={2}
                     />
                   </RadarChart>
@@ -376,12 +391,12 @@ export default function Analysis() {
             <>
               {/* No Recent Data Warning */}
               {prediction.hasRecentData === false && (
-                <div className="card p-4 bg-yellow-500/10 border-yellow-500/30 animate-slide-in-up">
+                <div className="panel p-4 border-[var(--risk-medium)]/30 bg-[var(--risk-medium)]/10 animate-slide-in-up">
                   <div className="flex items-start gap-3">
-                    <Clock className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <Clock className="w-5 h-5 text-[#f59e0b] flex-shrink-0 mt-0.5" />
                     <div className="text-sm">
-                      <p className="text-yellow-400 font-medium mb-1">No Recent Training Data</p>
-                      <p className="text-slate-400">
+                      <p className="text-[#f59e0b] font-semibold mb-1">No Recent Training Data</p>
+                      <p className="text-[#64748b]">
                         This player has no training sessions in the last 45 days. 
                         Risk is automatically set to LOW as we cannot accurately assess without recent data.
                       </p>
@@ -391,34 +406,33 @@ export default function Analysis() {
               )}
 
               {/* Risk Level Card */}
-              <div className={`card p-6 border ${riskConfig[prediction.riskLevel].border} animate-slide-in-up`}>
+              <div className={`panel panel--elevated p-6 border bg-white animate-slide-in-up ${riskConfig[prediction.riskLevel].border}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className={`
-                      w-16 h-16 rounded-2xl flex items-center justify-center
-                      bg-gradient-to-br ${riskConfig[prediction.riskLevel].gradient}
-                      shadow-lg
+                      w-16 h-16 rounded-lg flex items-center justify-center border-2
+                      ${riskConfig[prediction.riskLevel].bg} ${riskConfig[prediction.riskLevel].border}
                     `}>
                       {(() => {
                         const IconComponent = riskConfig[prediction.riskLevel].icon;
-                        return <IconComponent className="w-8 h-8 text-white" />;
+                        return <IconComponent className={`w-8 h-8 ${riskConfig[prediction.riskLevel].text}`} />;
                       })()}
                     </div>
                     <div>
-                      <p className="text-sm text-slate-400 mb-1">Injury Risk Level</p>
+                      <p className="text-sm text-[#64748b] mb-1">Injury Risk Level</p>
                       <p className={`text-3xl font-bold capitalize ${riskConfig[prediction.riskLevel].text}`}>
                         {prediction.riskLevel} Risk
                       </p>
-                      <p className="text-sm text-slate-500 mt-1">
+                      <p className="text-sm text-[#64748b] mt-1">
                         {prediction.playerName}
                       </p>
                     </div>
                   </div>
 
                   {/* Probability Donut */}
-                  <div className="w-32 h-32 relative">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
+                  <div className="w-32 h-32 relative flex-shrink-0" style={{ minWidth: 128, minHeight: 128 }}>
+                    <ResponsiveContainer width={128} height={128}>
+                      <PieChart width={128} height={128}>
                         <Pie
                           data={getProbabilityData()}
                           cx="50%"
@@ -426,12 +440,24 @@ export default function Analysis() {
                           innerRadius={35}
                           outerRadius={50}
                           dataKey="value"
-                          strokeWidth={0}
+                          strokeWidth={2}
+                          stroke="#ffffff"
                         >
                           {getProbabilityData().map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '6px',
+                            padding: '8px 10px',
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                          }}
+                          labelStyle={{ color: '#1e293b', fontWeight: 600, fontSize: '12px' }}
+                          itemStyle={{ color: '#334155', fontSize: '13px' }}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -439,7 +465,7 @@ export default function Analysis() {
                         <p className={`text-2xl font-bold ${riskConfig[prediction.riskLevel].text}`}>
                           {(prediction.probability * 100).toFixed(0)}%
                         </p>
-                        <p className="text-[10px] text-slate-500">Confidence</p>
+                        <p className="text-[10px] text-[#64748b]">Confidence</p>
                       </div>
                     </div>
                   </div>
@@ -449,35 +475,35 @@ export default function Analysis() {
               {/* Risk Factors & Recommendations */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Risk Factors */}
-                <div className="card p-6 animate-slide-in-up" style={{ animationDelay: '100ms' }}>
+                <div className="panel panel--elevated p-6 bg-white animate-slide-in-up" style={{ animationDelay: '100ms' }}>
                   <div className="flex items-center gap-2 mb-4">
-                    <AlertTriangle className="w-5 h-5 text-orange-400" />
-                    <h3 className="font-semibold text-white">Risk Factors</h3>
+                    <AlertTriangle className="w-5 h-5 text-[#ea580c]" />
+                    <h3 className="font-semibold text-[#1e293b]">Risk Factors</h3>
                   </div>
                   <ul className="space-y-3">
                     {prediction.factors.map((factor, i) => (
-                      <li key={i} className="flex items-start gap-3 p-3 bg-slate-800/30 rounded-lg">
+                      <li key={i} className="flex items-start gap-3 p-3 bg-[#f8fafc] rounded-lg border border-[#e2e8f0]">
                         <span className={`
                           w-2 h-2 rounded-full mt-1.5 flex-shrink-0
-                          ${prediction.riskLevel === 'high' ? 'bg-red-400' : prediction.riskLevel === 'medium' ? 'bg-yellow-400' : 'bg-emerald-400'}
+                          ${prediction.riskLevel === 'high' ? 'bg-[#dc2626]' : prediction.riskLevel === 'medium' ? 'bg-[#f59e0b]' : 'bg-[#1e40af]'}
                         `} />
-                        <span className="text-sm text-slate-300">{factor}</span>
+                        <span className="text-sm text-[#334155]">{factor}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
 
                 {/* Recommendations */}
-                <div className="card p-6 animate-slide-in-up" style={{ animationDelay: '150ms' }}>
+                <div className="panel panel--elevated p-6 bg-white animate-slide-in-up" style={{ animationDelay: '150ms' }}>
                   <div className="flex items-center gap-2 mb-4">
-                    <CheckCircle className="w-5 h-5 text-emerald-400" />
-                    <h3 className="font-semibold text-white">Recommendations</h3>
+                    <CheckCircle className="w-5 h-5 text-[#1e40af]" />
+                    <h3 className="font-semibold text-[#1e293b]">Recommendations</h3>
                   </div>
                   <ul className="space-y-3">
                     {prediction.recommendations.map((rec, i) => (
-                      <li key={i} className="flex items-start gap-3 p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg">
-                        <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-                        <span className="text-sm text-slate-300">{rec}</span>
+                      <li key={i} className="flex items-start gap-3 p-3 bg-[#1e40af]/5 border border-[#1e40af]/20 rounded-lg">
+                        <CheckCircle className="w-4 h-4 text-[#1e40af] mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-[#334155]">{rec}</span>
                       </li>
                     ))}
                   </ul>
@@ -485,15 +511,15 @@ export default function Analysis() {
               </div>
 
               {/* AI Coach Section */}
-              <div className="card p-6 animate-slide-in-up" style={{ animationDelay: '200ms' }}>
+              <div className="panel panel--elevated p-6 bg-white animate-slide-in-up" style={{ animationDelay: '200ms' }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50">
-                      <Bot className="w-5 h-5 text-slate-300" />
+                    <div className="p-2.5 rounded-lg bg-[#06b6d4]/10 border border-[#06b6d4]/20">
+                      <Bot className="w-5 h-5 text-[#06b6d4]" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white">AI Coach Recommendations</h3>
-                      <p className="text-xs text-slate-500">
+                      <h3 className="font-semibold text-[#1e293b]">AI Coach Recommendations</h3>
+                      <p className="text-xs text-[#64748b]">
                         Powered by Ollama {ollamaStatus?.status === 'ready' ? '(Connected)' : '(Fallback mode)'}
                       </p>
                     </div>
@@ -502,7 +528,7 @@ export default function Analysis() {
                   <button
                     onClick={handleGetAIRecommendations}
                     disabled={aiMutation.isPending || !selectedPlayer}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-lg font-medium text-white text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 bg-[#06b6d4] hover:bg-[#0891b2] border border-[#06b6d4] rounded-lg font-semibold text-white text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {aiMutation.isPending ? (
                       <>
@@ -522,10 +548,10 @@ export default function Analysis() {
                 {ollamaStatus && (
                   <div className={`mb-4 px-3 py-2 rounded-lg text-xs inline-flex items-center gap-2 ${
                     ollamaStatus.status === 'ready' 
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                      : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-                  }`}>
-                    <span className={`w-2 h-2 rounded-full ${ollamaStatus.status === 'ready' ? 'bg-emerald-400' : 'bg-yellow-400'}`} />
+                      ? 'bg-[var(--risk-low)]/10 text-[var(--risk-low)] border border-[var(--risk-low)]/30'
+                      : 'bg-[var(--risk-medium)]/10 text-[var(--risk-medium)] border border-[var(--risk-medium)]/30'
+                  }`} style={ollamaStatus.status !== 'ready' ? { backgroundColor: 'rgba(255, 193, 7, 0.15)' } : {}}>
+                    <span className={`w-2 h-2 rounded-full ${ollamaStatus.status === 'ready' ? 'bg-[#10b981]' : 'bg-[#ffc107]'}`} />
                     {ollamaStatus.status === 'ready' 
                       ? `Ollama connected - Model: ${ollamaStatus.defaultModel}`
                       : ollamaStatus.message}
@@ -534,10 +560,10 @@ export default function Analysis() {
 
                 {/* Error Message */}
                 {aiMutation.isError && (
-                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                  <div className="mb-4 p-3 bg-[#dc2626]/10 border border-[#dc2626]/30 rounded-lg">
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-red-400" />
-                      <span className="text-sm text-red-400">
+                      <AlertTriangle className="w-4 h-4 text-[#dc2626]" />
+                      <span className="text-sm text-[#dc2626]">
                         Failed to get AI analysis: {(aiMutation.error as Error)?.message || 'Unknown error'}
                       </span>
                     </div>
@@ -546,28 +572,28 @@ export default function Analysis() {
 
                 {/* AI Recommendations Content */}
                 {aiRecommendations ? (
-                    <div className="p-4 bg-slate-800/30 rounded-xl">
+                    <div className="p-4 bg-[#f8fafc] rounded-lg border border-[#e2e8f0]">
                     <div className="flex items-center gap-2 mb-3">
-                      <Bot className="w-4 h-4 text-slate-400" />
-                      <span className="text-sm font-medium text-slate-300">
+                      <Bot className="w-4 h-4 text-[#64748b]" />
+                      <span className="text-sm font-semibold text-[#1e293b]">
                         {aiRecommendations.aiSuccess ? 'AI Analysis' : 'Standard Recommendations'}
                       </span>
                       {!aiRecommendations.aiSuccess && aiRecommendations.aiError && (
-                        <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">
+                        <span className="text-xs text-[#dc2626] bg-[#dc2626]/10 px-2 py-1 rounded">
                           {aiRecommendations.aiError}
                         </span>
                       )}
                     </div>
-                    <div className="prose prose-invert prose-sm max-w-none">
+                    <div className="prose prose-sm max-w-none">
                       <ReactMarkdown
                         components={{
-                          h2: ({children}) => <h2 className="text-lg font-semibold text-white mt-4 mb-2">{children}</h2>,
-                          h3: ({children}) => <h3 className="text-md font-medium text-slate-300 mt-3 mb-1">{children}</h3>,
-                          p: ({children}) => <p className="text-sm text-slate-400 mb-2">{children}</p>,
-                          ul: ({children}) => <ul className="list-disc list-inside text-sm text-slate-400 space-y-1">{children}</ul>,
-                          ol: ({children}) => <ol className="list-decimal list-inside text-sm text-slate-400 space-y-1">{children}</ol>,
-                          li: ({children}) => <li className="text-slate-400">{children}</li>,
-                          strong: ({children}) => <strong className="text-white font-semibold">{children}</strong>,
+                          h2: ({children}) => <h2 className="text-lg font-semibold text-[#1e293b] mt-4 mb-2">{children}</h2>,
+                          h3: ({children}) => <h3 className="text-md font-semibold text-[#334155] mt-3 mb-1">{children}</h3>,
+                          p: ({children}) => <p className="text-sm text-[#334155] mb-2">{children}</p>,
+                          ul: ({children}) => <ul className="list-disc list-inside text-sm text-[#334155] space-y-1">{children}</ul>,
+                          ol: ({children}) => <ol className="list-decimal list-inside text-sm text-[#334155] space-y-1">{children}</ol>,
+                          li: ({children}) => <li className="text-[#334155]">{children}</li>,
+                          strong: ({children}) => <strong className="text-[#1e293b] font-semibold">{children}</strong>,
                         }}
                       >
                         {aiRecommendations.aiRecommendations}
@@ -575,15 +601,15 @@ export default function Analysis() {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-6 bg-slate-800/20 rounded-xl text-center">
-                    <Bot className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                    <p className="text-sm text-slate-500 mb-2">
+                  <div className="p-6 bg-[#f8fafc] rounded-lg text-center border border-[#e2e8f0]">
+                    <Bot className="w-10 h-10 text-[#cbd5e1] mx-auto mb-3" />
+                    <p className="text-sm text-[#64748b] mb-2">
                       {selectedPlayer 
                         ? 'Click "Get AI Analysis" to receive personalized coaching recommendations based on this player\'s performance data.'
                         : 'Select a player first to get AI-powered coaching recommendations.'}
                     </p>
                     {!selectedPlayer && (
-                      <p className="text-xs text-slate-600 mt-2">
+                      <p className="text-xs text-[#94a3b8] mt-2">
                         The AI Analysis button will be enabled once you select a player.
                       </p>
                     )}
@@ -592,13 +618,13 @@ export default function Analysis() {
               </div>
 
               {/* Info Box */}
-              <div className="card p-4 bg-slate-800/30 border-slate-700/50 animate-slide-in-up" style={{ animationDelay: '250ms' }}>
+              <div className="panel p-4 border-[var(--border-default)] bg-white animate-slide-in-up" style={{ animationDelay: '250ms' }}>
                 <div className="flex items-start gap-3">
-                  <Info className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-slate-400">
-                    <p className="text-slate-300 font-medium mb-1">About this prediction</p>
+                  <Info className="w-5 h-5 text-[#64748b] flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-[#64748b]">
+                    <p className="text-[#334155] font-semibold mb-1">About this prediction</p>
                     <p>
-                      Risk analysis uses data from the <strong>last 45 days only</strong>. If no recent training data is available, 
+                      Risk analysis uses data from the <strong className="text-[#1e293b]">last 45 days only</strong>. If no recent training data is available, 
                       risk is set to LOW. AI recommendations are powered by Ollama (when available) or use rule-based fallback.
                     </p>
                   </div>
@@ -606,28 +632,28 @@ export default function Analysis() {
               </div>
             </>
           ) : predictMutation.isError ? (
-            <div className="card p-8 text-center animate-slide-in-up">
-              <div className="w-16 h-16 mx-auto mb-4 bg-red-500/10 rounded-2xl flex items-center justify-center">
-                <AlertTriangle className="w-8 h-8 text-red-400" />
+            <div className="panel panel--elevated p-8 bg-white text-center animate-slide-in-up">
+              <div className="w-16 h-16 mx-auto mb-4 bg-[#dc2626]/10 border border-[#dc2626]/20 rounded-lg flex items-center justify-center">
+                <AlertTriangle className="w-8 h-8 text-[#dc2626]" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Analysis Failed</h3>
-              <p className="text-slate-400 text-sm mb-4">
+              <h3 className="text-lg font-semibold text-[#1e293b] mb-2">Analysis Failed</h3>
+              <p className="text-[#64748b] text-sm mb-4">
                 {(predictMutation.error as Error)?.message || 'Could not analyze player risk. Please try again.'}
               </p>
               <button
                 onClick={handlePredict}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-white transition-colors"
+                className="px-4 py-2 bg-[#06b6d4] hover:bg-[#0891b2] rounded-lg text-sm text-white transition-colors border border-[#06b6d4]"
               >
                 Try Again
               </button>
             </div>
           ) : (
-            <div className="card p-12 text-center">
-              <div className="w-20 h-20 mx-auto mb-6 bg-slate-800/50 rounded-2xl flex items-center justify-center">
-                <Shield className="w-10 h-10 text-slate-600" />
+            <div className="panel panel--elevated p-12 bg-white text-center">
+              <div className="w-20 h-20 mx-auto mb-6 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg flex items-center justify-center">
+                <Shield className="w-10 h-10 text-[#cbd5e1]" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Ready to Analyze</h3>
-              <p className="text-slate-500 text-sm max-w-md mx-auto">
+              <h3 className="text-lg font-semibold text-[#1e293b] mb-2">Ready to Analyze</h3>
+              <p className="text-[#64748b] text-sm max-w-md mx-auto">
                 Select a player from the list and click "Analyze Risk" to get a comprehensive injury risk assessment with AI-powered recommendations.
               </p>
             </div>

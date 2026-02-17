@@ -52,9 +52,19 @@ class MLService:
         self._load_saved_models()
     
     def _load_saved_models(self):
+        # Ensure models directory exists
+        os.makedirs(MODELS_DIR, exist_ok=True)
+        
         regression_path = os.path.join(MODELS_DIR, 'regression_model.pkl')
         classification_path = os.path.join(MODELS_DIR, 'classification_model.pkl')
+        load_joblib_path = os.path.join(MODELS_DIR, 'load_model.joblib')
+        risk_joblib_path = os.path.join(MODELS_DIR, 'risk_model.joblib')
         
+        logger.info(f"Looking for models in: {MODELS_DIR}")
+        logger.info(f"Regression path exists: {os.path.exists(regression_path)}")
+        logger.info(f"Load joblib exists: {os.path.exists(load_joblib_path)}")
+        
+        # Try loading regression model (pickle format)
         if os.path.exists(regression_path):
             try:
                 with open(regression_path, 'rb') as f:
@@ -62,10 +72,22 @@ class MLService:
                 self.load_pipeline = data.get('model')
                 self.load_metrics = data.get('metrics')
                 self.load_features = data.get('features', [])
-                logger.info(f"Loaded regression model from {regression_path}")
+                logger.info(f"✓ Loaded regression model from {regression_path}")
             except Exception as e:
                 logger.warning(f"Could not load regression model: {e}")
         
+        # Try loading load model (joblib format) if pickle didn't work
+        if self.load_pipeline is None and os.path.exists(load_joblib_path):
+            try:
+                self.load_pipeline = joblib.load(load_joblib_path)
+                cols_path = os.path.join(MODELS_DIR, 'load_feature_cols.joblib')
+                if os.path.exists(cols_path):
+                    self.load_features = joblib.load(cols_path)
+                logger.info(f"✓ Loaded load model from {load_joblib_path}")
+            except Exception as e:
+                logger.warning(f"Could not load load model: {e}")
+        
+        # Try loading classification model (pickle format)
         if os.path.exists(classification_path):
             try:
                 with open(classification_path, 'rb') as f:
@@ -73,33 +95,23 @@ class MLService:
                 self.risk_pipeline = data.get('model')
                 self.risk_metrics = data.get('metrics')
                 self.risk_features = data.get('features', [])
-                logger.info(f"Loaded classification model from {classification_path}")
+                logger.info(f"✓ Loaded classification model from {classification_path}")
             except Exception as e:
                 logger.warning(f"Could not load classification model: {e}")
         
-        if self.load_pipeline is None:
-            load_path = os.path.join(MODELS_DIR, 'load_model.joblib')
-            if os.path.exists(load_path):
-                try:
-                    self.load_pipeline = joblib.load(load_path)
-                    cols_path = os.path.join(MODELS_DIR, 'load_feature_cols.joblib')
-                    if os.path.exists(cols_path):
-                        self.load_features = joblib.load(cols_path)
-                    logger.info("Loaded local load prediction model")
-                except Exception as e:
-                    logger.warning(f"Could not load local load model: {e}")
+        # Try loading risk model (joblib format) if pickle didn't work
+        if self.risk_pipeline is None and os.path.exists(risk_joblib_path):
+            try:
+                self.risk_pipeline = joblib.load(risk_joblib_path)
+                cols_path = os.path.join(MODELS_DIR, 'risk_feature_cols.joblib')
+                if os.path.exists(cols_path):
+                    self.risk_features = joblib.load(cols_path)
+                logger.info(f"✓ Loaded risk model from {risk_joblib_path}")
+            except Exception as e:
+                logger.warning(f"Could not load risk model: {e}")
         
-        if self.risk_pipeline is None:
-            risk_path = os.path.join(MODELS_DIR, 'risk_model.joblib')
-            if os.path.exists(risk_path):
-                try:
-                    self.risk_pipeline = joblib.load(risk_path)
-                    cols_path = os.path.join(MODELS_DIR, 'risk_feature_cols.joblib')
-                    if os.path.exists(cols_path):
-                        self.risk_features = joblib.load(cols_path)
-                    logger.info("Loaded local risk prediction model")
-                except Exception as e:
-                    logger.warning(f"Could not load local risk model: {e}")
+        # Final status log
+        logger.info(f"Model loading complete - Load: {self.load_pipeline is not None}, Risk: {self.risk_pipeline is not None}")
     
     def get_available_algorithms(self) -> Dict[str, List[Dict[str, str]]]:
         regression_algos = [

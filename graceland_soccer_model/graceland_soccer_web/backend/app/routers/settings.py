@@ -40,7 +40,15 @@ async def get_team_status():
         status = data_service.get_team_status()
         return ApiResponse(success=True, data=status)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error getting team status: {e}", exc_info=True)
+        # Return default structure on error instead of raising
+        return ApiResponse(success=True, data={
+            'currentTeam': 'mens',
+            'mens': { 'loaded': False, 'rowCount': 0 },
+            'womens': { 'loaded': False, 'rowCount': 0 }
+        })
 
 
 @router.post("/switch-team", response_model=ApiResponse)

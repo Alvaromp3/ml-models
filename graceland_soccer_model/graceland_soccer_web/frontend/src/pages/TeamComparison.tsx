@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useTeam } from '../contexts/TeamContext';
 import { dashboardApi, playersApi } from '../services/api';
-import { BarChart3, TrendingUp, Users, Zap, Activity, Gauge, Award } from 'lucide-react';
+import { BarChart3, TrendingUp, Users, Zap, Activity, Gauge } from 'lucide-react';
 
 export default function TeamComparison() {
   const { teamStatus, currentTeam } = useTeam();
@@ -25,6 +25,8 @@ export default function TeamComparison() {
   const mensPlayers = (currentTeam === 'mens' && teamStatus?.mens?.loaded) ? currentPlayers : null;
   const womensPlayers = (currentTeam === 'womens' && teamStatus?.womens?.loaded) ? currentPlayers : null;
   
+  const bothTeamsLoaded = Boolean(teamStatus?.mens?.loaded && teamStatus?.womens?.loaded);
+
   // Check if current team has data loaded
   const showCurrentTeamData = (currentTeam === 'mens' && teamStatus?.mens?.loaded) || 
                               (currentTeam === 'womens' && teamStatus?.womens?.loaded);
@@ -61,74 +63,62 @@ export default function TeamComparison() {
       mensValue: (currentTeam === 'mens' && activeKPIs) ? activeKPIs.avgTeamSpeed : (mensKPIs?.avgTeamSpeed || 0),
       womensValue: (currentTeam === 'womens' && activeKPIs) ? activeKPIs.avgTeamSpeed : (womensKPIs?.avgTeamSpeed || 0),
       icon: Gauge,
-      color: 'text-green-400',
+      color: 'text-[#1e40af]',
       unit: 'mph',
     },
   ];
 
-  return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-6 border border-slate-700">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-3 bg-purple-600/20 rounded-lg">
-            <BarChart3 className="w-6 h-6 text-purple-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Team Comparison</h1>
-            <p className="text-slate-400">
-              {teamStatus?.mens?.loaded && teamStatus?.womens?.loaded 
-                ? "Compare Men's and Women's team performance"
-                : teamStatus?.mens?.loaded 
-                  ? "Men's team performance metrics"
-                  : teamStatus?.womens?.loaded
-                    ? "Women's team performance metrics"
-                    : "Team performance overview"}
-            </p>
-          </div>
+  if (!bothTeamsLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="panel panel--elevated p-12 text-center max-w-xl">
+          <BarChart3 className="w-12 h-12 text-[var(--text-tertiary)] mx-auto mb-4" />
+          <h2 className="section-title mb-2">Team comparison</h2>
+          <p className="caption">
+            Load data for both Men's and Women's teams in the Dashboard to compare.
+          </p>
         </div>
       </div>
+    );
+  }
 
-      {/* Team Status */}
+  return (
+    <div className="space-y-6">
+      <p className="caption">Compare Men's and Women's team performance</p>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className={`p-4 rounded-lg border ${teamStatus?.mens?.loaded ? 'bg-blue-900/20 border-blue-700/50' : 'bg-slate-800/50 border-slate-700'}`}>
+        <div className={`panel p-4 border ${teamStatus?.mens?.loaded ? 'border-[var(--accent-performance)]/40 bg-[var(--accent-performance-muted)]' : 'border-[var(--border-default)]'}`}>
           <div className="flex items-center gap-2 mb-2">
-            <Users className={`w-5 h-5 ${teamStatus?.mens?.loaded ? 'text-blue-400' : 'text-slate-500'}`} />
-            <h3 className="font-semibold text-white">Men's Team</h3>
-            {teamStatus?.mens?.loaded && <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded">Loaded</span>}
+            <Users className={`w-5 h-5 ${teamStatus?.mens?.loaded ? 'text-[var(--accent-performance)]' : 'text-[var(--text-tertiary)]'}`} />
+            <h3 className="section-title">Men's Team</h3>
+            {teamStatus?.mens?.loaded && <span className="text-xs bg-[var(--accent-performance)] text-white px-2 py-0.5 rounded">Loaded</span>}
           </div>
           {teamStatus?.mens?.loaded ? (
-            <div className="text-sm text-slate-300">
-              <p>Players: <span className="text-blue-400 font-semibold">{teamStatus.mens.rowCount}</span></p>
-            </div>
+            <p className="text-sm text-[var(--text-secondary)]">Players: <span className="font-semibold text-[var(--text-primary)]">{teamStatus.mens.rowCount}</span></p>
           ) : (
-            <p className="text-sm text-slate-500">No data loaded</p>
+            <p className="caption">No data loaded</p>
           )}
         </div>
-        <div className={`p-4 rounded-lg border ${teamStatus?.womens?.loaded ? 'bg-pink-900/20 border-pink-700/50' : 'bg-slate-800/50 border-slate-700'}`}>
+        <div className={`panel p-4 border ${teamStatus?.womens?.loaded ? 'border-[var(--accent-performance)]/40 bg-[var(--accent-performance-muted)]' : 'border-[var(--border-default)]'}`}>
           <div className="flex items-center gap-2 mb-2">
-            <Users className={`w-5 h-5 ${teamStatus?.womens?.loaded ? 'text-pink-400' : 'text-slate-500'}`} />
-            <h3 className="font-semibold text-white">Women's Team</h3>
-            {teamStatus?.womens?.loaded && <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded">Loaded</span>}
+            <Users className={`w-5 h-5 ${teamStatus?.womens?.loaded ? 'text-[var(--accent-performance)]' : 'text-[var(--text-tertiary)]'}`} />
+            <h3 className="section-title">Women's Team</h3>
+            {teamStatus?.womens?.loaded && <span className="text-xs bg-[var(--accent-performance)] text-white px-2 py-0.5 rounded">Loaded</span>}
           </div>
           {teamStatus?.womens?.loaded ? (
-            <div className="text-sm text-slate-300">
-              <p>Players: <span className="text-pink-400 font-semibold">{teamStatus.womens.rowCount}</span></p>
-            </div>
+            <p className="text-sm text-[var(--text-secondary)]">Players: <span className="font-semibold text-[var(--text-primary)]">{teamStatus.womens.rowCount}</span></p>
           ) : (
-            <p className="text-sm text-slate-500">No data loaded</p>
+            <p className="caption">No data loaded</p>
           )}
         </div>
       </div>
 
       {/* Comparison Metrics */}
       {showCurrentTeamData ? (
-        <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-purple-400" />
-            {teamStatus?.mens?.loaded && teamStatus?.womens?.loaded 
-              ? 'Performance Comparison' 
-              : 'Team Performance Metrics'}
+        <div className="panel panel--elevated p-6">
+          <h2 className="section-title mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-[var(--accent-performance)]" />
+            Performance comparison
           </h2>
           <div className="space-y-4">
             {comparisonMetrics.map((metric, idx) => {
@@ -140,41 +130,41 @@ export default function TeamComparison() {
                 : '0.0';
               
               return (
-                <div key={idx} className="bg-slate-800/30 p-4 rounded-lg border border-slate-700/50">
+                <div key={idx} className="p-4 rounded border border-[var(--border-default)] bg-[var(--bg-surface)]">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Icon className={`w-5 h-5 ${metric.color}`} />
-                      <h3 className="font-semibold text-white">{metric.name}</h3>
+                      <Icon className="w-5 h-5 text-[var(--accent-performance)]" />
+                      <h3 className="section-title">{metric.name}</h3>
                     </div>
                   </div>
                   <div className={`grid gap-4 ${hasBothTeams ? 'grid-cols-2' : 'grid-cols-1'}`}>
                     {(currentTeam === 'mens' && teamStatus?.mens?.loaded && activeKPIs) && (
-                      <div className="text-center p-3 bg-blue-900/20 rounded-lg">
-                        <p className="text-xs text-slate-400 mb-1">Men's</p>
-                        <p className="text-2xl font-bold text-blue-400">
+                      <div className="text-center p-3 rounded border border-[var(--accent-performance)]/20 bg-[var(--accent-performance-muted)]">
+                        <p className="caption mb-1">Men's</p>
+                        <p className="metric-value text-xl text-[var(--accent-performance)]">
                           {typeof metric.mensValue === 'number' ? metric.mensValue.toFixed(1) : metric.mensValue}
-                          {metric.unit && <span className="text-sm ml-1">{metric.unit}</span>}
+                          {metric.unit && <span className="text-sm ml-1 font-normal">{metric.unit}</span>}
                         </p>
                       </div>
                     )}
                     {(currentTeam === 'womens' && teamStatus?.womens?.loaded && activeKPIs) && (
-                      <div className="text-center p-3 bg-pink-900/20 rounded-lg">
-                        <p className="text-xs text-slate-400 mb-1">Women's</p>
-                        <p className="text-2xl font-bold text-pink-400">
+                      <div className="text-center p-3 rounded border border-[var(--accent-performance)]/20 bg-[var(--accent-performance-muted)]">
+                        <p className="caption mb-1">Women's</p>
+                        <p className="metric-value text-xl text-[var(--accent-performance)]">
                           {typeof metric.womensValue === 'number' ? metric.womensValue.toFixed(1) : metric.womensValue}
-                          {metric.unit && <span className="text-sm ml-1">{metric.unit}</span>}
+                          {metric.unit && <span className="text-sm ml-1 font-normal">{metric.unit}</span>}
                         </p>
                       </div>
                     )}
                   </div>
                   {hasBothTeams && (
-                    <div className="mt-3 pt-3 border-t border-slate-700">
+                    <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-400">Difference</span>
-                        <span className={`font-semibold ${difference >= 0 ? 'text-blue-400' : 'text-pink-400'}`}>
+                        <span className="text-[var(--text-secondary)]">Difference</span>
+                        <span className={`font-semibold ${difference >= 0 ? 'text-[var(--accent-performance)]' : 'text-[var(--accent-risk-high)]'}`}>
                           {difference >= 0 ? '+' : ''}{typeof difference === 'number' ? difference.toFixed(1) : difference}
                           {metric.unit && <span className="ml-1">{metric.unit}</span>}
-                          <span className="ml-2 text-slate-500">({percentageDiff}%)</span>
+                          <span className="ml-2 text-[var(--text-tertiary)]">({percentageDiff}%)</span>
                         </span>
                       </div>
                     </div>
@@ -184,44 +174,38 @@ export default function TeamComparison() {
             })}
           </div>
         </div>
-      ) : (
-        <div className="bg-slate-900/50 rounded-xl p-12 border border-slate-700 text-center">
-          <Award className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-          <p className="text-slate-400 mb-2">No team data loaded</p>
-          <p className="text-slate-500 text-sm">Upload CSV files for Men's or Women's team to view performance metrics</p>
-        </div>
-      )}
+      ) : null}
 
       {/* Additional Insights */}
       {showCurrentTeamData && currentPlayers && (
         <div className="grid grid-cols-1 gap-4">
           {currentTeam === 'mens' && mensPlayers && (
-            <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-700">
-              <h3 className="font-semibold text-white mb-4">Men's Team Top Performers</h3>
+            <div className="panel panel--elevated p-6">
+              <h3 className="section-title mb-4">Top — Men's</h3>
               <div className="space-y-2">
                 {mensPlayers.slice(0, 5).map((player, idx) => (
-                  <div key={player.id} className="flex items-center justify-between p-2 bg-slate-800/30 rounded-lg">
+                  <div key={player.id} className="flex items-center justify-between py-2 px-2 rounded border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-500 text-sm">#{idx + 1}</span>
-                      <span className="text-white text-sm">{player.name}</span>
+                      <span className="caption">#{idx + 1}</span>
+                      <span className="text-sm text-[var(--text-primary)]">{player.name}</span>
                     </div>
-                    <span className="text-blue-400 font-semibold">{player.avgLoad}</span>
+                    <span className="font-semibold text-[var(--accent-performance)]">{player.avgLoad}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
           {currentTeam === 'womens' && womensPlayers && (
-            <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-700">
-              <h3 className="font-semibold text-white mb-4">Women's Team Top Performers</h3>
+            <div className="panel panel--elevated p-6">
+              <h3 className="section-title mb-4">Top — Women's</h3>
               <div className="space-y-2">
                 {womensPlayers.slice(0, 5).map((player, idx) => (
-                  <div key={player.id} className="flex items-center justify-between p-2 bg-slate-800/30 rounded-lg">
+                  <div key={player.id} className="flex items-center justify-between py-2 px-2 rounded border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-500 text-sm">#{idx + 1}</span>
-                      <span className="text-white text-sm">{player.name}</span>
+                      <span className="caption">#{idx + 1}</span>
+                      <span className="text-sm text-[var(--text-primary)]">{player.name}</span>
                     </div>
-                    <span className="text-pink-400 font-semibold">{player.avgLoad}</span>
+                    <span className="font-semibold text-[var(--accent-performance)]">{player.avgLoad}</span>
                   </div>
                 ))}
               </div>

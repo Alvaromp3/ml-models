@@ -1,23 +1,16 @@
 import { useState, useRef } from 'react';
-import { 
-  Users, 
-  Zap, 
-  AlertTriangle, 
-  Gauge, 
-  Upload, 
-  Database, 
-  FileUp, 
-  CheckCircle, 
-  Activity,
-  TrendingUp,
-  Shield,
-  Calendar,
+import {
+  FileUp,
+  Database,
+  CheckCircle,
+  AlertTriangle,
   Clock,
-  Sparkles,
-  ChevronRight
+  ChevronRight,
+  Upload,
 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import KPICard from '../components/dashboard/KPICard';
+import { Link } from 'react-router-dom';
+import MetricBlock from '../components/dashboard/MetricBlock';
 import LoadChart from '../components/charts/LoadChart';
 import RiskDonut from '../components/charts/RiskDonut';
 import PlayerList from '../components/dashboard/PlayerList';
@@ -31,13 +24,15 @@ import {
 } from '../hooks/useDashboard';
 import { dataApi } from '../services/api';
 import { useTeam } from '../contexts/TeamContext';
+import TeamSelector from '../components/layout/TeamSelector';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadStatus, setUploadStatus] = useState<{ success: boolean; message: string } | null>(null);
-  const { currentTeam } = useTeam();
-  
+  const { currentTeam, teamStatus } = useTeam();
+  const hasAnyData = Boolean(teamStatus?.mens?.loaded || teamStatus?.womens?.loaded);
+
   const { data: dataStatus } = useDataStatus();
   const { data: kpis } = useDashboardKPIs();
   const { data: loadHistory } = useLoadHistory();
@@ -49,32 +44,32 @@ export default function Dashboard() {
     mutationFn: dataApi.loadSample,
     onSuccess: () => {
       queryClient.invalidateQueries();
-      setUploadStatus({ success: true, message: 'Sample data loaded successfully!' });
+      setUploadStatus({ success: true, message: 'Sample data loaded successfully.' });
     },
     onError: () => {
-      setUploadStatus({ success: false, message: 'Error loading data. Make sure backend is running on port 8000.' });
-    }
+      setUploadStatus({ success: false, message: 'Error loading data. Ensure backend is running on port 8000.' });
+    },
   });
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => dataApi.upload(file, currentTeam),
     onSuccess: (data) => {
       queryClient.invalidateQueries();
-      setUploadStatus({ 
-        success: true, 
-        message: `CSV loaded: ${data.rowCount} rows, ${data.players.length} players` 
+      setUploadStatus({
+        success: true,
+        message: `CSV loaded: ${data.rowCount} rows, ${data.players.length} players`,
       });
     },
     onError: (error: Error) => {
-      setUploadStatus({ success: false, message: `Upload error: ${error.message}` });
-    }
+      setUploadStatus({ success: false, message: error?.message || 'Upload failed. Check file format and try again.' });
+    },
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.name.endsWith('.csv')) {
-        setUploadStatus({ success: false, message: 'Please select a CSV file' });
+        setUploadStatus({ success: false, message: 'Please select a CSV file.' });
         return;
       }
       setUploadStatus(null);
@@ -82,126 +77,80 @@ export default function Dashboard() {
     }
   };
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleUploadClick = () => fileInputRef.current?.click();
 
-  // Welcome screen when no data loaded
-  if (!dataStatus?.loaded) {
+  const teamLabel = currentTeam === 'mens' ? "Men's Team" : "Women's Team";
+
+  if (!hasAnyData) {
     return (
-      <div className="min-h-[85vh] flex items-center justify-center">
-        <div className="max-w-lg w-full animate-fade-in">
-          <div className="card p-8 text-center relative overflow-hidden">
-            {/* Background decoration */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500" />
-            <div className="absolute -top-24 -right-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl" />
-            <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl" />
-            
-            {/* Icon */}
-            <div className="relative w-20 h-20 mx-auto mb-6">
-              <div className="absolute inset-0 bg-slate-800/50 rounded-2xl rotate-6 opacity-50" />
-              <div className="relative w-full h-full bg-slate-800/60 border border-slate-700/50 rounded-2xl flex items-center justify-center">
-                <Activity className="w-10 h-10 text-slate-300" />
-              </div>
-            </div>
-
-            <h1 className="text-3xl font-bold text-white mb-3">
-              Graceland Soccer Analytics
-            </h1>
-            <p className="text-slate-400 text-sm mb-8 leading-relaxed max-w-sm mx-auto">
-              Upload your Catapult GPS data to analyze player performance, predict injury risks, and get AI-powered recommendations.
+      <div className="min-h-[80vh] flex items-center justify-center px-4">
+        <div className="max-w-md w-full animate-fade-in">
+          <div className="panel panel--elevated p-8 text-center">
+            <h2 className="page-title mb-2">Graceland Soccer Analytics</h2>
+            <p className="text-[var(--text-secondary)] text-sm mb-6">
+              Upload Catapult GPS data to analyze performance, injury risk, and recommendations.
             </p>
-
-            {/* Status message */}
+            <p className="caption mb-3">Upload CSV for:</p>
+            <div className="flex justify-center mb-6">
+              <TeamSelector />
+            </div>
+            <p className="caption mb-6">The CSV will be assigned to the team selected above.</p>
             {uploadStatus && (
-              <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 text-sm ${
-                uploadStatus.success 
-                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
-                  : 'bg-red-500/10 border border-red-500/30 text-red-400'
-              }`}>
-                {uploadStatus.success ? (
-                  <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                ) : (
-                  <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                )}
+              <div
+                className={`mb-6 p-3 rounded flex items-center gap-2 text-sm border ${
+                  uploadStatus.success
+                    ? 'bg-[var(--accent-performance-muted)] border-[var(--accent-performance)]/30 text-[var(--accent-performance)]'
+                    : 'bg-[var(--accent-risk-high)]/10 border-[var(--accent-risk-high)]/30 text-[var(--accent-risk-high)]'
+                }`}
+              >
+                {uploadStatus.success ? <CheckCircle className="w-4 h-4 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
                 <span>{uploadStatus.message}</span>
               </div>
             )}
-            
-            {/* Buttons */}
             <div className="space-y-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              
+              <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
               <button
+                type="button"
                 onClick={handleUploadClick}
                 disabled={uploadMutation.isPending}
-                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-xl font-semibold text-white transition-all disabled:opacity-50"
+                className="btn btn--primary w-full gap-2 py-3"
               >
                 {uploadMutation.isPending ? (
                   <>
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Uploading...
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" aria-hidden><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    Uploading…
                   </>
                 ) : (
                   <>
-                    <FileUp className="w-5 h-5" />
+                    <FileUp className="w-4 h-4" />
                     Upload Catapult CSV
                   </>
                 )}
               </button>
-
-              <div className="flex items-center gap-3 text-xs text-slate-500 py-2">
-                <div className="flex-1 h-px bg-slate-800" />
-                <span>or try demo data</span>
-                <div className="flex-1 h-px bg-slate-800" />
+              <div className="flex items-center gap-3 py-2">
+                <span className="flex-1 h-px bg-[var(--border-subtle)]" />
+                <span className="caption">or</span>
+                <span className="flex-1 h-px bg-[var(--border-subtle)]" />
               </div>
-              
               <button
+                type="button"
                 onClick={() => loadSampleMutation.mutate()}
                 disabled={loadSampleMutation.isPending}
-                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl font-medium text-slate-300 transition-all disabled:opacity-50"
+                className="btn btn--secondary w-full gap-2 py-3"
               >
                 {loadSampleMutation.isPending ? (
                   <>
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Loading...
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" aria-hidden><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    Loading…
                   </>
                 ) : (
                   <>
-                    <Database className="w-5 h-5" />
-                    Load Demo Data
-                    <span className="px-2 py-0.5 bg-slate-700/50 text-slate-400 text-[10px] rounded-full">24 players</span>
+                    <Database className="w-4 h-4" />
+                    Load Sample Data
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-subtle)] text-[var(--text-tertiary)]">24 players</span>
                   </>
                 )}
               </button>
-            </div>
-
-            {/* Features */}
-            <div className="mt-8 pt-6 border-t border-slate-800 grid grid-cols-3 gap-4 text-center">
-              <div className="p-3">
-                <Shield className="w-5 h-5 text-slate-400 mx-auto mb-2" />
-                <p className="text-[10px] text-slate-500">Injury Risk</p>
-              </div>
-              <div className="p-3">
-                <TrendingUp className="w-5 h-5 text-slate-400 mx-auto mb-2" />
-                <p className="text-[10px] text-slate-500">Performance</p>
-              </div>
-              <div className="p-3">
-                <Sparkles className="w-5 h-5 text-slate-400 mx-auto mb-2" />
-                <p className="text-[10px] text-slate-500">AI Insights</p>
-              </div>
             </div>
           </div>
         </div>
@@ -209,202 +158,164 @@ export default function Dashboard() {
     );
   }
 
-  // Calculate total from risk distribution
-  const totalPlayers = riskDistribution ? (riskDistribution.low + riskDistribution.medium + riskDistribution.high) : 0;
+  if (!dataStatus?.loaded) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <p className="section-title text-[var(--text-secondary)]">Dashboard – {teamLabel}</p>
+        <p className="caption">No data for this team. Upload a CSV to view metrics.</p>
+        <div className="panel panel--elevated p-8 text-center max-w-lg mx-auto">
+          <h3 className="section-title mb-2">No data for {teamLabel}</h3>
+          <p className="text-sm text-[var(--text-secondary)] mb-6">
+            Upload a Catapult CSV for this team to view load, risk, and performance.
+          </p>
+          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
+          <button
+            type="button"
+            onClick={handleUploadClick}
+            disabled={uploadMutation.isPending}
+            className="btn btn--primary gap-2"
+          >
+            {uploadMutation.isPending ? (
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" aria-hidden><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+            ) : (
+              <><FileUp className="w-4 h-4" /> Upload CSV for {teamLabel}</>
+            )}
+          </button>
+          {uploadStatus && (
+            <p className={`mt-4 text-sm ${uploadStatus.success ? 'text-[var(--accent-performance)]' : 'text-[var(--accent-risk-high)]'}`}>
+              {uploadStatus.message}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const totalPlayers = riskDistribution
+    ? riskDistribution.low + riskDistribution.medium + riskDistribution.high
+    : 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between animate-fade-in">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <div className="p-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
-              <Activity className="w-5 h-5 text-slate-300" />
-            </div>
-            Performance Dashboard
-          </h1>
-          <p className="text-slate-500 text-sm mt-2 ml-12">
-            Real-time insights and injury risk prediction
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-xs text-slate-400 flex items-center gap-2">
-            <Calendar className="w-3.5 h-3.5" />
-            {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-          <button
-            onClick={handleUploadClick}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-lg text-xs font-medium text-slate-300 hover:text-white transition-all"
-          >
-            <Upload className="w-3.5 h-3.5" />
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <p className="caption">Real-time metrics and injury risk · {teamLabel}</p>
+        <div className="flex items-center gap-2">
+          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
+          <button type="button" onClick={handleUploadClick} className="btn btn--secondary gap-2 text-sm">
+            <Upload className="w-4 h-4" />
             Upload CSV
           </button>
         </div>
       </div>
 
-      {/* Status message */}
       {uploadStatus && (
-        <div className={`p-4 rounded-xl flex items-center justify-between text-sm animate-slide-in-up ${
-          uploadStatus.success 
-            ? 'bg-emerald-500/10 border border-emerald-500/30' 
-            : 'bg-red-500/10 border border-red-500/30'
-        }`}>
-          <div className="flex items-center gap-3">
-            {uploadStatus.success ? (
-              <CheckCircle className="w-5 h-5 text-emerald-400" />
-            ) : (
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-            )}
-            <span className={uploadStatus.success ? 'text-emerald-400' : 'text-red-400'}>
-              {uploadStatus.message}
-            </span>
+        <div
+          className={`flex items-center justify-between p-3 rounded border text-sm animate-slide-in-up ${
+            uploadStatus.success
+              ? 'bg-[var(--accent-performance-muted)] border-[var(--accent-performance)]/30 text-[var(--accent-performance)]'
+              : 'bg-[var(--accent-risk-high)]/10 border-[var(--accent-risk-high)]/30 text-[var(--accent-risk-high)]'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {uploadStatus.success ? <CheckCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+            <span>{uploadStatus.message}</span>
           </div>
-          <button 
-            onClick={() => setUploadStatus(null)}
-            className="text-slate-400 hover:text-white text-lg leading-none px-2"
-          >
-            ×
-          </button>
+          <button type="button" onClick={() => setUploadStatus(null)} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]" aria-label="Dismiss">×</button>
         </div>
       )}
 
-      {/* Important Notice about 45 days */}
-      <div className="p-4 bg-slate-800/30 border border-slate-700/50 rounded-xl flex items-start gap-3 animate-fade-in">
-        <Clock className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
+      {/* Executive summary */}
+      <div className="panel p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <p className="metric-label mb-1">Actionable alerts</p>
+            {highRiskPlayers && highRiskPlayers.length > 0 ? (
+              <p className="text-sm text-[var(--text-primary)]">
+                <span className="font-semibold text-[var(--accent-risk-high)]">{highRiskPlayers.length} player{highRiskPlayers.length > 1 ? 's' : ''} at high risk</span>
+                {' — consider rest or reduce load.'}
+              </p>
+            ) : (
+              <p className="text-sm text-[var(--text-secondary)]">No players at high risk.</p>
+            )}
+            <Link to="/players?filter=high-risk" className="text-xs font-medium text-[var(--accent-performance)] hover:underline mt-1 inline-block">View players →</Link>
+          </div>
+          <div>
+            <p className="metric-label mb-1">Period metrics</p>
+            <p className="text-sm text-[var(--text-primary)]">
+              Avg Load <strong className="tabular-nums">{kpis?.avgTeamLoad ?? 0}</strong>
+              {' · '}
+              Avg Speed <strong className="tabular-nums">{kpis?.avgTeamSpeed ?? 0}</strong> mph
+            </p>
+            <Link to="/analysis" className="text-xs font-medium text-[var(--accent-performance)] hover:underline mt-1 inline-block">Detailed analysis →</Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-start gap-3 p-3 rounded border border-[var(--border-default)] bg-[var(--bg-elevated)]">
+        <Clock className="w-4 h-4 text-[var(--text-tertiary)] flex-shrink-0 mt-0.5" />
         <div className="text-sm">
-          <p className="text-slate-300 font-medium">Risk Assessment Period</p>
-          <p className="text-slate-400 text-xs mt-1">
-            Injury risk is calculated using only the <strong>last 45 days</strong> of data from today's date. 
-            Players without recent training data are marked as <strong className="text-slate-300">Low Risk</strong>.
+          <p className="font-medium text-[var(--text-primary)]">Risk assessment period</p>
+          <p className="caption mt-0.5">
+            Injury risk uses the <strong className="text-[var(--text-primary)]">last 45 days</strong> (Settings). Without recent data, risk is marked low.
           </p>
         </div>
       </div>
 
-      {/* Alerts Widget */}
       {highRiskPlayers && highRiskPlayers.length > 0 && (
-        <div className="card p-4 bg-red-500/10 border border-red-500/30 rounded-xl animate-slide-in-up">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-500/20 rounded-lg">
-                <AlertTriangle className="w-5 h-5 text-red-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-white">⚠️ Alert: High Risk Players Detected</h3>
-                <p className="text-sm text-slate-400">
-                  {highRiskPlayers.length} player{highRiskPlayers.length > 1 ? 's' : ''} require immediate attention
-                </p>
-              </div>
-            </div>
-            <a
-              href="/analysis"
-              className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              View Details
-              <ChevronRight className="w-4 h-4" />
-            </a>
+        <div className="flex items-center justify-between p-4 rounded border border-[var(--accent-risk-high)]/30 bg-[var(--accent-risk-high)]/10 animate-slide-in-up">
+          <div>
+            <p className="section-title">High risk players</p>
+            <p className="caption mt-0.5">{highRiskPlayers.length} player{highRiskPlayers.length > 1 ? 's' : ''} require attention</p>
           </div>
+          <Link
+            to="/analysis"
+            className="btn btn--primary gap-1.5 text-sm bg-[var(--accent-risk-high)] border-[var(--accent-risk-high)] hover:opacity-90"
+          >
+            View details
+            <ChevronRight className="w-4 h-4" />
+          </Link>
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          title="Total Players"
-          value={kpis?.totalPlayers ?? 0}
-          change={kpis?.totalPlayersChange ?? 0}
-          icon={Users}
-          subtitle="active roster"
-          delay={0}
-          sparklineData={loadHistory?.slice(-7).map(d => d.avgLoad) || []}
-        />
-        <KPICard
-          title="Avg Team Load"
-          value={`${kpis?.avgTeamLoad ?? 0}`}
-          change={kpis?.avgTeamLoadChange ?? 0}
-          icon={Zap}
-          subtitle="units per session"
-          delay={50}
-          sparklineData={loadHistory?.slice(-7).map(d => d.avgLoad) || []}
-        />
-        <KPICard
-          title="High Risk Players"
-          value={kpis?.highRiskPlayers ?? 0}
-          change={0}
-          icon={AlertTriangle}
-          subtitle="last 45 days"
-          variant="warning"
-          delay={100}
-        />
-        <KPICard
-          title="Avg Team Speed"
-          value={`${kpis?.avgTeamSpeed ?? 0}`}
-          change={kpis?.avgTeamSpeedChange ?? 0}
-          icon={Gauge}
-          subtitle="mph"
-          variant="success"
-          delay={150}
-        />
+      {/* Metrics row — not cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <MetricBlock value={kpis?.totalPlayers ?? 0} label="Active roster" sublabel="players" />
+        <MetricBlock value={kpis?.avgTeamLoad ?? 0} label="Average load" sublabel="units/session" />
+        <MetricBlock value={kpis?.highRiskPlayers ?? 0} label="High risk" sublabel="last 45 days" valueClassName="text-[var(--accent-risk-high)]" />
+        <MetricBlock value={kpis?.avgTeamSpeed ?? 0} label="Average speed" sublabel="mph" />
       </div>
 
-      {/* Charts Row */}
+      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Load Chart - Takes more space */}
         <div className="lg:col-span-2">
           <LoadChart data={loadHistory ?? []} />
         </div>
-        
-        {/* Risk Distribution */}
-        <div className="card p-6">
+        <div className="panel panel--elevated">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-white flex items-center gap-2">
-              <Shield className="w-4 h-4 text-slate-400" />
-              Risk Distribution
-            </h3>
-            <span className="text-xs text-slate-500">{totalPlayers} players</span>
+            <h3 className="section-title">Risk distribution</h3>
+            <span className="caption">{totalPlayers} players</span>
           </div>
-          
           <RiskDonut data={riskDistribution ?? { low: 0, medium: 0, high: 0 }} />
-          
-          {/* Legend */}
           <div className="mt-4 grid grid-cols-3 gap-2">
-            <div className="text-center p-3 bg-emerald-500/10 rounded-lg">
-              <p className="text-2xl font-bold text-emerald-400">{riskDistribution?.low ?? 0}</p>
-              <p className="text-[10px] text-slate-500 mt-1">Low Risk</p>
+            <div className="text-center p-2 rounded border border-[var(--border-subtle)]">
+              <p className="metric-value text-lg text-[var(--risk-low)]">{riskDistribution?.low ?? 0}</p>
+              <p className="metric-label mt-0.5">Low</p>
             </div>
-            <div className="text-center p-3 bg-yellow-500/10 rounded-lg">
-              <p className="text-2xl font-bold text-yellow-400">{riskDistribution?.medium ?? 0}</p>
-              <p className="text-[10px] text-slate-500 mt-1">Medium</p>
+            <div className="text-center p-2 rounded border border-[var(--border-subtle)]">
+              <p className="metric-value text-lg text-[var(--risk-medium)]">{riskDistribution?.medium ?? 0}</p>
+              <p className="metric-label mt-0.5">Medium</p>
             </div>
-            <div className="text-center p-3 bg-red-500/10 rounded-lg">
-              <p className="text-2xl font-bold text-red-400">{riskDistribution?.high ?? 0}</p>
-              <p className="text-[10px] text-slate-500 mt-1">High Risk</p>
+            <div className="text-center p-2 rounded border border-[var(--border-subtle)]">
+              <p className="metric-value text-lg text-[var(--risk-high)]">{riskDistribution?.high ?? 0}</p>
+              <p className="metric-label mt-0.5">High</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Player Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PlayerList
-          title="High Risk Players"
-          players={highRiskPlayers ?? []}
-          type="risk"
-          viewAllLink="/players?filter=high-risk"
-        />
-        <PlayerList
-          title="Top Performers"
-          players={topPerformers ?? []}
-          type="top"
-          viewAllLink="/players"
-        />
+        <PlayerList title="High risk players" players={highRiskPlayers ?? []} type="risk" viewAllLink="/players?filter=high-risk" />
+        <PlayerList title="Top performers" players={topPerformers ?? []} type="top" viewAllLink="/players" />
       </div>
     </div>
   );

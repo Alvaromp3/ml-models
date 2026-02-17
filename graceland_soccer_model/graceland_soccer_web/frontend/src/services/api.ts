@@ -46,7 +46,7 @@ export const playersApi = {
   },
 
   getById: async (id: string): Promise<PlayerDetail> => {
-    const { data } = await api.get<ApiResponse<PlayerDetail>>(`/players/${id}`);
+    const { data } = await api.get<ApiResponse<PlayerDetail>>(`/players/detail/${id}`);
     return data.data!;
   },
 
@@ -61,7 +61,7 @@ export const playersApi = {
   },
 
   getDetail: async (playerId: string): Promise<any> => {
-    const { data } = await api.get<ApiResponse<any>>(`/players/${playerId}`);
+    const { data } = await api.get<ApiResponse<any>>(`/players/detail/${playerId}`);
     return data.data!;
   },
 
@@ -102,10 +102,11 @@ export const playersApi = {
 
 // Analysis endpoints
 export const analysisApi = {
-  predictLoad: async (playerId: string, features: Record<string, number>): Promise<LoadPrediction> => {
-    const { data } = await api.post<ApiResponse<LoadPrediction>>('/analysis/predict-load', {
-      playerId,
-      features,
+  predictLoad: async (params: { playerId: string; features: Record<string, number>; sessionType?: string }): Promise<LoadPrediction & { predictedLoad: number; confidence?: number; method?: string; sessionType?: string }> => {
+    const { data } = await api.post<ApiResponse<any>>('/analysis/predict-load', {
+      playerId: params.playerId,
+      features: params.features,
+      sessionType: params.sessionType ?? 'match',
     });
     return data.data!;
   },
@@ -173,14 +174,27 @@ export const getModelStatus = trainingApi.getModelStatus;
 // Data endpoints
 export const dataApi = {
   upload: async (file: File, team: string = 'mens'): Promise<UploadResult> => {
+    const MAX_SIZE_MB = 15;
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      throw new Error(`File too large. Maximum size is ${MAX_SIZE_MB} MB.`);
+    }
     const formData = new FormData();
     formData.append('file', file);
-    const { data } = await api.post<ApiResponse<UploadResult>>(`/data/upload?team=${team}`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return data.data!;
+    try {
+      const { data } = await api.post<ApiResponse<UploadResult>>(`/data/upload?team=${team}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      });
+      return data.data!;
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { detail?: string | string[] } }; message?: string };
+      const detail = ax.response?.data?.detail;
+      const message = Array.isArray(detail) ? detail[0] : typeof detail === 'string' ? detail : ax.message || 'Upload failed';
+      throw new Error(message);
+    }
   },
 
   getStatus: async (): Promise<{ loaded: boolean; rowCount: number; players: string[] }> => {

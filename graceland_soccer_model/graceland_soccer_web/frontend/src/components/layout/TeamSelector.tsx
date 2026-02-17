@@ -5,40 +5,63 @@ export default function TeamSelector() {
   const { currentTeam, switchTeam, teamStatus } = useTeam();
 
   return (
-    <div className="flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 rounded-xl p-1">
+    <div
+      className="flex rounded overflow-hidden border border-[var(--border-default)] bg-[var(--bg-elevated)]"
+      role="tablist"
+      aria-label="Team selection"
+    >
       <button
+        type="button"
+        role="tab"
+        aria-selected={currentTeam === 'mens'}
         onClick={() => switchTeam('mens')}
         className={`
-          flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200
-          ${currentTeam === 'mens'
-            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-            : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+          flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors min-w-[90px] justify-center
+          ${
+            currentTeam === 'mens'
+              ? 'bg-[var(--accent-performance-muted)] text-[var(--accent-performance)]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
           }
         `}
       >
-        <Users className={`w-4 h-4 ${currentTeam === 'mens' ? 'text-white' : 'text-slate-500'}`} />
-        <span className="text-sm font-medium">Men's</span>
+        <Users className="w-4 h-4 flex-shrink-0" />
+        <span className="hidden sm:inline">Men's</span>
         {teamStatus?.mens?.loaded && (
-          <span className={`text-xs px-1.5 py-0.5 rounded ${currentTeam === 'mens' ? 'bg-blue-700' : 'bg-slate-700'}`}>
+          <span
+            className={`text-[10px] px-1.5 py-0.5 rounded ${
+              currentTeam === 'mens'
+                ? 'bg-[var(--accent-performance)] text-white'
+                : 'bg-[var(--bg-subtle)] text-[var(--text-tertiary)]'
+            }`}
+          >
             {teamStatus.mens.rowCount}
           </span>
         )}
       </button>
-      
       <button
+        type="button"
+        role="tab"
+        aria-selected={currentTeam === 'womens'}
         onClick={() => switchTeam('womens')}
         className={`
-          flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200
-          ${currentTeam === 'womens'
-            ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/20'
-            : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+          flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors min-w-[90px] justify-center
+          ${
+            currentTeam === 'womens'
+              ? 'bg-[var(--accent-performance-muted)] text-[var(--accent-performance)]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
           }
         `}
       >
-        <UserCheck className={`w-4 h-4 ${currentTeam === 'womens' ? 'text-white' : 'text-slate-500'}`} />
-        <span className="text-sm font-medium">Women's</span>
+        <UserCheck className="w-4 h-4 flex-shrink-0" />
+        <span className="hidden sm:inline">Women's</span>
         {teamStatus?.womens?.loaded && (
-          <span className={`text-xs px-1.5 py-0.5 rounded ${currentTeam === 'womens' ? 'bg-pink-700' : 'bg-slate-700'}`}>
+          <span
+            className={`text-[10px] px-1.5 py-0.5 rounded ${
+              currentTeam === 'womens'
+                ? 'bg-[var(--accent-performance)] text-white'
+                : 'bg-[var(--bg-subtle)] text-[var(--text-tertiary)]'
+            }`}
+          >
             {teamStatus.womens.rowCount}
           </span>
         )}
