@@ -1,0 +1,11 @@
+{
+  "useTodayAsReference": false,
+  "currentTeam": "mens",
+  "excludedPlayers": [],
+  "playerPositions": {
+    "mens": {},
+    "womens": {}
+  },
+  "isCleaned": false,
+  "cleaningStats": {}
+}

@@ -185,7 +185,7 @@ export function PlayersComparisonChart({ players }: { players: Player[] }) {
             <YAxis stroke="var(--text-tertiary)" fontSize={10} tickLine={false} axisLine={false} width={32} />
             <Tooltip
               contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: '4px', padding: '6px 10px', fontSize: '12px' }}
-              formatter={(value: number, name: string) => [name === 'load' ? `${value.toFixed(1)} units` : `${value.toFixed(1)} mph`, name === 'load' ? 'Load' : 'Speed']}
+              formatter={(value, name) => [String(name) === 'load' ? `${Number(value ?? 0).toFixed(1)} units` : `${Number(value ?? 0).toFixed(1)} mph`, String(name) === 'load' ? 'Load' : 'Speed']}
             />
             <Bar dataKey="load" fill="var(--accent-performance)" radius={[2, 2, 0, 0]} name="load" />
             <Bar dataKey="speed" fill="var(--risk-low)" radius={[2, 2, 0, 0]} name="speed" />

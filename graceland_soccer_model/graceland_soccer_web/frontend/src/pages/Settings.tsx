@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Calendar, Clock, CheckCircle, RefreshCw, Database, FileSearch, Settings as SettingsIcon } from 'lucide-react';
-import { settingsApi, useDataStatus } from '../services/api';
+import { settingsApi } from '../services/api';
 import DataAuditContent from '../components/settings/DataAuditContent';
 
 type SettingsTab = 'general' | 'data-audit';

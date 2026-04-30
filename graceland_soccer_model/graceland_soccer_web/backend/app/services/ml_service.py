@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from typing import Optional, Dict, Any, List, Tuple
+import warnings
 import joblib
 import pickle
 import os
@@ -15,6 +16,12 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.pipeline import Pipeline
+
+try:
+    from sklearn.exceptions import InconsistentVersionWarning  # type: ignore
+    warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+except Exception:
+    pass
 
 try:
     from xgboost import XGBClassifier, XGBRegressor
@@ -49,6 +56,8 @@ class MLService:
         self.risk_features: List[str] = []
         self.load_metrics: Optional[Dict] = None
         self.risk_metrics: Optional[Dict] = None
+        self.load_diagnostics: Dict[str, Any] = {}
+        self.risk_diagnostics: Dict[str, Any] = {}
         self._load_saved_models()
     
     def _load_saved_models(self):
@@ -215,6 +224,16 @@ class MLService:
         
         training_time = round(time.time() - start_time, 2)
         self.load_metrics = test_metrics
+        self.load_diagnostics = {
+            'trainMetrics': train_metrics,
+            'cvMetrics': cv_metrics,
+            'featureImportance': self._extract_feature_importance(self.load_pipeline, self.load_features),
+            'samplesUsed': len(X),
+            'residualSummary': {
+                'meanResidual': round(float(np.mean(y_test - y_pred_test)), 4),
+                'maxAbsoluteResidual': round(float(np.max(np.abs(y_test - y_pred_test))), 4),
+            },
+        }
         
         return {
             'modelType': 'regression',
@@ -309,6 +328,17 @@ class MLService:
         
         training_time = round(time.time() - start_time, 2)
         self.risk_metrics = test_metrics
+        self.risk_diagnostics = {
+            'trainMetrics': train_metrics,
+            'cvMetrics': cv_metrics,
+            'featureImportance': self._extract_feature_importance(self.risk_pipeline, self.risk_features),
+            'samplesUsed': len(X),
+            'classDistribution': {
+                'low': int((y == 0).sum()),
+                'medium': int((y == 1).sum()),
+                'high': int((y == 2).sum())
+            },
+        }
         
         return {
             'modelType': 'classification',
@@ -504,20 +534,45 @@ class MLService:
                 "Continue monitoring key metrics",
                 "Good foundation for high-intensity work"
             ]
+
+    def _extract_feature_importance(self, pipeline: Any, feature_names: List[str]) -> List[Dict[str, Any]]:
+        if pipeline is None or not feature_names:
+            return []
+        model = None
+        if hasattr(pipeline, 'named_steps'):
+            model = pipeline.named_steps.get('model')
+        elif hasattr(pipeline, 'steps') and pipeline.steps:
+            model = pipeline.steps[-1][1]
+        if model is None or not hasattr(model, 'feature_importances_'):
+            return []
+        try:
+            raw_values = getattr(model, 'feature_importances_')
+            pairs = []
+            for idx, name in enumerate(feature_names):
+                if idx < len(raw_values):
+                    pairs.append({
+                        'feature': name,
+                        'importance': round(float(raw_values[idx]), 4),
+                    })
+            return sorted(pairs, key=lambda item: item['importance'], reverse=True)
+        except Exception:
+            return []
     
     def get_model_status(self) -> Dict[str, Any]:
         load_status = {
             'trained': self.load_pipeline is not None,
             'algorithm': None,
             'metrics': self.load_metrics,
-            'features': len(self.load_features) if self.load_features else 0
+            'features': len(self.load_features) if self.load_features else 0,
+            'diagnostics': self.load_diagnostics,
         }
         
         risk_status = {
             'trained': self.risk_pipeline is not None,
             'algorithm': None,
             'metrics': self.risk_metrics,
-            'features': len(self.risk_features) if self.risk_features else 0
+            'features': len(self.risk_features) if self.risk_features else 0,
+            'diagnostics': self.risk_diagnostics,
         }
         
         if self.load_pipeline is not None:

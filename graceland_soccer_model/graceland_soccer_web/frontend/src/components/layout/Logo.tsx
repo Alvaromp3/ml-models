@@ -1,6 +1,3 @@
-import logoImage from '../../assets/logo_GUJ.jpeg';
-
-/** Graceland Logo - Using provided image without background */
 interface LogoProps {
   className?: string;
   size?: number;
@@ -9,7 +6,7 @@ interface LogoProps {
 export default function Logo({ className = '', size = 40 }: LogoProps) {
   return (
     <img
-      src={logoImage}
+      src="/logo-graceland.png"
       alt="Graceland Logo"
       className={className}
       style={{

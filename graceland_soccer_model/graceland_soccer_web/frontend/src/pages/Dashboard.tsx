@@ -1,12 +1,12 @@
 import { useState, useRef } from 'react';
 import {
   FileUp,
-  Database,
   CheckCircle,
   AlertTriangle,
   Clock,
   ChevronRight,
   Upload,
+  Loader2,
 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -33,23 +33,12 @@ export default function Dashboard() {
   const { currentTeam, teamStatus } = useTeam();
   const hasAnyData = Boolean(teamStatus?.mens?.loaded || teamStatus?.womens?.loaded);
 
-  const { data: dataStatus } = useDataStatus();
+  const { data: dataStatus, isPending: dataStatusPending, isError: dataStatusError } = useDataStatus();
   const { data: kpis } = useDashboardKPIs();
   const { data: loadHistory } = useLoadHistory();
   const { data: riskDistribution } = useRiskDistribution();
   const { data: highRiskPlayers } = useHighRiskPlayers();
   const { data: topPerformers } = useTopPerformers();
-
-  const loadSampleMutation = useMutation({
-    mutationFn: dataApi.loadSample,
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      setUploadStatus({ success: true, message: 'Sample data loaded successfully.' });
-    },
-    onError: () => {
-      setUploadStatus({ success: false, message: 'Error loading data. Ensure backend is running on port 8000.' });
-    },
-  });
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => dataApi.upload(file, currentTeam),
@@ -127,32 +116,31 @@ export default function Dashboard() {
                   </>
                 )}
               </button>
-              <div className="flex items-center gap-3 py-2">
-                <span className="flex-1 h-px bg-[var(--border-subtle)]" />
-                <span className="caption">or</span>
-                <span className="flex-1 h-px bg-[var(--border-subtle)]" />
-              </div>
-              <button
-                type="button"
-                onClick={() => loadSampleMutation.mutate()}
-                disabled={loadSampleMutation.isPending}
-                className="btn btn--secondary w-full gap-2 py-3"
-              >
-                {loadSampleMutation.isPending ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" aria-hidden><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                    Loading…
-                  </>
-                ) : (
-                  <>
-                    <Database className="w-4 h-4" />
-                    Load Sample Data
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-subtle)] text-[var(--text-tertiary)]">24 players</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasAnyData && dataStatusPending) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3 text-[var(--text-secondary)]">
+        <Loader2 className="w-10 h-10 animate-spin text-[var(--accent-performance)]" aria-hidden />
+        <p className="text-sm">Loading dashboard…</p>
+      </div>
+    );
+  }
+
+  if (hasAnyData && dataStatusError) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-4 max-w-md mx-auto text-center px-4">
+        <AlertTriangle className="w-10 h-10 text-[var(--accent-risk-high)]" aria-hidden />
+        <div>
+          <p className="font-semibold text-[var(--text-primary)] mb-1">Could not reach the server</p>
+          <p className="text-sm text-[var(--text-secondary)]">
+            Start the backend on port 8000, then refresh. If it is running, check the terminal for errors.
+          </p>
         </div>
       </div>
     );

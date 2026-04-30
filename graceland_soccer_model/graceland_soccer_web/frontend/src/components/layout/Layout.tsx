@@ -10,7 +10,6 @@ const routeTitles: Record<string, string> = {
   '/lineup': 'Best Lineup',
   '/rankings': 'Rankings',
   '/comparison': 'Team Comparison',
-  '/models': 'ML Models',
   '/settings': 'Settings',
 };
 

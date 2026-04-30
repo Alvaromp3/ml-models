@@ -29,64 +29,95 @@ import {
   Pie,
   Cell,
   Tooltip,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Legend,
+  BarChart,
+  Bar,
 } from 'recharts';
 import { playersApi, analysisApi, useDataStatus } from '../services/api';
 import { useTeam } from '../contexts/TeamContext';
 import type { RiskPrediction, Player } from '../types';
 import ReactMarkdown from 'react-markdown';
 
+interface AIRecommendationBundle {
+  playerId: string;
+  playerName: string;
+  aiRecommendations: string;
+  aiSource?: string;
+  aiSuccess: boolean;
+  aiError?: string;
+}
+
 export default function Analysis() {
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [prediction, setPrediction] = useState<RiskPrediction | null>(null);
   const [selectedPlayerData, setSelectedPlayerData] = useState<Player | null>(null);
-  const [aiRecommendations, setAiRecommendations] = useState<any>(null);
+  const [aiRecommendations, setAiRecommendations] = useState<AIRecommendationBundle | null>(null);
 
   const { currentTeam } = useTeam();
   const { data: dataStatus } = useDataStatus();
 
   const { data: players } = useQuery({
-    queryKey: ['players'],
+    queryKey: ['players', currentTeam],
     queryFn: playersApi.getAll,
     enabled: !!dataStatus?.loaded,
   });
 
   const { data: teamAverage } = useQuery({
-    queryKey: ['teamAverage'],
+    queryKey: ['teamAverage', currentTeam],
     queryFn: analysisApi.getTeamAverage,
     enabled: !!dataStatus?.loaded,
   });
 
-  // Ollama status query
-  const { data: ollamaStatus } = useQuery({
-    queryKey: ['ollama', 'status'],
-    queryFn: analysisApi.getOllamaStatus,
+  const { data: analytics } = useQuery({
+    queryKey: ['analysis', 'analytics', currentTeam, selectedPlayer || 'team'],
+    queryFn: () => analysisApi.getAnalytics(selectedPlayer || undefined),
+    enabled: !!dataStatus?.loaded && !!selectedPlayer && !!prediction,
+  });
+
+  // OpenRouter status query (AI recommendations provider)
+  const { data: openRouterStatus } = useQuery({
+    queryKey: ['openrouter', 'status'],
+    queryFn: analysisApi.getOpenRouterStatus,
     staleTime: 30000,
   });
 
-  const predictMutation = useMutation({
-    mutationFn: (playerId: string) => analysisApi.predictRisk(playerId),
-    onSuccess: (data) => {
-      setPrediction(data);
+  // One backend round-trip: ML risk + OpenRouter coach text (no duplicate predict_risk / no double timeout)
+  const analyzeMutation = useMutation({
+    mutationFn: async (playerId: string) => {
+      const d = await analysisApi.getAIRecommendations(playerId);
+      const risk: RiskPrediction = {
+        playerId: d.playerId,
+        playerName: d.playerName,
+        riskLevel: d.riskLevel,
+        probability: typeof d.probability === 'number' ? d.probability : 0,
+        factors: Array.isArray(d.factors) ? d.factors : [],
+        recommendations: Array.isArray(d.recommendations) ? d.recommendations : [],
+        hasRecentData: d.hasRecentData,
+        recentSessionCount: d.recentSessionCount,
+      };
+      return { risk, ai: d };
+    },
+    onMutate: () => {
+      setPrediction(null);
       setAiRecommendations(null);
     },
-    onError: (error: Error) => {
-      console.error('Prediction error:', error);
-    }
-  });
-
-  const aiMutation = useMutation({
-    mutationFn: (playerId: string) => analysisApi.getAIRecommendations(playerId),
-    onSuccess: (data) => {
-      setAiRecommendations(data);
+    onSuccess: ({ risk, ai }) => {
+      setPrediction(risk);
+      setAiRecommendations(ai);
     },
     onError: (error: Error) => {
-      console.error('AI Analysis error:', error);
+      console.error('Analyze error:', error);
+      setPrediction(null);
       setAiRecommendations({
         aiSuccess: false,
-        aiError: error.message || 'Failed to get AI recommendations',
-        aiRecommendations: 'Unable to generate AI analysis. Please check if Ollama is running and try again.',
+        aiError: error.message || 'Failed to analyze',
+        aiRecommendations: 'Analysis request failed. Ensure backend and OpenRouter are running, then try again.',
         playerId: selectedPlayer,
-        playerName: selectedPlayerData?.name || 'Unknown'
+        playerName: selectedPlayerData?.name || 'Unknown',
+        aiSource: 'openrouter',
       });
     },
   });
@@ -123,13 +154,7 @@ export default function Analysis() {
 
   const handlePredict = () => {
     if (selectedPlayer) {
-      predictMutation.mutate(selectedPlayer);
-    }
-  };
-
-  const handleGetAIRecommendations = () => {
-    if (selectedPlayer) {
-      aiMutation.mutate(selectedPlayer);
+      analyzeMutation.mutate(selectedPlayer);
     }
   };
 
@@ -203,6 +228,8 @@ export default function Analysis() {
     ];
   };
 
+  const percentileForSelected = analytics?.percentiles?.find((entry) => entry.playerId === selectedPlayer);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -252,18 +279,18 @@ export default function Analysis() {
 
               <button
                 onClick={handlePredict}
-                disabled={!selectedPlayer || predictMutation.isPending}
+                disabled={!selectedPlayer || analyzeMutation.isPending}
                 className="btn btn--primary w-full py-3 gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {predictMutation.isPending ? (
+                {analyzeMutation.isPending ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Analyzing...
+                    Analyzing (coach report)...
                   </>
                 ) : (
                   <>
                     <Activity className="w-5 h-5" />
-                    Analyze Risk
+                    Analyze (OpenRouter)
                   </>
                 )}
               </button>
@@ -494,21 +521,80 @@ export default function Analysis() {
                 </div>
 
                 {/* Recommendations */}
-                <div className="panel panel--elevated p-6 bg-white animate-slide-in-up" style={{ animationDelay: '150ms' }}>
+                <div
+                  className="panel panel--elevated p-6 bg-[#0f172a] border border-[#334155] animate-slide-in-up"
+                  style={{ animationDelay: '150ms' }}
+                >
                   <div className="flex items-center gap-2 mb-4">
-                    <CheckCircle className="w-5 h-5 text-[#1e40af]" />
-                    <h3 className="font-semibold text-[#1e293b]">Recommendations</h3>
+                    <CheckCircle className="w-5 h-5 text-cyan-400" />
+                    <h3 className="font-semibold text-white">Recommendations</h3>
                   </div>
                   <ul className="space-y-3">
                     {prediction.recommendations.map((rec, i) => (
-                      <li key={i} className="flex items-start gap-3 p-3 bg-[#1e40af]/5 border border-[#1e40af]/20 rounded-lg">
-                        <CheckCircle className="w-4 h-4 text-[#1e40af] mt-0.5 flex-shrink-0" />
-                        <span className="text-sm text-[#334155]">{rec}</span>
+                      <li
+                        key={i}
+                        className="flex items-start gap-3 p-3 bg-[#1e293b]/80 border border-[#334155] rounded-lg"
+                      >
+                        <CheckCircle className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-white">{rec}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
               </div>
+
+              {analytics && (
+                <>
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                    {percentileForSelected && (
+                      <div className="panel p-5 bg-white">
+                        <h3 className="font-semibold text-[#1e293b] mb-3">Percentiles</h3>
+                        <div className="space-y-3 text-sm">
+                          <p className="text-[#64748b]">Load: <span className="font-semibold text-[#1e293b]">{percentileForSelected.loadPercentile.toFixed(1)}%</span></p>
+                          <p className="text-[#64748b]">Speed: <span className="font-semibold text-[#1e293b]">{percentileForSelected.speedPercentile.toFixed(1)}%</span></p>
+                          <p className="text-[#64748b]">Sessions: <span className="font-semibold text-[#1e293b]">{percentileForSelected.sessionPercentile.toFixed(1)}%</span></p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="panel p-5 bg-white xl:col-span-2">
+                      <h3 className="font-semibold text-[#1e293b] mb-3">Recent Outlier Timeline</h3>
+                      <div className="space-y-2 max-h-56 overflow-auto pr-1">
+                        {analytics.outlierTimeline.length > 0 ? analytics.outlierTimeline.slice(-8).reverse().map((event, idx) => (
+                          <div key={`${event.date}-${idx}`} className="p-3 rounded-lg border border-[#e2e8f0] bg-[#f8fafc]">
+                            <p className="text-sm font-medium text-[#1e293b]">{event.playerName} · {event.playerLoad}</p>
+                            <p className="text-xs text-[#64748b]">{event.date} · {event.sessionTitle}</p>
+                          </div>
+                        )) : (
+                          <p className="text-sm text-[#64748b]">No extreme spikes detected with the current dataset.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {analytics.positionComparison.length > 0 && (
+                    <div className="panel panel--elevated p-6 bg-white animate-slide-in-up">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Shield className="w-5 h-5 text-[#10b981]" />
+                        <h3 className="font-semibold text-[#1e293b]">Position Group Comparison</h3>
+                      </div>
+                      <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={analytics.positionComparison}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                            <XAxis dataKey="positionGroup" stroke="#94a3b8" fontSize={11} />
+                            <YAxis stroke="#94a3b8" fontSize={11} />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="avgLoad" fill="#10b981" radius={[6, 6, 0, 0]} name="Avg Load" />
+                            <Bar dataKey="avgTopSpeed" fill="#1e40af" radius={[6, 6, 0, 0]} name="Avg Top Speed" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* AI Coach Section */}
               <div className="panel panel--elevated p-6 bg-white animate-slide-in-up" style={{ animationDelay: '200ms' }}>
@@ -520,17 +606,17 @@ export default function Analysis() {
                     <div>
                       <h3 className="font-semibold text-[#1e293b]">AI Coach Recommendations</h3>
                       <p className="text-xs text-[#64748b]">
-                        Powered by Ollama {ollamaStatus?.status === 'ready' ? '(Connected)' : '(Fallback mode)'}
+                        Powered by OpenRouter {openRouterStatus?.status === 'ready' ? '(Connected)' : '(Not configured)'}
                       </p>
                     </div>
                   </div>
                   
                   <button
-                    onClick={handleGetAIRecommendations}
-                    disabled={aiMutation.isPending || !selectedPlayer}
+                    onClick={handlePredict}
+                    disabled={analyzeMutation.isPending || !selectedPlayer}
                     className="px-4 py-2 bg-[#06b6d4] hover:bg-[#0891b2] border border-[#06b6d4] rounded-lg font-semibold text-white text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    {aiMutation.isPending ? (
+                    {analyzeMutation.isPending ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
                         Generating...
@@ -544,27 +630,27 @@ export default function Analysis() {
                   </button>
                 </div>
 
-                {/* Ollama Status Badge */}
-                {ollamaStatus && (
+                {/* OpenRouter Status Badge */}
+                {openRouterStatus && (
                   <div className={`mb-4 px-3 py-2 rounded-lg text-xs inline-flex items-center gap-2 ${
-                    ollamaStatus.status === 'ready' 
+                    openRouterStatus.status === 'ready' 
                       ? 'bg-[var(--risk-low)]/10 text-[var(--risk-low)] border border-[var(--risk-low)]/30'
                       : 'bg-[var(--risk-medium)]/10 text-[var(--risk-medium)] border border-[var(--risk-medium)]/30'
-                  }`} style={ollamaStatus.status !== 'ready' ? { backgroundColor: 'rgba(255, 193, 7, 0.15)' } : {}}>
-                    <span className={`w-2 h-2 rounded-full ${ollamaStatus.status === 'ready' ? 'bg-[#10b981]' : 'bg-[#ffc107]'}`} />
-                    {ollamaStatus.status === 'ready' 
-                      ? `Ollama connected - Model: ${ollamaStatus.defaultModel}`
-                      : ollamaStatus.message}
+                  }`} style={openRouterStatus.status !== 'ready' ? { backgroundColor: 'rgba(255, 193, 7, 0.15)' } : {}}>
+                    <span className={`w-2 h-2 rounded-full ${openRouterStatus.status === 'ready' ? 'bg-[#10b981]' : 'bg-[#ffc107]'}`} />
+                    {openRouterStatus.status === 'ready' 
+                      ? `OpenRouter connected - Model: ${openRouterStatus.defaultModel}`
+                      : openRouterStatus.message}
                   </div>
                 )}
 
                 {/* Error Message */}
-                {aiMutation.isError && (
+                {analyzeMutation.isError && (
                   <div className="mb-4 p-3 bg-[#dc2626]/10 border border-[#dc2626]/30 rounded-lg">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-[#dc2626]" />
                       <span className="text-sm text-[#dc2626]">
-                        Failed to get AI analysis: {(aiMutation.error as Error)?.message || 'Unknown error'}
+                        Failed to analyze: {(analyzeMutation.error as Error)?.message || 'Unknown error'}
                       </span>
                     </div>
                   </div>
@@ -578,6 +664,11 @@ export default function Analysis() {
                       <span className="text-sm font-semibold text-[#1e293b]">
                         {aiRecommendations.aiSuccess ? 'AI Analysis' : 'Standard Recommendations'}
                       </span>
+                      {aiRecommendations.aiSource && (
+                        <span className="text-xs text-[#64748b] bg-[#e2e8f0] px-2 py-1 rounded">
+                          source: {aiRecommendations.aiSource}
+                        </span>
+                      )}
                       {!aiRecommendations.aiSuccess && aiRecommendations.aiError && (
                         <span className="text-xs text-[#dc2626] bg-[#dc2626]/10 px-2 py-1 rounded">
                           {aiRecommendations.aiError}
@@ -625,20 +716,30 @@ export default function Analysis() {
                     <p className="text-[#334155] font-semibold mb-1">About this prediction</p>
                     <p>
                       Risk analysis uses data from the <strong className="text-[#1e293b]">last 45 days only</strong>. If no recent training data is available, 
-                      risk is set to LOW. AI recommendations are powered by Ollama (when available) or use rule-based fallback.
+                      risk is set to LOW. AI recommendations are powered by OpenRouter.
                     </p>
                   </div>
                 </div>
               </div>
             </>
-          ) : predictMutation.isError ? (
+          ) : analyzeMutation.isPending ? (
+            <div className="panel panel--elevated p-8 bg-white text-center animate-slide-in-up">
+              <div className="w-16 h-16 mx-auto mb-4 bg-[#06b6d4]/10 border border-[#06b6d4]/20 rounded-lg flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-[#06b6d4] animate-spin" />
+              </div>
+              <h3 className="text-lg font-semibold text-[#1e293b] mb-2">Running Analysis</h3>
+              <p className="text-[#64748b] text-sm max-w-md mx-auto">
+                Generating risk scoring and coach recommendations for the selected player.
+              </p>
+            </div>
+          ) : analyzeMutation.isError ? (
             <div className="panel panel--elevated p-8 bg-white text-center animate-slide-in-up">
               <div className="w-16 h-16 mx-auto mb-4 bg-[#dc2626]/10 border border-[#dc2626]/20 rounded-lg flex items-center justify-center">
                 <AlertTriangle className="w-8 h-8 text-[#dc2626]" />
               </div>
               <h3 className="text-lg font-semibold text-[#1e293b] mb-2">Analysis Failed</h3>
               <p className="text-[#64748b] text-sm mb-4">
-                {(predictMutation.error as Error)?.message || 'Could not analyze player risk. Please try again.'}
+                {(analyzeMutation.error as Error)?.message || 'Could not analyze player risk. Please try again.'}
               </p>
               <button
                 onClick={handlePredict}
@@ -654,7 +755,7 @@ export default function Analysis() {
               </div>
               <h3 className="text-lg font-semibold text-[#1e293b] mb-2">Ready to Analyze</h3>
               <p className="text-[#64748b] text-sm max-w-md mx-auto">
-                Select a player from the list and click "Analyze Risk" to get a comprehensive injury risk assessment with AI-powered recommendations.
+                Select a player, then run AI Analysis to get injury risk plus a coach report.
               </p>
             </div>
           )}

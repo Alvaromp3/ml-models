@@ -10,7 +10,14 @@ if [ ! -d "venv" ]; then
 fi
 source venv/bin/activate
 pip install -r requirements.txt -q
-uvicorn app.main:app --reload --port 8000 &
+
+# Stable default: do NOT auto-reload (watchers can reload on venv changes).
+# Enable reload explicitly with: DEV_RELOAD=1 make run
+if [ "${DEV_RELOAD:-0}" = "1" ]; then
+  uvicorn app.main:app --reload --reload-dir app --port 8000 &
+else
+  uvicorn app.main:app --port 8000 &
+fi
 BACKEND_PID=$!
 
 # Start frontend

@@ -1,3 +1,32 @@
+import warnings
+
+# Load environment variables from backend/.env (if present).
+# Do not fail if python-dotenv is missing.
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except Exception:
+    pass
+
+# Keep startup logs clean: ignore known non-fatal dependency/model warnings
+# (Filter by message so it applies even during the initial `requests` import.)
+warnings.filterwarnings(
+    "ignore",
+    message=r"urllib3 .* doesn't match a supported version!",
+)
+
+try:
+    from sklearn.exceptions import InconsistentVersionWarning  # type: ignore
+    warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+except Exception:
+    pass
+
+# LightGBM / sklearn: predicting with ndarray when model was trained with feature names
+warnings.filterwarnings(
+    "ignore",
+    message=r"X does not have valid feature names, but .* was fitted with feature names",
+)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import dashboard, players, analysis, training, data, settings

@@ -11,10 +11,15 @@ import type {
   TrainingResult,
   UploadResult,
   ApiResponse,
+  AnalyticsOverview,
+  TeamComparisonData,
 } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
+  // Keep bounded so a dead/slow backend does not block the whole UI for minutes.
+  // Long operations (coach report) override per-request.
+  timeout: 45000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -130,13 +135,34 @@ export const analysisApi = {
     return data.data!;
   },
 
+  getOpenRouterStatus: async (): Promise<any> => {
+    const { data } = await api.get<ApiResponse<any>>('/analysis/openrouter-status');
+    return data.data!;
+  },
+
   getAIRecommendations: async (playerId: string): Promise<any> => {
-    const { data } = await api.post<ApiResponse<any>>('/analysis/ai-recommendations', { playerId });
+    // Slightly above backend OPENROUTER_TIMEOUT_MAX_S so the browser does not abort first.
+    const { data } = await api.post<ApiResponse<any>>(
+      '/analysis/ai-recommendations',
+      { playerId },
+      { timeout: 35000 }
+    );
     return data.data!;
   },
 
   getTeamAverage: async (): Promise<any> => {
     const { data } = await api.get<ApiResponse<any>>('/analysis/team-average');
+    return data.data!;
+  },
+
+  getAnalytics: async (playerId?: string): Promise<AnalyticsOverview> => {
+    const suffix = playerId ? `?playerId=${encodeURIComponent(playerId)}` : '';
+    const { data } = await api.get<ApiResponse<AnalyticsOverview>>(`/analysis/analytics${suffix}`);
+    return data.data!;
+  },
+
+  getTeamComparison: async (): Promise<TeamComparisonData> => {
+    const { data } = await api.get<ApiResponse<TeamComparisonData>>('/analysis/team-comparison');
     return data.data!;
   },
 };
@@ -167,9 +193,6 @@ export const trainingApi = {
     return data.data!;
   },
 };
-
-// Export for Models page
-export const getModelStatus = trainingApi.getModelStatus;
 
 // Data endpoints
 export const dataApi = {

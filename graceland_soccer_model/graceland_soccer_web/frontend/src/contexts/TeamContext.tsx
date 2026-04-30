@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { settingsApi } from '../services/api';
 
 type TeamType = 'mens' | 'womens';
 
@@ -16,6 +16,17 @@ interface TeamContextType {
 
 const TeamContext = createContext<TeamContextType | undefined>(undefined);
 
+/** Avoid hanging forever when the API is down (fetch has no default timeout). */
+async function fetchWithTimeout(url: string, ms: number, init?: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = window.setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    window.clearTimeout(t);
+  }
+}
+
 export function TeamProvider({ children }: { children: ReactNode }) {
   const [currentTeam, setCurrentTeam] = useState<TeamType>('mens');
   const queryClient = useQueryClient();
@@ -24,7 +35,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     queryKey: ['teamStatus'],
     queryFn: async () => {
       try {
-        const response = await fetch('/api/settings/team-status');
+        const response = await fetchWithTimeout('/api/settings/team-status', 12000);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -43,15 +54,19 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         };
       }
     },
-    refetchInterval: 5000,
-    retry: 2,
-    retryDelay: 1000,
+    // Light polling: team CSV rarely changes without user action; heavy polling starves the API.
+    staleTime: 120_000,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 1,
+    retryDelay: 800,
   });
 
   const switchTeamMutation = useMutation({
     mutationFn: async (team: TeamType) => {
       try {
-        const response = await fetch('/api/settings/switch-team', {
+        const response = await fetchWithTimeout('/api/settings/switch-team', 15000, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ team }),
@@ -69,9 +84,14 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    onSuccess: (data, team) => {
+    onSuccess: (_data, team) => {
       setCurrentTeam(team);
-      queryClient.invalidateQueries();
+      // Avoid invalidateQueries() with no filter — it refetches every query and floods /team-status.
+      queryClient.invalidateQueries({ queryKey: ['teamStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['players'] });
+      queryClient.invalidateQueries({ queryKey: ['data', 'status'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['analysis'] });
     },
   });
 

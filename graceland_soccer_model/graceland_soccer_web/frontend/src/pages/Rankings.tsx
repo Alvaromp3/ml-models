@@ -195,7 +195,7 @@ function getRankIcon(rank: number) {
   return <Award className="w-4 h-4" style={{ color: '#cbd5e1' }} strokeWidth={2} />;
 }
 
-function formatValue(value: number, unit: string): string {
+function formatValue(value: number): string {
   if (value === 0) return '0';
   if (value < 1) return value.toFixed(2);
   if (value < 10) return value.toFixed(1);
@@ -305,18 +305,18 @@ export default function Rankings() {
             <p className="text-xs font-semibold text-[#64748b] uppercase mb-1" style={{ letterSpacing: '0.5px' }}>Top Performer</p>
             <p className="text-lg font-bold text-[#1e293b] mb-1">{stats.topPlayer?.name}</p>
             <p className="text-sm font-semibold" style={{ color: currentMetric.color }}>
-              {formatValue(stats.maxValue, currentMetric.unit)} {currentMetric.unit}
+              {formatValue(stats.maxValue)} {currentMetric.unit}
             </p>
           </div>
           <div className="card p-4 bg-white">
             <p className="text-xs font-semibold text-[#64748b] uppercase mb-1" style={{ letterSpacing: '0.5px' }}>Average</p>
-            <p className="text-2xl font-bold text-[#1e293b] mb-1">{formatValue(stats.avgValue, currentMetric.unit)}</p>
+            <p className="text-2xl font-bold text-[#1e293b] mb-1">{formatValue(stats.avgValue)}</p>
             <p className="text-xs text-[#64748b]">{currentMetric.unit}</p>
           </div>
           <div className="card p-4 bg-white">
             <p className="text-xs font-semibold text-[#64748b] uppercase mb-1" style={{ letterSpacing: '0.5px' }}>Range</p>
             <p className="text-sm font-semibold text-[#1e293b] mb-1">
-              {formatValue(stats.minValue, currentMetric.unit)} - {formatValue(stats.maxValue, currentMetric.unit)}
+              {formatValue(stats.minValue)} - {formatValue(stats.maxValue)}
             </p>
             <p className="text-xs text-[#64748b]">{currentMetric.unit}</p>
           </div>
@@ -340,7 +340,7 @@ export default function Rankings() {
               {stats && (
                 <div className="text-right">
                   <p className="text-xs text-field-muted uppercase font-semibold" style={{ letterSpacing: '0.5px' }}>Average</p>
-                  <p className="text-sm font-semibold text-on-field" style={{ textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>{formatValue(stats.avgValue, currentMetric.unit)} {currentMetric.unit}</p>
+                  <p className="text-sm font-semibold text-on-field" style={{ textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>{formatValue(stats.avgValue)} {currentMetric.unit}</p>
                 </div>
               )}
             </div>
@@ -360,7 +360,7 @@ export default function Rankings() {
                   tickLine={false}
                   axisLine={false}
                   tick={{ fill: '#64748b' }}
-                  tickFormatter={(value) => formatValue(value, currentMetric.unit)}
+                  tickFormatter={(value) => formatValue(Number(value))}
                 />
                 <YAxis 
                   dataKey="name" 
@@ -387,9 +387,9 @@ export default function Rankings() {
                     fontSize: '12px'
                   }}
                   itemStyle={{ color: '#334155', fontSize: '13px' }}
-                  formatter={(value: any, name: string, props: any) => {
+                  formatter={(value) => {
                     return [
-                      `${formatValue(value, currentMetric.unit)} ${currentMetric.unit}`,
+                      `${formatValue(Number(value ?? 0))} ${currentMetric.unit}`,
                       currentMetric.name
                     ];
                   }}
@@ -455,7 +455,7 @@ export default function Rankings() {
           </div>
         ) : (
           <div className="divide-y divide-[#e2e8f0]">
-            {rankings.map((player: any, index: number) => {
+            {rankings.map((player: any) => {
               const value = player.metrics[currentMetric.key] || 0;
               const isTopThree = player.rank <= 3;
               const maxValue = Math.max(...rankings.map((p: any) => p.metrics[currentMetric.key] || 0));
@@ -485,7 +485,7 @@ export default function Rankings() {
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="text-right">
-                      <span className="text-base font-bold text-[#1e293b]">{formatValue(value, currentMetric.unit)}</span>
+                    <span className="text-base font-bold text-[#1e293b]">{formatValue(value)}</span>
                       {currentMetric.unit && <span className="text-xs text-[#64748b] ml-1">{currentMetric.unit}</span>}
                     </div>
                     <div className="w-24 sm:w-32 h-2 bg-[#e2e8f0] rounded-full overflow-hidden shrink-0">

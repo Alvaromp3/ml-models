@@ -15,16 +15,10 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { Link } from 'react-router-dom';
 import { playersApi, useDataStatus } from '../services/api';
 import { useTeam } from '../contexts/TeamContext';
-import type { Player } from '../types';
 import PlayerPanel, { PlayersComparisonChart } from '../components/players/PlayerPanel';
 import ChartPanel from '../components/charts/ChartPanel';
 
 const positions = ['GK', 'CB', 'LB', 'RB', 'CM', 'CDM', 'CAM', 'LW', 'RW', 'ST', 'CF'];
-const riskColors: Record<string, string> = {
-  low: 'var(--risk-low)',
-  medium: 'var(--risk-medium)',
-  high: 'var(--risk-high)',
-};
 
 export default function Players() {
   const queryClient = useQueryClient();
@@ -304,7 +298,7 @@ export default function Players() {
                     boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                   }}
                   labelStyle={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 4 }}
-                  formatter={(value: number) => [`${Number(value).toFixed(1)} units`, 'Load']}
+                  formatter={(value) => [`${Number(value ?? 0).toFixed(1)} units`, 'Load']}
                   labelFormatter={(_, payload) => (payload?.[0] as { payload?: { fullName?: string } })?.payload?.fullName ?? ''}
                   cursor={{ fill: 'var(--bg-subtle)', opacity: 0.6 }}
                 />

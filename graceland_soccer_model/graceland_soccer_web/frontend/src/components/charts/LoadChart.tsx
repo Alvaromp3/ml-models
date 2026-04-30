@@ -87,7 +87,7 @@ export default function LoadChart({ data }: LoadChartProps) {
                   fontSize: '12px',
                 }}
                 labelStyle={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 2, fontSize: '11px' }}
-                formatter={(value: number) => [`${value.toFixed(1)} units`, 'Load']}
+                formatter={(value) => [`${Number(value ?? 0).toFixed(1)} units`, 'Load']}
                 cursor={{ fill: 'var(--bg-subtle)', opacity: 0.5 }}
               />
               <ReferenceLine

@@ -11,7 +11,8 @@ import {
   ChevronRight,
   Info,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  FileSearch
 } from 'lucide-react';
 import {
   BarChart,
@@ -21,10 +22,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { dataApi, useDataStatus } from '../../services/api';
+import { dataApi, useDataStatus } from '../services/api';
 
-export default function DataAuditContent() {
+export default function DataAudit() {
   const queryClient = useQueryClient();
+
   const { data: dataStatus } = useDataStatus();
 
   const { data: audit, isLoading, refetch } = useQuery({
@@ -34,7 +36,7 @@ export default function DataAuditContent() {
   });
 
   const cleanMutation = useMutation({
-    mutationFn: () => dataApi.cleanOutliers('iqr', 3.0),
+    mutationFn: () => dataApi.cleanOutliers('iqr', 3.0), // Fixed to 3.0 for permissive cleaning
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['data'] });
       queryClient.invalidateQueries({ queryKey: ['players'] });
@@ -53,6 +55,7 @@ export default function DataAuditContent() {
     },
   });
 
+  // Prepare outlier chart data
   const outlierChartData = audit?.outliers 
     ? Object.entries(audit.outliers)
         .map(([col, data]: [string, any]) => ({
@@ -64,44 +67,66 @@ export default function DataAuditContent() {
         .slice(0, 8)
     : [];
 
-  const beforeAfterChartData = audit?.beforeAfterCleaning || [];
-
+  // No data state
   if (!dataStatus?.loaded) {
     return (
-      <div className="panel panel--elevated p-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-6 bg-slate-800/60 border border-slate-700/50 rounded-2xl flex items-center justify-center">
-          <Database className="w-8 h-8 text-slate-300" />
+      <div className="min-h-[70vh] flex items-center justify-center animate-fade-in">
+        <div className="card p-8 max-w-md text-center">
+          <div className="w-16 h-16 mx-auto mb-6 bg-slate-800/60 border border-slate-700/50 rounded-2xl flex items-center justify-center">
+            <Database className="w-8 h-8 text-slate-300" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">No Data Loaded</h2>
+          <p className="text-slate-400 text-sm mb-6">
+            Load CSV data first to perform data audit.
+          </p>
+          <a 
+            href="/"
+            className="inline-flex items-center gap-2 px-5 py-2.5 btn-primary rounded-xl font-medium text-white text-sm"
+          >
+            Go to Dashboard
+            <ChevronRight className="w-4 h-4" />
+          </a>
         </div>
-        <h2 className="text-xl font-bold text-white mb-2">No Data Loaded</h2>
-        <p className="text-slate-400 text-sm mb-6">
-          Upload a CSV in the Dashboard to audit the data.
-        </p>
-        <a 
-          href="/"
-          className="btn btn--primary gap-2 text-sm"
-        >
-          Go to Dashboard
-          <ChevronRight className="w-4 h-4" />
-        </a>
       </div>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="min-h-[70vh] flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full" />
       </div>
     );
   }
 
-  const qualityColor = audit?.dataQualityScore >= 80 ? 'blue' : audit?.dataQualityScore >= 60 ? 'yellow' : 'red';
+  const qualityColor = audit?.dataQualityScore >= 80 ? 'emerald' : audit?.dataQualityScore >= 60 ? 'yellow' : 'red';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <FileSearch className="w-7 h-7 text-slate-400" />
+            Data Audit
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Analyze data quality and clean outliers
+          </p>
+        </div>
+
+        {/* Status Badge */}
+        {audit?.isCleaned && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
+            <CheckCircle className="w-4 h-4 text-emerald-400" />
+            <span className="text-sm text-emerald-400 font-medium">Data Cleaned</span>
+          </div>
+        )}
+      </div>
+
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="panel p-5">
+        <div className="card p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className={`p-2 bg-${qualityColor}-500/10 rounded-lg`}>
               <Shield className={`w-5 h-5 text-${qualityColor}-400`} />
@@ -113,7 +138,7 @@ export default function DataAuditContent() {
           </p>
         </div>
 
-        <div className="panel p-5">
+        <div className="card p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
               <Database className="w-5 h-5 text-slate-400" />
@@ -125,7 +150,7 @@ export default function DataAuditContent() {
           </p>
         </div>
 
-        <div className="panel p-5">
+        <div className="card p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-orange-500/10 rounded-lg">
               <AlertTriangle className="w-5 h-5 text-orange-400" />
@@ -137,7 +162,7 @@ export default function DataAuditContent() {
           </p>
         </div>
 
-        <div className="panel p-5">
+        <div className="card p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
               <Zap className="w-5 h-5 text-slate-400" />
@@ -156,7 +181,7 @@ export default function DataAuditContent() {
         <div className="lg:col-span-2 space-y-6">
           {/* Outliers Chart */}
           {outlierChartData.length > 0 && (
-            <div className="panel panel--elevated p-6">
+            <div className="card p-6">
               <div className="flex items-center gap-2 mb-4">
                 <BarChart3 className="w-5 h-5 text-orange-400" />
                 <h3 className="font-semibold text-white">Outliers by Column</h3>
@@ -184,28 +209,8 @@ export default function DataAuditContent() {
             </div>
           )}
 
-          {beforeAfterChartData.length > 0 && (
-            <div className="panel panel--elevated p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart3 className="w-5 h-5 text-blue-400" />
-                <h3 className="font-semibold text-white">Before vs After Cleaning</h3>
-              </div>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={beforeAfterChartData}>
-                    <XAxis dataKey="metric" stroke="#475569" fontSize={10} angle={-15} textAnchor="end" height={60} />
-                    <YAxis stroke="#475569" fontSize={11} />
-                    <Tooltip />
-                    <Bar dataKey="beforeMax" fill="#f97316" radius={[4, 4, 0, 0]} name="Before Max" />
-                    <Bar dataKey="afterMax" fill="#06b6d4" radius={[4, 4, 0, 0]} name="After Max" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-
           {/* Clean Outliers Action */}
-          <div className="panel panel--elevated p-6">
+          <div className="card p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50">
                 <Trash2 className="w-5 h-5 text-slate-300" />
@@ -220,8 +225,8 @@ export default function DataAuditContent() {
               <div className="flex items-start gap-2">
                 <Info className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-slate-400">
-                  The IQR method caps only extreme values outside Q1 - 3.0×IQR and Q3 + 3.0×IQR. 
-                  This is a <strong className="text-slate-300">permissive approach</strong> that only removes truly extreme outliers.
+                  The IQR (Interquartile Range) method caps only extreme values outside Q1 - 3.0×IQR and Q3 + 3.0×IQR. 
+                  This is a <strong className="text-slate-300">permissive approach</strong> that only removes truly extreme outliers, preserving most of your data.
                 </p>
               </div>
             </div>
@@ -261,11 +266,12 @@ export default function DataAuditContent() {
               )}
             </div>
 
+            {/* Cleaning Results */}
             {cleanMutation.data?.success && (
-              <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl animate-slide-in-up">
+              <div className="mt-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl animate-slide-in-up">
                 <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="w-4 h-4 text-blue-400" />
-                  <p className="text-sm font-semibold text-blue-400">Cleaning Complete!</p>
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <p className="text-sm font-semibold text-emerald-400">Cleaning Complete!</p>
                 </div>
                 <p className="text-sm text-slate-400">{cleanMutation.data.message}</p>
                 {cleanMutation.data.stats && (
@@ -285,10 +291,11 @@ export default function DataAuditContent() {
           </div>
         </div>
 
-        {/* Sidebar */}
+        {/* Sidebar - Warnings & Stats */}
         <div className="space-y-6">
+          {/* Warnings */}
           {audit?.warnings && audit.warnings.length > 0 && (
-            <div className="panel panel--elevated p-6">
+            <div className="card p-6">
               <div className="flex items-center gap-2 mb-4">
                 <AlertTriangle className="w-5 h-5 text-yellow-400" />
                 <h3 className="font-semibold text-white">Warnings</h3>
@@ -303,8 +310,9 @@ export default function DataAuditContent() {
             </div>
           )}
 
+          {/* Recommendations */}
           {audit?.recommendations && audit.recommendations.length > 0 && (
-            <div className="panel panel--elevated p-6">
+            <div className="card p-6">
               <div className="flex items-center gap-2 mb-4">
                 <CheckCircle className="w-5 h-5 text-cyan-400" />
                 <h3 className="font-semibold text-white">Recommendations</h3>
@@ -313,6 +321,41 @@ export default function DataAuditContent() {
                 {audit.recommendations.map((rec: string, idx: number) => (
                   <div key={idx} className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
                     <p className="text-xs text-cyan-400">{rec}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Column Stats */}
+          {audit?.columnStats && Object.keys(audit.columnStats).length > 0 && (
+            <div className="card p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <BarChart3 className="w-5 h-5 text-slate-400" />
+                <h3 className="font-semibold text-white">Key Metrics</h3>
+              </div>
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                {Object.entries(audit.columnStats).slice(0, 5).map(([col, stats]: [string, any]) => (
+                  <div key={col} className="p-3 bg-slate-800/30 rounded-lg">
+                    <p className="text-xs text-slate-400 mb-2 truncate" title={col}>{col}</p>
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div>
+                        <span className="text-slate-500">Mean:</span>
+                        <span className="text-white ml-1">{stats.mean}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Std:</span>
+                        <span className="text-white ml-1">{stats.std}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Min:</span>
+                        <span className="text-white ml-1">{stats.min}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Max:</span>
+                        <span className="text-white ml-1">{stats.max}</span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

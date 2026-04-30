@@ -51,7 +51,7 @@ export default function RiskDonut({ data }: RiskDonutProps) {
               padding: '6px 10px',
               fontSize: '12px',
             }}
-            formatter={(value: number, name: string) => [`${value} players`, name]}
+            formatter={(value, name) => [`${Number(value ?? 0)} players`, String(name ?? '')]}
           />
         </PieChart>
       </ResponsiveContainer>

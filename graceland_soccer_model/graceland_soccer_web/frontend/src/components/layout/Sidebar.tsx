@@ -6,7 +6,6 @@ import {
   Settings,
   X,
   Trophy,
-  Brain,
   Award,
   GitCompare,
 } from 'lucide-react';
@@ -39,10 +38,7 @@ const navGroups = [
   },
   {
     label: 'System',
-    items: [
-      { path: '/models', icon: Brain, label: 'ML Models' },
-      { path: '/settings', icon: Settings, label: 'Settings' },
-    ],
+    items: [{ path: '/settings', icon: Settings, label: 'Settings' }],
   },
 ];
 

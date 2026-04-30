@@ -9,6 +9,8 @@ export interface Player {
   avgSpeed: number;
   sessions: number;
   lastSession?: string;
+  hasRecentData?: boolean;
+  recentSessions?: number;
 }
 
 export interface PlayerDetail extends Player {
@@ -125,4 +127,39 @@ export interface UploadResult {
     start: string;
     end: string;
   };
+}
+
+export interface RollingLoadPoint {
+  date: string;
+  load: number;
+  rolling7: number;
+  rolling14: number;
+  rolling28: number;
+  upperBand: number;
+  lowerBand: number;
+}
+
+export interface AnalyticsOverview {
+  playerScope?: string | null;
+  rollingLoad: RollingLoadPoint[];
+  acwr: Array<{ date: string; acuteChronicRatio: number; acuteLoad: number; chronicLoad: number }>;
+  sessionSplit: Array<{ sessionType: string; avgLoad: number; avgTopSpeed: number; avgSprintDistance: number; avgEnergy: number; sessions: number }>;
+  positionComparison: Array<{ positionGroup: string; avgLoad: number; avgTopSpeed: number; avgSprintDistance: number; avgWorkRatio: number; players: number }>;
+  percentiles: Array<{ playerId: string; playerName: string; loadPercentile: number; speedPercentile: number; sessionPercentile: number; riskLevel: 'low' | 'medium' | 'high' }>;
+  variability: Array<{ playerId: string; playerName: string; meanLoad: number; stdLoad: number; coefficientOfVariation: number; riskLevel: 'low' | 'medium' | 'high' }>;
+  correlations: Array<{ x: string; y: string; value: number }>;
+  scatterLoadWorkRatio: Array<{ playerName: string; playerLoad: number; workRatio: number; riskLevel: 'low' | 'medium' | 'high'; date?: string | null }>;
+  scatterSprintSpeed: Array<{ playerName: string; sprintDistance: number; topSpeed: number; energy: number; riskLevel: 'low' | 'medium' | 'high' }>;
+  outlierTimeline: Array<{ date: string; playerName: string; playerLoad: number; sessionTitle: string }>;
+  trainingDensity: Array<{ date: string; sessions: number }>;
+}
+
+export interface TeamComparisonData {
+  teams: Record<string, {
+    loaded: boolean;
+    players?: Player[];
+    kpis?: DashboardKPIs | null;
+    topPerformers?: Player[];
+  }>;
+  metrics: Array<{ key: string; label: string; mensValue: number; womensValue: number; difference: number }>;
 }

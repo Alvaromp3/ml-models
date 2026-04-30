@@ -11,12 +11,10 @@ import {
   Gauge,
   Trophy,
   BarChart3,
-  Sparkles,
   Calculator,
   Play,
   Clock,
   RefreshCw,
-  Star
 } from 'lucide-react';
 import {
   RadarChart,
@@ -38,7 +36,7 @@ import {
   Line,
   CartesianGrid,
 } from 'recharts';
-import { playersApi, trainingApi, analysisApi, useDataStatus } from '../services/api';
+import { playersApi, analysisApi, useDataStatus } from '../services/api';
 import { useTeam } from '../contexts/TeamContext';
 import type { Player } from '../types';
 import Chart3D from '../components/charts/Chart3D';
@@ -403,7 +401,7 @@ export default function Lineup() {
                       borderRadius: '8px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                     }}
-                    formatter={(value: number) => [`${Number(value).toFixed(1)} mph`, 'Speed']}
+                    formatter={(value) => [`${Number(value ?? 0).toFixed(1)} mph`, 'Speed']}
                     labelFormatter={(label) => `Player: ${label}`}
                   />
                   <Bar dataKey="speed" fill="url(#lineupSpeedGrad)" radius={[0, 6, 6, 0]} name="Speed (mph)" maxBarSize={28} />
@@ -437,7 +435,7 @@ export default function Lineup() {
                       borderRadius: '8px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                     }}
-                    formatter={(value: number) => [`${(value * 10).toFixed(0)}`, 'Load']}
+                    formatter={(value) => [`${(Number(value ?? 0) * 10).toFixed(0)}`, 'Load']}
                     labelFormatter={(label) => `Player: ${label}`}
                   />
                   <Bar dataKey="load" fill="url(#lineupLoadGrad)" radius={[0, 6, 6, 0]} name="Load" maxBarSize={28} />
@@ -472,7 +470,7 @@ export default function Lineup() {
                       borderRadius: '8px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                     }}
-                    formatter={(value: number, name: string) => [name === 'Speed' ? `${Number(value).toFixed(1)} mph` : `${Number(value).toFixed(0)}%`, name]}
+                    formatter={(value, name) => [String(name) === 'Speed' ? `${Number(value ?? 0).toFixed(1)} mph` : `${Number(value ?? 0).toFixed(0)}%`, String(name ?? '')]}
                     labelFormatter={(label) => `Player: ${label}`}
                   />
                   <Legend />

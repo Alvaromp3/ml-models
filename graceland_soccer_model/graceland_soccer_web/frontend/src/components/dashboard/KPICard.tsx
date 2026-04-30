@@ -17,7 +17,7 @@ export default function KPICard({
   title, 
   value, 
   change, 
-  icon: Icon, 
+  icon: _Icon, 
   subtitle,
   variant = 'default',
   delay = 0,

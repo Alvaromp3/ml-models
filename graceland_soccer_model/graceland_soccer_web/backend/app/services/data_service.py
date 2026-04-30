@@ -3,10 +3,21 @@ import numpy as np
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
 import logging
+import json
+import re
+import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 RECENT_DATA_DAYS = 45
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+DATA_STORE_DIR = BACKEND_DIR / 'data_store'
+STATE_FILE = DATA_STORE_DIR / 'state.json'
+TEAM_FILES = {
+    'mens': DATA_STORE_DIR / 'mens.csv',
+    'womens': DATA_STORE_DIR / 'womens.csv',
+}
 
 
 class DataService:
@@ -51,6 +62,120 @@ class DataService:
         }
         
         self.risk_thresholds = {'high_load': 500, 'low_load': 200}
+        self._ensure_store()
+
+        # Default behavior: start with NO data loaded. This forces the user to upload a CSV
+        # (or explicitly call the load-sample endpoint) each time the app starts.
+        # You can override this with:
+        # - PERSIST_DATA=1 to load persisted datasets/state from data_store/
+        # - RESET_DATA_ON_START=0 to keep existing files on disk
+        reset_on_start = os.environ.get("RESET_DATA_ON_START", "1") == "1"
+        persist_data = os.environ.get("PERSIST_DATA", "0") == "1"
+
+        if reset_on_start:
+            self._reset_store_files()
+
+        if persist_data and not reset_on_start:
+            self._load_persisted_state()
+
+    def _ensure_store(self) -> None:
+        DATA_STORE_DIR.mkdir(parents=True, exist_ok=True)
+
+    def _reset_store_files(self) -> None:
+        """Delete persisted datasets/state so the app boots with an empty workspace."""
+        try:
+            for fp in TEAM_FILES.values():
+                try:
+                    fp.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            try:
+                STATE_FILE.unlink(missing_ok=True)
+            except Exception:
+                pass
+        except Exception as exc:
+            logger.warning(f"Could not reset data store files: {exc}")
+
+    def _state_payload(self) -> Dict[str, Any]:
+        return {
+            'useTodayAsReference': self.use_today_as_reference,
+            'currentTeam': self.current_team,
+            'excludedPlayers': sorted(self.excluded_players),
+            'playerPositions': self.player_positions,
+            'isCleaned': self.is_cleaned,
+            'cleaningStats': self.cleaning_stats,
+        }
+
+    def _save_state(self) -> None:
+        self._ensure_store()
+        STATE_FILE.write_text(json.dumps(self._state_payload(), indent=2), encoding='utf-8')
+
+    def _save_team_dataframe(self, team: str) -> None:
+        if team not in TEAM_FILES or self.team_data.get(team) is None:
+            return
+        self._ensure_store()
+        self.team_data[team].to_csv(TEAM_FILES[team], index=False)
+
+    def _load_persisted_state(self) -> None:
+        self._ensure_store()
+
+        for team, file_path in TEAM_FILES.items():
+            if file_path.exists():
+                try:
+                    team_df = pd.read_csv(file_path)
+                    self.team_data[team] = team_df
+                except Exception as exc:
+                    logger.warning(f"Could not load persisted dataset for {team}: {exc}")
+
+        if STATE_FILE.exists():
+            try:
+                state = json.loads(STATE_FILE.read_text(encoding='utf-8'))
+                self.use_today_as_reference = bool(state.get('useTodayAsReference', True))
+                self.current_team = state.get('currentTeam', 'mens') if state.get('currentTeam') in ('mens', 'womens') else 'mens'
+                self.excluded_players = set(state.get('excludedPlayers', []))
+                self.player_positions = state.get('playerPositions', self.player_positions)
+                self.is_cleaned = bool(state.get('isCleaned', False))
+                self.cleaning_stats = state.get('cleaningStats', {})
+            except Exception as exc:
+                logger.warning(f"Could not load persisted app state: {exc}")
+
+        active_df = self.team_data.get(self.current_team)
+        if active_df is not None:
+            self.df = active_df.copy()
+            self.df_original = active_df.copy()
+            try:
+                self._process_loaded_data()
+            except Exception as exc:
+                logger.warning(f"Could not process persisted active team data: {exc}")
+
+    def _normalize_player_name(self, player_name: str) -> str:
+        return re.sub(r'\s+', ' ', str(player_name or '').strip())
+
+    def _build_player_id(self, player_name: str, team: Optional[str] = None) -> str:
+        team_name = team or self.current_team
+        normalized = self._normalize_player_name(player_name).lower()
+        slug = re.sub(r'[^a-z0-9]+', '-', normalized).strip('-')
+        return f"{team_name}_{slug or 'player'}"
+
+    def _resolve_player_name_from_id(self, player_id: str) -> Optional[str]:
+        normalized_id = str(player_id or '').strip()
+        if not normalized_id:
+            return None
+
+        for player_name in self.players:
+            if self._build_player_id(player_name) == normalized_id:
+                return player_name
+
+        # Backward compatibility for older index-based ids.
+        if normalized_id.startswith('player_'):
+            try:
+                idx = int(normalized_id.replace('player_', ''))
+                if 0 <= idx < len(self.players):
+                    return self.players[idx]
+            except Exception:
+                return None
+
+        return None
     
     def load_csv(self, file_path: str, team: str = 'mens') -> Dict[str, Any]:
         """Load CSV file for a specific team"""
@@ -61,7 +186,10 @@ class DataService:
         self.excluded_players = set()
         self.is_cleaned = False
         self.cleaning_stats = {}
-        return self._process_loaded_data()
+        result = self._process_loaded_data()
+        self._save_team_dataframe(team)
+        self._save_state()
+        return result
     
     def load_from_upload(self, content: bytes, team: str = 'mens') -> Dict[str, Any]:
         """Load CSV from upload for a specific team"""
@@ -110,6 +238,8 @@ class DataService:
         try:
             result = self._process_loaded_data()
             self.team_data[team] = self.df.copy()
+            self._save_team_dataframe(team)
+            self._save_state()
             return result
         except Exception as e:
             logger.error(f"Error processing loaded data: {e}", exc_info=True)
@@ -125,6 +255,7 @@ class DataService:
             self.df = self.team_data[team].copy()
             self.df_original = self.team_data[team].copy()
             self._process_loaded_data()
+            self._save_state()
             return {'success': True, 'team': team, 'message': f'Switched to {team} team'}
         else:
             self.df = None
@@ -134,6 +265,7 @@ class DataService:
             self.excluded_players = set()
             self.is_cleaned = False
             self.cleaning_stats = {}
+            self._save_state()
             return {'success': False, 'team': team, 'message': f'No data loaded for {team} team'}
     
     def get_current_team(self) -> str:
@@ -268,6 +400,7 @@ class DataService:
         """Exclude a player from analysis"""
         if player_name in self.players:
             self.excluded_players.add(player_name)
+            self._save_state()
             return True
         return False
     
@@ -275,6 +408,7 @@ class DataService:
         """Restore a previously excluded player"""
         if player_name in self.excluded_players:
             self.excluded_players.discard(player_name)
+            self._save_state()
             return True
         return False
     
@@ -283,18 +417,21 @@ class DataService:
         if self.df is None:
             return False
         try:
-            idx = int(player_id.replace('player_', ''))
-            if idx >= len(self.players):
+            player_name = self._resolve_player_name_from_id(player_id)
+            if not player_name:
                 return False
-            player_name = self.players[idx]
             player_col = self.key_columns['player_name']
             
             # Remove from dataframe
             self.df = self.df[self.df[player_col].str.strip() != player_name]
+            self.df_original = self.df.copy()
+            self.team_data[self.current_team] = self.df.copy()
             
             # Update players list
             self.players = [p for p in self.players if p != player_name]
             self.excluded_players.discard(player_name)
+            self._save_team_dataframe(self.current_team)
+            self._save_state()
             
             return True
         except Exception as e:
@@ -563,12 +700,12 @@ class DataService:
             last = str(pdata['ParsedDate'].max().date()) if 'ParsedDate' in pdata.columns and pdata['ParsedDate'].notna().any() else None
             
             # Use custom position if set, otherwise use default circular assignment
-            player_name_clean = name.strip()
+            player_name_clean = self._normalize_player_name(name)
             custom_position = self.player_positions.get(self.current_team, {}).get(player_name_clean)
             position = custom_position if custom_position else positions[i % len(positions)]
             
             players.append({
-                'id': f'player_{i}', 
+                'id': self._build_player_id(player_name_clean),
                 'name': player_name_clean, 
                 'position': position,
                 'number': i + 1, 
@@ -583,13 +720,11 @@ class DataService:
         return players
     
     def get_player_detail(self, player_id: str) -> Optional[Dict[str, Any]]:
-        if self.df is None: return None
-        try:
-            idx = int(player_id.replace('player_', ''))
-            if idx >= len(self.players): return None
-            player_name = self.players[idx]
-            if player_name in self.excluded_players: return None
-        except: return None
+        if self.df is None:
+            return None
+        player_name = self._resolve_player_name_from_id(player_id)
+        if not player_name or player_name in self.excluded_players:
+            return None
         
         pdata = self.df[self.df[self.key_columns['player_name']].str.strip() == player_name]
         if pdata.empty: return None
@@ -810,6 +945,359 @@ class DataService:
         }
         
         return team_avg
+
+    def _classify_session_type(self, value: Any) -> str:
+        session_text = str(value or '').strip().lower()
+        if any(token in session_text for token in ('match', 'game', 'vs', 'fixture')):
+            return 'match'
+        return 'training'
+
+    def _group_position_family(self, position: str) -> str:
+        position_upper = str(position or '').upper()
+        if position_upper == 'GK':
+            return 'Goalkeepers'
+        if position_upper in {'CB', 'LB', 'RB'}:
+            return 'Defenders'
+        if position_upper in {'CM', 'CDM', 'CAM'}:
+            return 'Midfielders'
+        if position_upper in {'LW', 'RW', 'ST', 'CF'}:
+            return 'Forwards'
+        return 'Unassigned'
+
+    def _with_session_type(self, df: pd.DataFrame) -> pd.DataFrame:
+        if df.empty:
+            return df.copy()
+        prepared = df.copy()
+        prepared['SessionType'] = prepared.get(
+            self.key_columns['session_title'],
+            pd.Series(index=prepared.index, dtype='object')
+        ).apply(self._classify_session_type)
+        return prepared
+
+    def _rolling_average(self, grouped: pd.Series, window_days: int) -> pd.Series:
+        if grouped.empty:
+            return pd.Series(dtype=float)
+        return grouped.rolling(window=window_days, min_periods=1).mean()
+
+    def _acwr_series(self, grouped: pd.Series) -> pd.Series:
+        if grouped.empty:
+            return pd.Series(dtype=float)
+        acute = grouped.rolling(window=7, min_periods=1).mean()
+        chronic = grouped.rolling(window=28, min_periods=7).mean().replace(0, np.nan)
+        return (acute / chronic).replace([np.inf, -np.inf], np.nan).fillna(0)
+
+    def _player_position_map(self) -> Dict[str, str]:
+        return {player['name']: player['position'] for player in self.get_all_players()}
+
+    def get_analytics_overview(self, player_id: Optional[str] = None) -> Dict[str, Any]:
+        if self.df is None or self.df.empty:
+            return {
+                'rollingLoad': [],
+                'acwr': [],
+                'sessionSplit': [],
+                'positionComparison': [],
+                'percentiles': [],
+                'variability': [],
+                'correlations': [],
+                'scatterLoadWorkRatio': [],
+                'scatterSprintSpeed': [],
+                'outlierTimeline': [],
+                'trainingDensity': [],
+                'playerScope': None,
+            }
+
+        dataset = self.df.copy()
+        player_scope = None
+        if player_id and player_id != 'team_average':
+            player_name = self._resolve_player_name_from_id(player_id)
+            if player_name:
+                dataset = dataset[dataset[self.key_columns['player_name']].astype(str).str.strip() == player_name]
+                player_scope = player_name
+
+        if dataset.empty:
+            return {
+                'rollingLoad': [],
+                'acwr': [],
+                'sessionSplit': [],
+                'positionComparison': [],
+                'percentiles': [],
+                'variability': [],
+                'correlations': [],
+                'scatterLoadWorkRatio': [],
+                'scatterSprintSpeed': [],
+                'outlierTimeline': [],
+                'trainingDensity': [],
+                'playerScope': player_scope,
+            }
+
+        dataset = self._with_session_type(dataset)
+        player_col = self.key_columns['player_name']
+        load_col = self.key_columns['player_load']
+        speed_col = self.key_columns['top_speed']
+        sprint_col = self.key_columns['sprint_distance']
+        work_ratio_col = self.key_columns['work_ratio']
+        energy_col = self.key_columns['energy']
+        impacts_col = self.key_columns['impacts']
+
+        analytics: Dict[str, Any] = {
+            'playerScope': player_scope,
+            'rollingLoad': [],
+            'acwr': [],
+            'sessionSplit': [],
+            'positionComparison': [],
+            'percentiles': [],
+            'variability': [],
+            'correlations': [],
+            'scatterLoadWorkRatio': [],
+            'scatterSprintSpeed': [],
+            'outlierTimeline': [],
+            'trainingDensity': [],
+        }
+
+        if 'ParsedDate' in dataset.columns and dataset['ParsedDate'].notna().any():
+            dated = dataset[dataset['ParsedDate'].notna()].copy().sort_values('ParsedDate')
+            daily = dated.groupby(dated['ParsedDate'].dt.date)[load_col].mean()
+            roll7 = self._rolling_average(daily, 7)
+            roll14 = self._rolling_average(daily, 14)
+            roll28 = self._rolling_average(daily, 28)
+            acwr = self._acwr_series(daily)
+            upper_band = (roll28 * 1.3).fillna(0)
+            lower_band = (roll28 * 0.8).fillna(0)
+
+            analytics['rollingLoad'] = [
+                {
+                    'date': str(idx),
+                    'load': round(float(daily.loc[idx]), 2),
+                    'rolling7': round(float(roll7.loc[idx]), 2),
+                    'rolling14': round(float(roll14.loc[idx]), 2),
+                    'rolling28': round(float(roll28.loc[idx]), 2),
+                    'upperBand': round(float(upper_band.loc[idx]), 2),
+                    'lowerBand': round(float(lower_band.loc[idx]), 2),
+                }
+                for idx in daily.index
+            ]
+            analytics['acwr'] = [
+                {
+                    'date': str(idx),
+                    'acuteChronicRatio': round(float(acwr.loc[idx]), 3),
+                    'acuteLoad': round(float(roll7.loc[idx]), 2),
+                    'chronicLoad': round(float(roll28.loc[idx]), 2),
+                }
+                for idx in daily.index
+            ]
+
+            day_counts = dated.groupby(dated['ParsedDate'].dt.date).size()
+            analytics['trainingDensity'] = [
+                {'date': str(idx), 'sessions': int(count)}
+                for idx, count in day_counts.items()
+            ]
+
+        split_metrics = dataset.groupby('SessionType').agg({
+            load_col: 'mean',
+            speed_col: 'mean',
+            sprint_col: 'mean',
+            energy_col: 'mean',
+            player_col: 'count',
+        }).reset_index()
+        analytics['sessionSplit'] = [
+            {
+                'sessionType': row['SessionType'],
+                'avgLoad': round(float(row.get(load_col, 0) or 0), 2),
+                'avgTopSpeed': round(float(row.get(speed_col, 0) or 0), 2),
+                'avgSprintDistance': round(float(row.get(sprint_col, 0) or 0), 2),
+                'avgEnergy': round(float(row.get(energy_col, 0) or 0), 2),
+                'sessions': int(row.get(player_col, 0) or 0),
+            }
+            for _, row in split_metrics.iterrows()
+        ]
+
+        position_map = self._player_position_map()
+        if not player_scope:
+            positioned = dataset.copy()
+            positioned['PositionGroup'] = positioned[player_col].astype(str).str.strip().map(
+                lambda name: self._group_position_family(position_map.get(name, ''))
+            )
+            pos_group = positioned.groupby('PositionGroup').agg({
+                load_col: 'mean',
+                speed_col: 'mean',
+                sprint_col: 'mean',
+                work_ratio_col: 'mean',
+                player_col: pd.Series.nunique,
+            }).reset_index()
+            analytics['positionComparison'] = [
+                {
+                    'positionGroup': row['PositionGroup'],
+                    'avgLoad': round(float(row.get(load_col, 0) or 0), 2),
+                    'avgTopSpeed': round(float(row.get(speed_col, 0) or 0), 2),
+                    'avgSprintDistance': round(float(row.get(sprint_col, 0) or 0), 2),
+                    'avgWorkRatio': round(float(row.get(work_ratio_col, 0) or 0), 2),
+                    'players': int(row.get(player_col, 0) or 0),
+                }
+                for _, row in pos_group.iterrows()
+            ]
+
+            percentile_source = self.get_all_players()
+            if percentile_source:
+                loads = pd.Series([player['avgLoad'] for player in percentile_source], dtype=float)
+                speeds = pd.Series([player['avgSpeed'] for player in percentile_source], dtype=float)
+                sessions = pd.Series([player['sessions'] for player in percentile_source], dtype=float)
+                analytics['percentiles'] = [
+                    {
+                        'playerId': player['id'],
+                        'playerName': player['name'],
+                        'loadPercentile': round(float((loads <= player['avgLoad']).mean() * 100), 1),
+                        'speedPercentile': round(float((speeds <= player['avgSpeed']).mean() * 100), 1),
+                        'sessionPercentile': round(float((sessions <= player['sessions']).mean() * 100), 1),
+                        'riskLevel': player['riskLevel'],
+                    }
+                    for player in percentile_source
+                ]
+
+            variability_rows = []
+            for player in self.get_all_players():
+                name = player['name']
+                pdata = self.df[self.df[player_col].astype(str).str.strip() == name]
+                load_values = pd.to_numeric(pdata.get(load_col), errors='coerce').dropna()
+                if load_values.empty:
+                    continue
+                mean_load = float(load_values.mean())
+                std_load = float(load_values.std()) if len(load_values) > 1 else 0.0
+                cv = (std_load / mean_load * 100) if mean_load else 0.0
+                variability_rows.append({
+                    'playerId': player['id'],
+                    'playerName': name,
+                    'meanLoad': round(mean_load, 2),
+                    'stdLoad': round(std_load, 2),
+                    'coefficientOfVariation': round(cv, 2),
+                    'riskLevel': player['riskLevel'],
+                })
+            analytics['variability'] = sorted(
+                variability_rows,
+                key=lambda item: item['coefficientOfVariation'],
+                reverse=True
+            )[:20]
+
+        corr_columns = [
+            load_col,
+            sprint_col,
+            speed_col,
+            work_ratio_col,
+            impacts_col,
+            energy_col,
+        ]
+        corr_source = dataset[[col for col in corr_columns if col in dataset.columns]].apply(
+            pd.to_numeric,
+            errors='coerce'
+        )
+        if not corr_source.empty and corr_source.shape[1] > 1:
+            corr_matrix = corr_source.corr().fillna(0)
+            analytics['correlations'] = [
+                {
+                    'x': row_name,
+                    'y': col_name,
+                    'value': round(float(corr_matrix.loc[row_name, col_name]), 3),
+                }
+                for row_name in corr_matrix.index
+                for col_name in corr_matrix.columns
+            ]
+
+        scatter_df = dataset.copy()
+        scatter_df['RiskColor'] = scatter_df[player_col].astype(str).str.strip().map(
+            lambda name: next(
+                (player['riskLevel'] for player in self.get_all_players() if player['name'] == name),
+                'low'
+            )
+        )
+        analytics['scatterLoadWorkRatio'] = [
+            {
+                'playerName': str(row.get(player_col, '')).strip(),
+                'playerLoad': round(float(pd.to_numeric(row.get(load_col), errors='coerce') or 0), 2),
+                'workRatio': round(float(pd.to_numeric(row.get(work_ratio_col), errors='coerce') or 0), 2),
+                'riskLevel': row.get('RiskColor', 'low'),
+                'date': str(row.get('ParsedDate', '')).split(' ')[0] if pd.notna(row.get('ParsedDate')) else None,
+            }
+            for _, row in scatter_df.iterrows()
+            if pd.notna(row.get(load_col)) and pd.notna(row.get(work_ratio_col))
+        ][:250]
+        analytics['scatterSprintSpeed'] = [
+            {
+                'playerName': str(row.get(player_col, '')).strip(),
+                'sprintDistance': round(float(pd.to_numeric(row.get(sprint_col), errors='coerce') or 0), 2),
+                'topSpeed': round(float(pd.to_numeric(row.get(speed_col), errors='coerce') or 0), 2),
+                'energy': round(float(pd.to_numeric(row.get(energy_col), errors='coerce') or 0), 2),
+                'riskLevel': row.get('RiskColor', 'low'),
+            }
+            for _, row in scatter_df.iterrows()
+            if pd.notna(row.get(sprint_col)) and pd.notna(row.get(speed_col))
+        ][:250]
+
+        load_values = pd.to_numeric(dataset.get(load_col), errors='coerce').dropna()
+        if not load_values.empty and 'ParsedDate' in dataset.columns:
+            q1 = load_values.quantile(0.25)
+            q3 = load_values.quantile(0.75)
+            iqr = q3 - q1
+            upper_bound = q3 + 3.0 * iqr
+            outliers = dataset[pd.to_numeric(dataset.get(load_col), errors='coerce') > upper_bound].copy()
+            analytics['outlierTimeline'] = [
+                {
+                    'date': str(row.get('ParsedDate', '')).split(' ')[0] if pd.notna(row.get('ParsedDate')) else 'Unknown',
+                    'playerName': str(row.get(player_col, '')).strip(),
+                    'playerLoad': round(float(pd.to_numeric(row.get(load_col), errors='coerce') or 0), 2),
+                    'sessionTitle': str(row.get(self.key_columns['session_title'], 'Session')),
+                }
+                for _, row in outliers.sort_values('ParsedDate').iterrows()
+            ]
+
+        return analytics
+
+    def get_team_comparison(self) -> Dict[str, Any]:
+        comparison: Dict[str, Any] = {'teams': {}, 'metrics': []}
+        metric_names = [
+            ('totalPlayers', 'Total Players'),
+            ('avgTeamLoad', 'Average Team Load'),
+            ('highRiskPlayers', 'High Risk Players'),
+            ('avgTeamSpeed', 'Average Team Speed'),
+        ]
+        original_team = self.current_team
+
+        for team in ('mens', 'womens'):
+            team_df = self.team_data.get(team)
+            if team_df is None or team_df.empty:
+                comparison['teams'][team] = {'loaded': False, 'players': [], 'kpis': None}
+                continue
+
+            self.current_team = team
+            self.df = team_df.copy()
+            self.df_original = team_df.copy()
+            self._process_loaded_data()
+            kpis = self.get_dashboard_kpis()
+            players = self.get_all_players()
+            comparison['teams'][team] = {
+                'loaded': True,
+                'players': players,
+                'kpis': kpis,
+                'topPerformers': sorted(players, key=lambda item: item['avgLoad'], reverse=True)[:5],
+            }
+
+        for key, label in metric_names:
+            mens_value = comparison['teams'].get('mens', {}).get('kpis', {}).get(key, 0) if comparison['teams'].get('mens', {}).get('kpis') else 0
+            womens_value = comparison['teams'].get('womens', {}).get('kpis', {}).get(key, 0) if comparison['teams'].get('womens', {}).get('kpis') else 0
+            comparison['metrics'].append({
+                'key': key,
+                'label': label,
+                'mensValue': mens_value,
+                'womensValue': womens_value,
+                'difference': round(float(mens_value - womens_value), 2) if isinstance(mens_value, (int, float)) and isinstance(womens_value, (int, float)) else 0,
+            })
+
+        self.current_team = original_team
+        restored_df = self.team_data.get(original_team)
+        self.df = restored_df.copy() if restored_df is not None else None
+        self.df_original = restored_df.copy() if restored_df is not None else None
+        if self.df is not None:
+            self._process_loaded_data()
+
+        return comparison
     
     def get_player_rankings(self, metric: str = 'player_load') -> List[Dict[str, Any]]:
         """Get player rankings sorted by different metrics"""
@@ -1003,6 +1491,7 @@ class DataService:
             'totalPlayers': len(self.players),
             'isCleaned': self.is_cleaned,
             'cleaningStats': self.cleaning_stats,
+            'beforeAfterCleaning': [],
             'missingValues': {},
             'outliers': {},
             'columnStats': {},
@@ -1092,6 +1581,20 @@ class DataService:
             audit['recommendations'].append("Consider filling missing values before training models")
         if not self.is_cleaned and audit['outliers']:
             audit['recommendations'].append("Data cleaning recommended for better model performance")
+
+        if self.is_cleaned and self.df_original is not None:
+            compare_columns = ['Player Load', 'Distance (miles)', 'Sprint Distance (yards)', 'Top Speed (mph)', 'Work Ratio']
+            for col in compare_columns:
+                if col in self.df.columns and col in self.df_original.columns:
+                    before = pd.to_numeric(self.df_original[col], errors='coerce')
+                    after = pd.to_numeric(self.df[col], errors='coerce')
+                    audit['beforeAfterCleaning'].append({
+                        'metric': col,
+                        'beforeMean': round(float(before.mean()), 2) if before.notna().any() else 0.0,
+                        'afterMean': round(float(after.mean()), 2) if after.notna().any() else 0.0,
+                        'beforeMax': round(float(before.max()), 2) if before.notna().any() else 0.0,
+                        'afterMax': round(float(after.max()), 2) if after.notna().any() else 0.0,
+                    })
         
         return audit
     
@@ -1152,6 +1655,9 @@ class DataService:
         
         # Refresh player list and data
         self._process_loaded_data()
+        self.team_data[self.current_team] = self.df.copy()
+        self._save_team_dataframe(self.current_team)
+        self._save_state()
         
         return {
             'success': True,
@@ -1168,6 +1674,9 @@ class DataService:
         self.is_cleaned = False
         self.cleaning_stats = {}
         self._process_loaded_data()
+        self.team_data[self.current_team] = self.df.copy()
+        self._save_team_dataframe(self.current_team)
+        self._save_state()
         
         return {
             'success': True,
@@ -1185,6 +1694,7 @@ class DataService:
     def set_date_reference_setting(self, use_today: bool) -> Dict[str, Any]:
         """Set date reference setting"""
         self.use_today_as_reference = use_today
+        self._save_state()
         return {
             'success': True,
             'useTodayAsReference': self.use_today_as_reference,
@@ -1194,6 +1704,7 @@ class DataService:
     def update_player_position(self, player_name: str, position: str, team: str = None) -> Dict[str, Any]:
         """Update player position for a specific team"""
         team = team or self.current_team
+        player_name = self._normalize_player_name(player_name)
         if team not in ['mens', 'womens']:
             raise ValueError("Team must be 'mens' or 'womens'")
         
@@ -1205,6 +1716,7 @@ class DataService:
             self.player_positions[team] = {}
         
         self.player_positions[team][player_name] = position
+        self._save_state()
         
         return {
             'success': True,
