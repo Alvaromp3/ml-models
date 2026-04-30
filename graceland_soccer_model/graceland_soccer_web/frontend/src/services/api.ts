@@ -15,8 +15,15 @@ import type {
   TeamComparisonData,
 } from '../types';
 
+/** Production: set to backend origin only, e.g. https://graceland-api.onrender.com (no trailing slash). */
+const API_BASE =
+  typeof import.meta.env.VITE_API_BASE_URL === 'string' &&
+  import.meta.env.VITE_API_BASE_URL.trim() !== ''
+    ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/api`
+    : '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
   // Keep bounded so a dead/slow backend does not block the whole UI for minutes.
   // Long operations (coach report) override per-request.
   timeout: 45000,
@@ -24,6 +31,12 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+const viteApiKey =
+  typeof import.meta.env.VITE_API_KEY === 'string' ? import.meta.env.VITE_API_KEY.trim() : '';
+if (viteApiKey) {
+  api.defaults.headers.common['X-API-Key'] = viteApiKey;
+}
 
 // Dashboard endpoints
 export const dashboardApi = {

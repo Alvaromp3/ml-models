@@ -4,8 +4,17 @@ from typing import Dict, Any
 from ..models.schemas import ApiResponse, TrainRequest, ModelStatus
 from ..services.ml_service import ml_service
 from ..services.data_service import data_service
+from ..middleware_config import is_training_disabled
 
 router = APIRouter(prefix="/training", tags=["Training"])
+
+
+def _ensure_training_allowed():
+    if is_training_disabled():
+        raise HTTPException(
+            status_code=403,
+            detail="Model training is disabled on this deployment (DISABLE_MODEL_TRAINING).",
+        )
 
 
 class PredictLoadRequest(BaseModel):
@@ -17,6 +26,7 @@ class PredictLoadRequest(BaseModel):
 @router.post("/train-load", response_model=ApiResponse)
 async def train_load_model(request: TrainRequest):
     """Train load prediction model"""
+    _ensure_training_allowed()
     try:
         df, feature_cols = data_service.get_data_for_training()
         if df.empty:
@@ -33,6 +43,7 @@ async def train_load_model(request: TrainRequest):
 @router.post("/train-risk", response_model=ApiResponse)
 async def train_risk_model(request: TrainRequest):
     """Train risk prediction model"""
+    _ensure_training_allowed()
     try:
         df, feature_cols = data_service.get_data_for_training()
         if df.empty:

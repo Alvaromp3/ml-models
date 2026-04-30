@@ -29,17 +29,52 @@ warnings.filterwarnings(
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+from .middleware_config import (
+    get_allowed_origins,
+    get_api_key,
+    is_production_docs_disabled,
+    paths_exempt_from_api_key,
+)
 from .routers import dashboard, players, analysis, training, data, settings
+
+_show_docs = not is_production_docs_disabled()
 
 app = FastAPI(
     title="Elite Sports Performance Analytics API",
     description="Backend API for sports analytics dashboard",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs" if _show_docs else None,
+    redoc_url="/redoc" if _show_docs else None,
+    openapi_url="/openapi.json" if _show_docs else None,
 )
 
+class APIKeyMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        expected = get_api_key()
+        if not expected:
+            return await call_next(request)
+        path = request.url.path
+        if paths_exempt_from_api_key(path):
+            return await call_next(request)
+        xkey = request.headers.get("X-API-Key", "")
+        auth = request.headers.get("Authorization", "")
+        bearer = auth[7:].strip() if auth.startswith("Bearer ") else ""
+        if xkey == expected or bearer == expected:
+            return await call_next(request)
+        return JSONResponse({"detail": "Invalid or missing API key"}, status_code=401)
+
+
+# API key runs inside CORS so error responses still pass through CORSMiddleware.
+app.add_middleware(APIKeyMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
+    allow_origins=get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

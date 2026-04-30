@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 RECENT_DATA_DAYS = 45
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-DATA_STORE_DIR = BACKEND_DIR / 'data_store'
+_data_store_override = (os.environ.get("DATA_STORE_DIR") or "").strip()
+DATA_STORE_DIR = Path(_data_store_override) if _data_store_override else (BACKEND_DIR / "data_store")
 STATE_FILE = DATA_STORE_DIR / 'state.json'
 TEAM_FILES = {
     'mens': DATA_STORE_DIR / 'mens.csv',
